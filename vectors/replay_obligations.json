@@ -43,6 +43,24 @@
     "verdict"
   ],
   "files": {
+    "typed_check.json": {
+      "cases": [{ "path": "cases", "id": "id", "class": "interface" }],
+      "metadata": ["schema", "foundation", "note", "declaration_sets"],
+      "assertions": ["expect", "code"],
+      "inputs": [
+        "statement", "declarations", "context", "expected", "foundation",
+        "candidate", "policy", "dependencies", "checker", "limits",
+        "input_nodes", "input_depth", "collection_entries", "name_bytes", "work", "depth"
+      ],
+      "input_reasons": {
+        "expected": "fed: contract/go/typed/vectors_test.go supplies the receiver's independently fixed expected type to Check; the assertion is expect"
+      },
+      "targets": { "rs": "replays", "go": "replays", "ts": "replays" },
+      "tri_core_required": true,
+      "relational": {
+        "runs": [{ "section": "cases", "when": [{ "at": "expect.status", "in": ["accepted"] }] }]
+      }
+    },
     "host_memory.json": {
       "cases": [{ "path": "cases", "id": "name", "class": "capability" }],
       "metadata": ["spi", "issue", "capability", "registry", "note"],
@@ -5085,6 +5103,44 @@
       "relational": {
         "excluded": "no-budget"
       }
+    },
+    "stream_door.json": {
+      "cases": [
+        {
+          "path": "cases",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "schema",
+        "scope",
+        "oracle",
+        "run_id_hex",
+        "request_hex",
+        "request_note"
+      ],
+      "assertions": [
+        "receive_dispositions",
+        "digest_hex",
+        "expect"
+      ],
+      "inputs": [
+        "records_hex",
+        "sink_dispositions",
+        "transport_status"
+      ],
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": {
+          "unreplayed": "#3656"
+        }
+      },
+      "relational": {
+        "excluded": "no-budget"
+      },
+      "accounting": "ledger"
     },
     "static_decline_admission.json": {
       "cases": [

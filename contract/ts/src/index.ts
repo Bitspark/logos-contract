@@ -59,3 +59,5 @@ export * from "./prelude.js";
 // The completion algebra (research 0031 row 15), PROPOSED: a namespace, since its not/and/or are
 // generic names that would collide at the top level.
 export * as completion from "./completion.js";
+// Search-free checking for receiver-fixed typed statements (typed-check-only v1).
+export * as typed from "./typed/index.js";

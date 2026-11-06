@@ -9,6 +9,12 @@ and evidence policies. The limits of a certified fragment in this document are
 obligations for that fragment, not a statement that it exhausts Logos's ambition.
 This orientation changes none of the firmness or verification requirements below.
 
+Supplied dependent proofs use the separately scoped
+[typed check-only contract](typed-check-only.md), admitted by
+[ADR 0039](../architecture/decisions/0039-typed-check-only.md). It has an explicit
+receiver-owned statement and assumption policy; it does not change this account
+grammar or provide a typed kernel execution route.
+
 **Status:** shipped and stable. The **account layer is FIRM**
 ([ADR 0001](../architecture/decisions/0001-account-grammar-invariant.md), *accepted*)
 and the **checker-facing SPI is STABLE v1, additive-only**
@@ -532,7 +538,8 @@ refused by name, never narrowed and never bounded by a platform's integer width 
 2026-09-26 amendment: a platform may inform a domain, and never sets one).
 
 - **`u32` fields**, `0..=2^32 - 1`: the fields above, and the kernel seam's arities (a host
-  builtin's arity, §5), stratum ids, stack-reference ordinals, variants and ranks.
+  builtin's arity, §5), stratum ids, stack-reference ordinals, variants and ranks, and Wasm
+  session and admission handles (design 0012's `Admitted` selection).
 - **index and count fields**, `0..=INDEX_MAX`: the fields above, and the seam's indices.
 - **`u64` fields**, `0..=2^64 - 1`: a duration in nanoseconds, a search budget (`RunLimits`), an
   epoch, a counter.
@@ -2166,9 +2173,13 @@ input to `check`, and never part of any trust artifact.
   footprint, strategy-specific count) well-defined for the engine that computes it but
   which may legitimately **differ across cores/engines** computing the same least model;
   diagnostic, not cross-core-pinned.
+- **`resource`** — application-owned allocation accounting and OS gauges with scope in
+  the metric identity (§11.8). Allocator fields compare only as distributions within the
+  same declared allocator/build/host/concurrency domain until retained measurement establishes
+  stronger stability. OS gauges remain informational distributions and are never exact-pinned.
 
-Only **`work-count`** and **`analysis`** fields may feed a cross-core parity vector; `timer` and
-`engine-local` fields MUST NOT feed any certified or cross-core-pinned measurement.
+Only **`work-count`** and **`analysis`** fields may feed a cross-core parity vector; `timer`,
+`engine-local` and `resource` fields MUST NOT feed any certified or cross-core-pinned measurement.
 
 ### 11.1 D1 — counters
 
@@ -2726,13 +2737,13 @@ design 0006 §2 adds — the columns a reader needs to interpret a value safely 
 
 | column | values | meaning |
 |---|---|---|
-| **class** | `work-count` · `analysis` · `timer` · `engine-local` · `metadata` · `outcome` | §11's determinism classes, plus two types §11's tables have no column for: an envelope or identity field (`record`, `schema`, an id, a name, a text) and a verdict or flag (`truncation`, `sld_refused`, `capture.outcome`). An outcome keeps the determinism of its §11 row; the class says it is not a quantity, so it is never read as a counter. |
-| **scope** | `selected` · `replay` · `analysis` · `envelope` · `by-span-kind` | which execution the value describes. Every counter and timer today is measured on a diagnostic **replay** (§11.4); only the trace's `selected_execution` span observes the answering run, and a span's scope is decided by its `kind`. A replay figure and the answering run's wall-clock are two executions, never compared as one. |
+| **class** | `work-count` · `analysis` · `timer` · `engine-local` · `resource` · `metadata` · `outcome` | §11's determinism classes, plus envelope/identity and verdict/flag types. Resource comparison is declared per metric, including its scope (§11.8). |
+| **scope** | `selected` · `replay` · `analysis` · `envelope` · `by-span-kind` · `by-source` · `process` | The subject the field describes. `by-source` reads the record's group source; `process` includes observer, consumer and unrelated application traffic within its stated window and claims no exclusive run attribution. A replay figure and the answering run's wall-clock describe different executions. |
 | **producer** | `seminaive` · `relational` · `sldnf` · `core::compile` · `core::symbol` · `core::analysis` · `cli` · `kernel` | the component that computed the value. |
-| **aggregation** | `counter` · `inclusive-duration` · `exclusive-duration` · `gauge` · `peak` · `enum` · `map` · `metadata` | what kind of quantity it is: additive over the execution, a duration with or without its children's time, a level (a footprint, a ratio, an offset), a high-water mark (declared for P7, unused yet), a token, a nested object keyed by **data** (`operators`, `fallback_by_reason`, `effective_limits` — the inner keys are not fields), or structure. |
+| **aggregation** | `counter` · `inclusive-duration` · `exclusive-duration` · `gauge` · `peak` · `enum` · `map` · `metadata` | Additive traffic, inclusive/exclusive duration, a point level, a high-water mark, token, data-keyed map, or structure. Process-lifetime peaks (§11.8) are never sums of capture or child peaks. |
 | **key stability** | `revision-stable` · `artifact-local` · `not-a-key` | whether a value is a key, and whether that key names the same thing in another capture: an operator id, reason token or clause text does; a `rule_id`, `variant_id`, `ClauseId` or span id names this artifact's compiled work only (§11.3 origins). For a `map` the column describes the inner keys. |
 | **absence** | prose | what a missing key means — a pass that did not run, a program outside an engine's fragment, a flag not given — and never a measured `0` (ADR 0012). Fields that are always present say so, and say what their zero or `null` means. |
-| **section** | `11.1` … `11.5` | the subsection above that defines the key. |
+| **section** | `11.1` … `11.8` | the subsection that defines the key. |
 
 **Conformance.** `app/cli/rs/tests/stats_registry.rs` (profiling build) walks every key at
 every depth of a real `--stats --trace --origins` emission and fails on any key the registry
@@ -2848,3 +2859,79 @@ plan_origin: {
   are this run's, and they are not keys across revisions.
 - Everything here is diagnostic and profiling-only. Without `--origins` the `stats` record is
   byte-identical to the pre-dw2 one (no `plan_origin` key), and the default build is unchanged.
+
+### 11.8 Application-owned process resources (`resource_v1`) [rs, #1962]
+
+The Rust observation seam has a separate resource family, independent of `RecordedCounter` /
+`Progress`, logical evidence, completion and `RunLimits`. A caller may supply a `ResourceProbe`;
+it owns the collector and allocator. No reusable Logos library installs `#[global_allocator]`.
+The CLI binary may select its `System` counting wrapper with the default-off
+`resource-accounting` feature. A profiling `--stats` record carries the report under
+`collectors.resources`; a request without a probe declares `missing_probe`, never measured zero.
+The common `resource_collection` availability token is `observation` on a captured kernel route.
+The diagnostic `sldnf-direct` route has no kernel Observation and says
+`unsupported_no_observation`, including when a probe was supplied to dispatch. It creates no
+kernel capture/collector and never relabels a diagnostic replay as a selected run.
+
+Each metric identity includes class `resource`, its name and accounting scope `process`.
+The window is `kernel-drive-and-consumer`: actual kernel drive and synchronous answer callbacks,
+closed before diagnostic replays. Observer and unrelated application traffic are included.
+Absence of observed overlapping captures does not prove isolation from unrelated allocation.
+This collector cannot supply exclusive-run attribution: such a comparison request returns
+`resource_scope_mismatch_1962`. Concurrent/nested captures over the same allocator retain
+distinct IDs and mark **both** windows as overlapping; no sum of their figures is a run total.
+
+| field | unit | class | meaning |
+|---|---|---|---|
+| `allocation_calls` | allocations | `resource` | successful allocation, zeroed-allocation and realloc calls during the window; additive process traffic, never exclusive run work. |
+| `allocated_bytes` | bytes | `resource` | sum of successfully requested sizes during the window; realloc contributes its entire new request, not its live-byte delta. |
+| `live_bytes_start` | bytes | `resource` | allocator-requested bytes live at window start; a process gauge including blocks allocated earlier. |
+| `live_bytes_end` | bytes | `resource` | allocator-requested bytes live at window end; a process gauge, not traffic or exclusive retention. |
+| `allocator_peak_live_bytes` | bytes | `resource` | process-lifetime high-water mark observed by allocator hooks; never an interval or summed child peak. |
+| `rss_bytes` | bytes | `resource` | OS resident-set gauge near the closing boundary, independently sampled; informational only. |
+| `os_peak_rss_bytes` | bytes | `resource` | OS process-lifetime resident high-water mark near the closing boundary; informational only. |
+
+Allocator hooks update only nonallocating atomics after successful allocation; a failed realloc
+keeps the old live block. Their multi-field snapshot is not globally atomic under concurrent
+traffic. Requested bytes exclude allocator overhead, rounding, stack/code and allocations which
+bypass this allocator. Linux RSS and peak come separately from `/proc/self/status`'s `VmRSS` and
+`VmHWM`, converted from kB to bytes; other platforms report `unsupported` for these gauges.
+Missing or malformed OS data says `probe_failed`; overflow says `counter_overflow`.
+
+The report carries `schema`, class/scope, `run_id` and `capture_id`, optional `process_id`,
+and a fresh 128-bit `capture_nonce` from the application's OS entropy source. PID/run/ordinal
+reuse across process/container lifetimes cannot make captures identical. If the entropy source
+is unsupported or unavailable, the nonce is `null` and same-capture correlation refuses with
+`resource_capture_identity_unavailable_1962`; distribution comparisons remain domain-based.
+The stock Unix collector reads `/dev/urandom`; other platforms declare this capability absent.
+The report also names its window, observer-traffic declaration and `overlapping_captures`.
+A supplied probe also declares allocator, descriptive build, host and concurrency identities.
+Its optional `comparison_build` is the application's explicitly qualified exact executable /
+configuration identity. `ProcessResourceProbe::new` leaves it `null`; the source/profile build
+label alone cannot distinguish compiler, features, custom profiles, optimization or flags.
+`with_comparison_build` accepts the application's qualification, including relevant external
+runtime configuration. Missing/empty qualification refuses distribution comparison with
+`resource_comparison_build_unavailable_1962` while measurements stay available. Stock CLI
+measurements alone grant no cross-build comparison. The fixed remote harness qualifies its
+actual test executable with streamed SHA-256 and states its fixed runtime configuration.
+`availability` maps every metric to
+`measured`, `missing_probe`, `unsupported`, `probe_failed`, `counter_overflow` or
+`capture_incomplete`. Numeric fields exist only for measured values. Capture event loss stays
+visible in the existing `complete`/`dropped` account; an unpublished resource report is
+`capture_incomplete`. The registry evaluates resource-field presence from this declaration.
+
+`comparison` declares a rule **per field**: allocator fields use
+`allocator-domain-distribution`; OS gauges use `informational-distribution`. Class, scope and
+allocator/qualified-build/host/concurrency/overlap domain must agree before distributions compare.
+Unique run/capture identifiers do not prevent comparing like distributions across captures.
+Correlation or a ratio requires the same process, run, capture and non-absent nonce identities; values from
+different executions cannot be joined into one allocation ratio. No resource field is an exact
+pin. The required remote harness retains all readings for at least 20 observable distinct
+hash seeds in the measured execution, the known 4096-byte allocation control and every contrary
+sample before any stronger stability claim is considered. OS gauges are never exact-pinned.
+
+Research 0026 R5 / #2851 owns later per-span context propagation and allocation-origin tracking.
+Prepared sessions (#3816/#3818) keep retained base/index/support, disposable overlay, retained
+witnesses and export/check windows distinct; shared retained state is not newly allocated per
+request. These observations neither implement native `memory_bytes` enforcement nor widen
+#3448's guest allocator budget or #3807's embedding ceiling into a total-memory bound.

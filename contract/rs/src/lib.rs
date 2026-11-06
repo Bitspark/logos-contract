@@ -156,6 +156,7 @@ pub mod spi;
 pub mod term;
 pub mod term_theory;
 pub mod text;
+pub mod typed;
 mod wire_sink;
 pub use wire_sink::closed_model_cert_write;
 
