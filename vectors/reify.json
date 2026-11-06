@@ -1,0 +1,307 @@
+{
+  "spec": "logos-contract §2a quote / reify",
+  "note": "HAND-AUTHORED (#3102) from logos-contract §2a: `reify` is the partial inverse of `quote` (rs `Option<Term>`, go `(Term, bool)`, ts `Term | undefined`), so a value reifies iff it is quote(t) for some term t, and is refused otherwise. A quoted variable Tuple[Atom(0x02), Atom(name)] carries its VarId's name, and a VarId's name is UTF-8 text in every core (rs holds it as a String; the derivation wire refuses a non-UTF-8 subst key as `decode subst.var: not valid UTF-8`). So a quoted variable whose name bytes are not valid UTF-8 is outside quote's image and is refused. An atom's bytes are opaque data and are never UTF-8-checked (`atom_payload_ff_is_data`). Each row is a value as its ontos-codec v1 bytes (`value_hex`), written by hand from the codec framing: an atom is 00 uvarint(len) bytes, a tuple 01 uvarint(n) children. EXPECTED in every core: every `refused` row reifies to nothing; every `reifies` row reifies to exactly `term` ({\"var\": name}, {\"atom_hex\": bytes}, {\"tuple\": [terms]}), and quote(term) re-encodes to value_hex byte for byte. Each ill-formed name has a well-formed sibling in `reifies` at the same lead byte or boundary: c3 28 / c3 a9, c0 80 (an overlong NUL) / 00, ed a0 80 (a surrogate half) / ed 9f bf (U+D7FF), e2 82 (truncated) / e2 82 ac, f4 90 80 80 (past U+10FFFF) / f4 8f bf bf (U+10FFFF). reify has no refusal code of its own; on the derivation wire the same quoted variable is refused `decode subst.term: value is not a quoted ground term` (derivation_wire.json `subst_term_quoted_var_not_utf8`, with the control `subst_term_quoted_var_utf8_decodes`). Before #3102 go ACCEPTED every non-UTF-8 name as raw bytes, while rs and ts refused it. The structural rows (bare atom, unknown tag, wrong arity, wrong payload kind) pin the rest of quote's image. Each replay walks every section the file carries and fails on one it has no reader for, so a section cannot be added unreplayed. The `var_names` section (#3115, seat:caa's ruling) pins CONSTRUCTION to the same domain: a VarId's name is UTF-8 text. Each row is a name as generalized-UTF-8 (WTF-8) bytes (`name_hex`): exactly the go string; for ts, the UTF-16 string those bytes decode to when they are WTF-8 (`utf16`), and no string otherwise; for rs, a String exactly when they are UTF-8 (`in_domain`). Each core checks the row's `utf16` and `in_domain` against its own reading of the bytes. EXPECTED where a core can hold the name: the constructor accepts it iff `in_domain` (go ParseVarId, with NewVarId and Var panicking by name; ts `new VarId`, `VarId.of` and `Term.var`, throwing `VarIdError`) and refuses it BY NAME otherwise, and an accepted name round-trips through quote and reify, with quote writing exactly `name_hex`. rs cannot even build an out-of-domain name, which is capability by type (research 0030 row 19): its replay records that from_utf8 refuses the bytes.",
+  "refused": [
+    {
+      "name": "var_name_lone_ff",
+      "value_hex": "01020001020001ff",
+      "note": "#3102's own input: a quoted variable whose name is the byte ff, which never occurs in UTF-8."
+    },
+    {
+      "name": "var_name_lead_byte_then_ascii_c3_28",
+      "value_hex": "01020001020002c328",
+      "note": "a two-byte lead c3 followed by the ASCII byte 28, not a continuation. Sibling: var_name_two_byte_c3_a9."
+    },
+    {
+      "name": "var_name_overlong_nul_c0_80",
+      "value_hex": "01020001020002c080",
+      "note": "the overlong two-byte encoding of U+0000 (modified UTF-8). Sibling: var_name_nul_00."
+    },
+    {
+      "name": "var_name_surrogate_half_ed_a0_80",
+      "value_hex": "01020001020003eda080",
+      "note": "U+D800, a UTF-16 surrogate half encoded as three bytes (CESU-8 / WTF-8), not a scalar value. Sibling: var_name_last_before_surrogates_ed_9f_bf."
+    },
+    {
+      "name": "var_name_truncated_e2_82",
+      "value_hex": "01020001020002e282",
+      "note": "a three-byte sequence cut after its first continuation byte. Sibling: var_name_three_byte_e2_82_ac."
+    },
+    {
+      "name": "var_name_past_max_code_point_f4_90_80_80",
+      "value_hex": "01020001020004f4908080",
+      "note": "U+110000, one past the last code point. Sibling: var_name_max_code_point_f4_8f_bf_bf."
+    },
+    {
+      "name": "var_name_ff_nested_in_tuple",
+      "value_hex": "01020001010102010200010000017001020001020001ff",
+      "note": "quote(Tuple[Atom(\"p\"), Var(ff)]): the ill-formed name one level down refuses the whole value, not only a top-level variable. Sibling: var_x_nested_in_tuple."
+    },
+    {
+      "name": "bare_atom",
+      "value_hex": "000178",
+      "note": "the bare Atom(\"x\"): every node of quote's image is a 2-tuple headed by a one-byte tag atom."
+    },
+    {
+      "name": "empty_tuple",
+      "value_hex": "0100",
+      "note": "Tuple[]: no tag and no payload."
+    },
+    {
+      "name": "unknown_tag_03",
+      "value_hex": "0102000103000178",
+      "note": "Tuple[Atom(03), Atom(\"x\")]: the tags are 00 (atom), 01 (tuple) and 02 (variable) only."
+    },
+    {
+      "name": "tag_two_bytes",
+      "value_hex": "010200020202000178",
+      "note": "Tuple[Atom(02 02), Atom(\"x\")]: a tag is exactly one byte."
+    },
+    {
+      "name": "tag_empty_atom",
+      "value_hex": "01020000000178",
+      "note": "Tuple[Atom(), Atom(\"x\")]: a tag is exactly one byte, never none."
+    },
+    {
+      "name": "tag_is_a_tuple",
+      "value_hex": "01020100000178",
+      "note": "Tuple[Tuple[], Atom(\"x\")]: a tag is an atom."
+    },
+    {
+      "name": "var_three_elements",
+      "value_hex": "0103000102000158000159",
+      "note": "Tuple[Atom(02), Atom(\"X\"), Atom(\"Y\")]: a quoted node has exactly two elements."
+    },
+    {
+      "name": "var_payload_a_tuple",
+      "value_hex": "01020001020100",
+      "note": "Tuple[Atom(02), Tuple[]]: a quoted variable's payload is its name atom."
+    },
+    {
+      "name": "atom_payload_a_tuple",
+      "value_hex": "01020001000100",
+      "note": "Tuple[Atom(00), Tuple[]]: a quoted atom's payload is an atom."
+    },
+    {
+      "name": "tuple_payload_an_atom",
+      "value_hex": "0102000101000178",
+      "note": "Tuple[Atom(01), Atom(\"x\")]: a quoted tuple's payload is the tuple of its quoted children."
+    }
+  ],
+  "reifies": [
+    {
+      "name": "var_name_ascii_x",
+      "value_hex": "0102000102000158",
+      "term": {
+        "var": "X"
+      },
+      "note": "quote(Var(\"X\")), the plain control."
+    },
+    {
+      "name": "var_name_two_byte_c3_a9",
+      "value_hex": "01020001020002c3a9",
+      "term": {
+        "var": "é"
+      },
+      "note": "U+00E9: the lead byte c3 with a continuation. Sibling of var_name_lead_byte_then_ascii_c3_28."
+    },
+    {
+      "name": "var_name_nul_00",
+      "value_hex": "0102000102000100",
+      "term": {
+        "var": "\u0000"
+      },
+      "note": "U+0000 in its one well-formed encoding, a single 00 byte. Sibling of var_name_overlong_nul_c0_80."
+    },
+    {
+      "name": "var_name_last_before_surrogates_ed_9f_bf",
+      "value_hex": "01020001020003ed9fbf",
+      "term": {
+        "var": "퟿"
+      },
+      "note": "U+D7FF, the last scalar value below the surrogates. Sibling of var_name_surrogate_half_ed_a0_80."
+    },
+    {
+      "name": "var_name_three_byte_e2_82_ac",
+      "value_hex": "01020001020003e282ac",
+      "term": {
+        "var": "€"
+      },
+      "note": "U+20AC, the complete three-byte sequence. Sibling of var_name_truncated_e2_82."
+    },
+    {
+      "name": "var_name_max_code_point_f4_8f_bf_bf",
+      "value_hex": "01020001020004f48fbfbf",
+      "term": {
+        "var": "􏿿"
+      },
+      "note": "U+10FFFF, the last code point (a surrogate pair in JSON's escape). Sibling of var_name_past_max_code_point_f4_90_80_80."
+    },
+    {
+      "name": "var_name_bom_prefixed_x",
+      "value_hex": "01020001020004efbbbf58",
+      "term": {
+        "var": "﻿X"
+      },
+      "note": "U+FEFF then X: well-formed, and the BOM is part of the name (§8, text is its exact bytes, #2682), so it is not the variable X."
+    },
+    {
+      "name": "var_x_nested_in_tuple",
+      "value_hex": "0102000101010201020001000001700102000102000158",
+      "term": {
+        "tuple": [
+          {
+            "atom_hex": "70"
+          },
+          {
+            "var": "X"
+          }
+        ]
+      },
+      "note": "quote(Tuple[Atom(\"p\"), Var(\"X\")]). Sibling of var_name_ff_nested_in_tuple."
+    },
+    {
+      "name": "atom_payload_ff_is_data",
+      "value_hex": "01020001000001ff",
+      "term": {
+        "atom_hex": "ff"
+      },
+      "note": "quote(Atom(ff)): an atom's bytes are opaque data, never UTF-8-checked, so the byte that refuses a variable's name reifies as an atom."
+    }
+  ],
+  "var_names": [
+    {
+      "name": "ascii_x",
+      "name_hex": "58",
+      "in_domain": true,
+      "utf16": true,
+      "note": "X, the plain control."
+    },
+    {
+      "name": "two_byte_c3_a9",
+      "name_hex": "c3a9",
+      "in_domain": true,
+      "utf16": true,
+      "note": "U+00E9."
+    },
+    {
+      "name": "four_byte_f0_9f_98_80",
+      "name_hex": "f09f9880",
+      "in_domain": true,
+      "utf16": true,
+      "note": "U+1F600: a surrogate PAIR in UTF-16, one scalar value, so well-formed."
+    },
+    {
+      "name": "replacement_char_ef_bf_bd",
+      "name_hex": "efbfbd",
+      "in_domain": true,
+      "utf16": true,
+      "note": "U+FFFD itself is a valid name. It is the byte string ts wrote for every lone surrogate before #3115."
+    },
+    {
+      "name": "empty",
+      "name_hex": "",
+      "in_domain": true,
+      "utf16": true,
+      "note": "The empty name: valid UTF-8, and the zero go VarId."
+    },
+    {
+      "name": "last_before_surrogates_ed_9f_bf",
+      "name_hex": "ed9fbf",
+      "in_domain": true,
+      "utf16": true,
+      "note": "U+D7FF, the last scalar value below the surrogates."
+    },
+    {
+      "name": "first_after_surrogates_ee_80_80",
+      "name_hex": "ee8080",
+      "in_domain": true,
+      "utf16": true,
+      "note": "U+E000, the first scalar value above the surrogates."
+    },
+    {
+      "name": "max_code_point_f4_8f_bf_bf",
+      "name_hex": "f48fbfbf",
+      "in_domain": true,
+      "utf16": true,
+      "note": "U+10FFFF, the last code point."
+    },
+    {
+      "name": "lone_high_surrogate_ed_a0_80",
+      "name_hex": "eda080",
+      "in_domain": false,
+      "utf16": true,
+      "note": "U+D800 alone. ts: the string \\ud800; go: three bytes that are not UTF-8; rs: no String holds it."
+    },
+    {
+      "name": "lone_low_surrogate_ed_bf_bf",
+      "name_hex": "edbfbf",
+      "in_domain": false,
+      "utf16": true,
+      "note": "U+DFFF alone."
+    },
+    {
+      "name": "lone_high_inside_61_ed_a0_80_62",
+      "name_hex": "61eda08062",
+      "in_domain": false,
+      "utf16": true,
+      "note": "a, U+D800, b: a lone surrogate inside a name."
+    },
+    {
+      "name": "low_then_high_ed_b0_80_ed_a0_80",
+      "name_hex": "edb080eda080",
+      "in_domain": false,
+      "utf16": true,
+      "note": "U+DC00 then U+D800: a low surrogate before a high one is not a pair."
+    },
+    {
+      "name": "trailing_lone_high_58_ed_a0_80",
+      "name_hex": "58eda080",
+      "in_domain": false,
+      "utf16": true,
+      "note": "X then a lone U+D800 at the end."
+    },
+    {
+      "name": "byte_ff",
+      "name_hex": "ff",
+      "in_domain": false,
+      "utf16": false,
+      "note": "0xff never occurs in UTF-8 or WTF-8: only a go string can hold it."
+    },
+    {
+      "name": "lead_then_ascii_c3_28",
+      "name_hex": "c328",
+      "in_domain": false,
+      "utf16": false,
+      "note": "a two-byte lead then a non-continuation."
+    },
+    {
+      "name": "overlong_nul_c0_80",
+      "name_hex": "c080",
+      "in_domain": false,
+      "utf16": false,
+      "note": "the overlong encoding of U+0000."
+    },
+    {
+      "name": "past_max_code_point_f4_90_80_80",
+      "name_hex": "f4908080",
+      "in_domain": false,
+      "utf16": false,
+      "note": "U+110000, one past the last code point."
+    },
+    {
+      "name": "truncated_e2_82",
+      "name_hex": "e282",
+      "in_domain": false,
+      "utf16": false,
+      "note": "a three-byte sequence cut after its first continuation byte."
+    },
+    {
+      "name": "pair_as_two_units_ed_a0_80_ed_b0_80",
+      "name_hex": "eda080edb080",
+      "in_domain": false,
+      "utf16": false,
+      "note": "U+D800 then U+DC00, each as three bytes (CESU-8). WTF-8 forbids it (a pair must be the four-byte form), so ts cannot read it as U+10000; go refuses the bytes."
+    }
+  ]
+}

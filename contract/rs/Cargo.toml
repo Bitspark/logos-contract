@@ -1,0 +1,57 @@
+[package]
+name = "logos-contract"
+version = "0.24.0"
+description = "logos-contract: the FIRM proof account (Term/Literal/Clause/Derivation) + the STABLE-v1 checker SPI (check/Theory/LeafVerifier/RuleAdmissibility) over ontos. The shared artifact a check-only consumer binds and an engine produces. See docs/spec/logos-contract.md."
+edition = "2021"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/Bitspark/logos-contract"
+
+[lib]
+path = "src/lib.rs"
+
+# ontos is the frozen value model (Atom|Tuple); ontos-codec is its frozen canonical
+# byte encoding (ontos-codec-v1) — used by the account codec (§2a/§9) to produce the
+# canonical bytes a ClauseId hashes. ontos-data is the frozen §5.1 embeddings (int,
+# utf8-text, …) the checkable ArithmeticTheory reads its operands through — ADR 0014
+# moves the standard Theory impls into contract tri-core, amending ADR 0004 D4 so the
+# firewall is "contract = ontos-core + ontos-codec + ontos-data" (all frozen, minimal
+# ontos-core-only siblings). All via a git dependency on the private Bitspark/ontos
+# repo, pinned to the release tag named below (Cargo.lock also pins the exact commit); CI
+# auth per ADR 0005.
+[dependencies]
+ontos-core = { package = "bitspark-ontos-core", version = "0.13.0" }
+ontos-codec = { package = "bitspark-ontos-codec", version = "0.13.0" }
+ontos-data = { package = "bitspark-ontos-data", version = "0.13.0" }
+sha2 = "0.10"
+# The Shelf-B prelude loader (ADR 0016 / src/prelude.rs) deserializes the curated-data
+# manifest `prelude/<name>@<version>.json`. The JSON parser is NOT the trust boundary: the
+# loader RECOMPUTES the `program_digest` over the deserialized clauses via the frozen account
+# codec and refuses any mismatch (proof-carrying-data discipline), so a parse error can only
+# *reject* a bundle, never silently admit a wrong clause set. serde_json is already in the
+# workspace lock (a dev-dep of contract/core, tools/loc); this adds no new external crate.
+serde_json = "1"
+
+# #2511: operation counters (canonical ground-key encodes, key comparisons) for the seal's and the
+# gate's cost measurements (`ops`). OFF by default: only a test turns it on (providers' #2497 row),
+# and with it off every counting hook is an empty inline function.
+[features]
+op-counters = []
+
+# Test-only: the TextTheory decision-vector replay (tests/text_vectors.rs) parses the
+# shared, language-agnostic vectors/text.json. serde_json is already in the workspace
+# lock (tools/loc/rs, core dev-deps), so this adds no new external dependency.
+#
+# Test-only generative cross-check (#488, tests/decval_proptest.rs): proptest drives
+# random decimal operands and a big-RATIONAL reference (`num-bigint`/`num-rational`)
+# independently re-derives the exact value, so a carry/sign/scale bug in the
+# hand-rolled `decval` shows as a mismatch. The reference MUST be a big type, not host
+# `i128` — decimals exceed `i128` (the bug class the integer-only grid at
+# intval.rs:910 cannot reach). All three are DEV-only: they never enter the FIRM
+# trusted graph (the `arch` foreign-edge guard lints `[dependencies]` only), and the
+# nightly fuzz lane is the heavier executor of the same boundary.
+[dev-dependencies]
+serde_json = "1"
+proptest = "1"
+num-bigint = "0.4"
+num-rational = "0.4"
+num-traits = "0.2"

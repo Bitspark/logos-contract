@@ -1,0 +1,121 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/Bitspark/logos/prelude/manifest.schema.json",
+  "title": "logos Shelf-B prelude manifest",
+  "description": "ADR 0016 Shelf B — the hash-pinned Horn-clause prelude. A `prelude/<name>@<version>.json` bundle is an array of account clauses plus a pinned `program_digest`. The bundle is CURATED DATA, not a crate: its clauses are ordinary `Rule | Builtin | Leaf` derivations the EXISTING shared check() verifies (zero new trusted code). A loader (contract/rs/src/prelude.rs::load_prelude) RECOMPUTES the `program_digest` over the deserialized clauses via the frozen account codec and REFUSES a mismatch. Term/goal/body-literal notation matches vectors/account.json.",
+  "type": "object",
+  "required": ["name", "version", "program_digest", "clauses"],
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The bundle name (the `<name>` of `prelude/<name>@<version>.json`, e.g. \"lists\")."
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "description": "Semantic version (the `<version>`). Shelf B is byte-frozen per (name@version): a published bundle is immutable; any change ships a new version."
+    },
+    "program_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "Lowercase-hex SHA-256(PROGRAM_PREFIX 'logos/account/program/v1\\n' || concat of length-prefixed, byte-SORTED ontos-codec(quote(clause-as-term)) per clause). The load-bearing tamper anchor: a loader recomputes this over the deserialized clauses and rejects any mismatch. Byte-identical across {rs,go,ts} (frozen ontos-codec + syntactic VarId)."
+    },
+    "note": {
+      "type": "string",
+      "description": "Optional human-readable description of the bundle (ignored by the loader)."
+    },
+    "clauses": {
+      "type": "array",
+      "minItems": 1,
+      "description": "The bundle's clauses, in manifest order. Must be non-empty and free of duplicate canonical clause ids.",
+      "items": { "$ref": "#/$defs/clauseEntry" }
+    }
+  },
+  "$defs": {
+    "clauseEntry": {
+      "type": "object",
+      "required": ["clause"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "Optional. The clause's canonical ClauseId = lowercase-hex SHA-256(CLAUSE_PREFIX 'logos/account/clause/v1\\n' || ontos-codec(quote(clause-as-term))). When present it MUST equal the recomputed canonical id; a mismatch is rejected."
+        },
+        "clause": { "$ref": "#/$defs/clause" }
+      }
+    },
+    "clause": {
+      "type": "object",
+      "required": ["head"],
+      "additionalProperties": false,
+      "description": "A Horn clause `head :- body0, ..., bodyN`. An absent or empty `body` is a rule-fact.",
+      "properties": {
+        "head": { "$ref": "#/$defs/goal" },
+        "body": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/bodyLit" },
+          "default": []
+        }
+      }
+    },
+    "goal": {
+      "type": "object",
+      "required": ["pred"],
+      "additionalProperties": false,
+      "description": "A predicate application p(args...). Reads as the labeled compound Tuple[Atom(pred), args...].",
+      "properties": {
+        "pred": {
+          "type": "string",
+          "description": "The predicate symbol (UTF-8 bytes)."
+        },
+        "args": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/term" },
+          "default": []
+        }
+      }
+    },
+    "bodyLit": {
+      "description": "A body literal: a positive goal, or a negated `{ \"neg\": <goal> }` (ADR 0007). A positive literal reads byte-identically to the bare goal; a negated one reads as Tuple[Atom(0x00), goal-as-term].",
+      "oneOf": [
+        { "$ref": "#/$defs/goal" },
+        {
+          "type": "object",
+          "required": ["neg"],
+          "additionalProperties": false,
+          "properties": { "neg": { "$ref": "#/$defs/goal" } }
+        }
+      ]
+    },
+    "term": {
+      "type": "object",
+      "description": "An account term: a bare Atom (by hex `atom` or utf8 `atom_str`), a Tuple of child terms, or a Var by id. Exactly one key is present.",
+      "minProperties": 1,
+      "maxProperties": 1,
+      "additionalProperties": false,
+      "properties": {
+        "atom": {
+          "type": "string",
+          "pattern": "^([0-9a-fA-F]{2})*$",
+          "description": "A bare Atom of these hex-decoded bytes."
+        },
+        "atom_str": {
+          "type": "string",
+          "description": "A bare Atom of these UTF-8 bytes (a convenience spelling of `atom`)."
+        },
+        "tuple": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/term" },
+          "description": "A Tuple of the child terms (may contain Vars at any depth)."
+        },
+        "var": {
+          "type": "string",
+          "description": "A variable hole, identified by name (syntactic: names are part of the encoding, no alpha-normalization)."
+        }
+      }
+    }
+  }
+}

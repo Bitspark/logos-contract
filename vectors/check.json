@@ -1,0 +1,329 @@
+{
+  "spi": "logos-checker-spi v1",
+  "profile": "demo_v1",
+  "note": "Language-agnostic conformance vectors for check() over a NON-ARCHE program (graph reachability + byte-ordering), so genericity is demonstrated, not asserted. Every {rs,go} binding replays this file and must agree on every outcome. Pins ONLY the FIRM structural rejection band (branch on the code string, never on detail). The host-extension band (builtin_failed/leaf_rejected/rule_inadmissible + consumer sub-codes) is deliberately NOT here: it is pinned in each consumer's own suite (see the rs runner's host_band unit tests). Two structural codes are decoder-only and unreachable from well-typed input, so they have no case here: non_ground_conclusion (a GroundLiteral's args are ontos Values, always ground) and unknown_node_kind (Node is a closed 3-variant enum). This is grammar/shape conformance; account-codec BYTE vectors are deferred until quote/reify byte form + VarId alpha-normalization settle (contract §9). Authoring notation: term = {atom:<hex>} | {atom_str:<utf8 sugar>} | {tuple:[...]} | {var:<id>} | {nest:{functor:<utf8>, times:N, leaf:<term>}} (#2731: functor(functor(...leaf...)), `times` Tuple[Atom(functor), ·] levels around `leaf`, expanded by a loop, so a term past any JSON parser's nesting limit is authored flat); pred = a utf8 string; ground_literal = {pred, args:[ground term...]}; node = {kind:rule|builtin|leaf, conclusion, ...}. The demo_v1 profile (implemented identically per language): Theory owns 'lt' and Holds iff lt(a,b) with a<b bytewise; LeafVerifier extensional={edge}, admits any edge leaf; RuleAdmissibility = always-admit; Context = unit.",
+  "program": {
+    "reach_base": {
+      "head": { "pred": "reach", "args": [{ "var": "X" }, { "var": "Y" }] },
+      "body": [{ "pred": "edge", "args": [{ "var": "X" }, { "var": "Y" }] }]
+    },
+    "reach_rec": {
+      "head": { "pred": "reach", "args": [{ "var": "X" }, { "var": "Z" }] },
+      "body": [
+        { "pred": "edge", "args": [{ "var": "X" }, { "var": "Y" }] },
+        { "pred": "reach", "args": [{ "var": "Y" }, { "var": "Z" }] }
+      ]
+    },
+    "ordered_edge": {
+      "head": { "pred": "ordered", "args": [{ "var": "X" }, { "var": "Y" }] },
+      "body": [
+        { "pred": "edge", "args": [{ "var": "X" }, { "var": "Y" }] },
+        { "pred": "lt", "args": [{ "var": "X" }, { "var": "Y" }] }
+      ]
+    },
+    "at_least_3_distinct": {
+      "head": { "pred": "at_least_3_distinct", "args": [{ "var": "X" }, { "var": "Y" }, { "var": "Z" }] },
+      "body": [
+        { "pred": "edge", "args": [{ "var": "X" }, { "var": "Y" }] },
+        { "pred": "edge", "args": [{ "var": "Y" }, { "var": "Z" }] },
+        { "pred": "lt", "args": [{ "var": "X" }, { "var": "Y" }] },
+        { "pred": "lt", "args": [{ "var": "Y" }, { "var": "Z" }] },
+        { "pred": "lt", "args": [{ "var": "X" }, { "var": "Z" }] }
+      ]
+    }
+  },
+  "cases": [
+    {
+      "name": "reach_two_hop_accept",
+      "claim": { "pred": "reach", "args": [{ "atom_str": "a" }, { "atom_str": "c" }] },
+      "derivation": {
+        "nodes": [
+          { "kind": "leaf", "conclusion": { "pred": "edge", "args": [{ "atom_str": "a" }, { "atom_str": "b" }] } },
+          { "kind": "leaf", "conclusion": { "pred": "edge", "args": [{ "atom_str": "b" }, { "atom_str": "c" }] } },
+          { "kind": "rule", "conclusion": { "pred": "reach", "args": [{ "atom_str": "b" }, { "atom_str": "c" }] },
+            "clause": "reach_base", "subst": { "X": { "atom_str": "b" }, "Y": { "atom_str": "c" } }, "premises": [1] },
+          { "kind": "rule", "conclusion": { "pred": "reach", "args": [{ "atom_str": "a" }, { "atom_str": "c" }] },
+            "clause": "reach_rec", "subst": { "X": { "atom_str": "a" }, "Y": { "atom_str": "b" }, "Z": { "atom_str": "c" } }, "premises": [0, 2] }
+        ],
+        "root": 3
+      },
+      "outcome": "accept"
+    },
+    {
+      "name": "ordered_edge_builtin_accept",
+      "claim": { "pred": "ordered", "args": [{ "atom_str": "a" }, { "atom_str": "b" }] },
+      "derivation": {
+        "nodes": [
+          { "kind": "leaf", "conclusion": { "pred": "edge", "args": [{ "atom_str": "a" }, { "atom_str": "b" }] } },
+          { "kind": "builtin", "conclusion": { "pred": "lt", "args": [{ "atom_str": "a" }, { "atom_str": "b" }] } },
+          { "kind": "rule", "conclusion": { "pred": "ordered", "args": [{ "atom_str": "a" }, { "atom_str": "b" }] },
+            "clause": "ordered_edge", "subst": { "X": { "atom_str": "a" }, "Y": { "atom_str": "b" } }, "premises": [0, 1] }
+        ],
+        "root": 2
+      },
+      "outcome": "accept"
+    },
+    {
+      "name": "leaf_with_hex_atom_and_tuple_arg_accept",
+      "note": "Exercises the {atom:<hex>} form (0xff — a byte atom_str cannot express) and the {tuple:[...]} recursion, so a second-language parser's hex-decode and tuple paths are pinned by the shared oracle, not just rs-local. edge is extensional, so the leaf is admitted regardless of its (structured) arguments.",
+      "claim": {
+        "pred": "edge",
+        "args": [
+          { "tuple": [{ "atom_str": "pair" }, { "atom_str": "a" }, { "atom_str": "b" }] },
+          { "atom": "ff" }
+        ]
+      },
+      "derivation": {
+        "nodes": [
+          { "kind": "leaf", "conclusion": {
+            "pred": "edge",
+            "args": [
+              { "tuple": [{ "atom_str": "pair" }, { "atom_str": "a" }, { "atom_str": "b" }] },
+              { "atom": "ff" }
+            ]
+          } }
+        ],
+        "root": 0
+      },
+      "outcome": "accept"
+    },
+    {
+      "name": "empty_derivation",
+      "claim": { "pred": "reach", "args": [{ "atom_str": "a" }, { "atom_str": "b" }] },
+      "derivation": { "nodes": [], "root": 0 },
+      "outcome": { "reject": "empty_derivation" }
+    },
+    {
+      "name": "root_out_of_range",
+      "claim": { "pred": "edge", "args": [{ "atom_str": "a" }, { "atom_str": "b" }] },
+      "derivation": {
+        "nodes": [{ "kind": "leaf", "conclusion": { "pred": "edge", "args": [{ "atom_str": "a" }, { "atom_str": "b" }] } }],
+        "root": 5
+      },
+      "outcome": { "reject": "root_out_of_range" }
+    },
+    {
+      "name": "root_at_index_max_out_of_range",
+      "note": "#2682 ruling A: the root at INDEX_MAX = 2^53 - 1, the largest index the contract's decoder admits (vectors/derivation_wire.json root_at_index_max_decodes). It passes decode in every core, so check refuses it by its FIRM root_out_of_range, the same as root 5 above.",
+      "claim": { "pred": "edge", "args": [{ "atom_str": "a" }, { "atom_str": "b" }] },
+      "derivation": {
+        "nodes": [{ "kind": "leaf", "conclusion": { "pred": "edge", "args": [{ "atom_str": "a" }, { "atom_str": "b" }] } }],
+        "root": 9007199254740991
+      },
+      "outcome": { "reject": "root_out_of_range" }
+    },
+    {
+      "name": "root_past_32_bit_offset_out_of_range",
+      "note": "#2735: the root at 2^32 + 5, past a 32-bit offset and inside the contract's domain (vectors/derivation_wire.json root_past_32_bit_offset_decodes). An index is an INTEGER, not a host offset: it passes decode in every core on every build, and check refuses it by its FIRM root_out_of_range, the same as root 5 above.",
+      "claim": { "pred": "edge", "args": [{ "atom_str": "a" }, { "atom_str": "b" }] },
+      "derivation": {
+        "nodes": [{ "kind": "leaf", "conclusion": { "pred": "edge", "args": [{ "atom_str": "a" }, { "atom_str": "b" }] } }],
+        "root": 4294967301
+      },
+      "outcome": { "reject": "root_out_of_range" }
+    },
+    {
+      "name": "too_many_nodes",
+      "claim": { "pred": "ordered", "args": [{ "atom_str": "a" }, { "atom_str": "b" }] },
+      "limits": { "max_nodes": 1, "max_depth": 4096 },
+      "derivation": {
+        "nodes": [
+          { "kind": "leaf", "conclusion": { "pred": "edge", "args": [{ "atom_str": "a" }, { "atom_str": "b" }] } },
+          { "kind": "builtin", "conclusion": { "pred": "lt", "args": [{ "atom_str": "a" }, { "atom_str": "b" }] } }
+        ],
+        "root": 0
+      },
+      "outcome": { "reject": "too_many_nodes" }
+    },
+    {
+      "name": "too_deep",
+      "claim": { "pred": "reach", "args": [{ "atom_str": "a" }, { "atom_str": "c" }] },
+      "limits": { "max_nodes": 100000, "max_depth": 1 },
+      "derivation": {
+        "nodes": [
+          { "kind": "leaf", "conclusion": { "pred": "edge", "args": [{ "atom_str": "a" }, { "atom_str": "b" }] } },
+          { "kind": "leaf", "conclusion": { "pred": "edge", "args": [{ "atom_str": "b" }, { "atom_str": "c" }] } },
+          { "kind": "rule", "conclusion": { "pred": "reach", "args": [{ "atom_str": "b" }, { "atom_str": "c" }] },
+            "clause": "reach_base", "subst": { "X": { "atom_str": "b" }, "Y": { "atom_str": "c" } }, "premises": [1] },
+          { "kind": "rule", "conclusion": { "pred": "reach", "args": [{ "atom_str": "a" }, { "atom_str": "c" }] },
+            "clause": "reach_rec", "subst": { "X": { "atom_str": "a" }, "Y": { "atom_str": "b" }, "Z": { "atom_str": "c" } }, "premises": [0, 2] }
+        ],
+        "root": 3
+      },
+      "outcome": { "reject": "too_deep" }
+    },
+    {
+      "name": "unknown_clause",
+      "claim": { "pred": "reach", "args": [{ "atom_str": "a" }, { "atom_str": "b" }] },
+      "derivation": {
+        "nodes": [
+          { "kind": "rule", "conclusion": { "pred": "reach", "args": [{ "atom_str": "a" }, { "atom_str": "b" }] },
+            "clause": "no_such_clause", "subst": {}, "premises": [] }
+        ],
+        "root": 0
+      },
+      "outcome": { "reject": "unknown_clause" }
+    },
+    {
+      "name": "bad_dependency_order",
+      "claim": { "pred": "reach", "args": [{ "atom_str": "b" }, { "atom_str": "c" }] },
+      "derivation": {
+        "nodes": [
+          { "kind": "rule", "conclusion": { "pred": "reach", "args": [{ "atom_str": "b" }, { "atom_str": "c" }] },
+            "clause": "reach_base", "subst": { "X": { "atom_str": "b" }, "Y": { "atom_str": "c" } }, "premises": [0] }
+        ],
+        "root": 0
+      },
+      "outcome": { "reject": "bad_dependency_order" }
+    },
+    {
+      "name": "instantiation_mismatch",
+      "claim": { "pred": "reach", "args": [{ "atom_str": "a" }, { "atom_str": "c" }] },
+      "derivation": {
+        "nodes": [
+          { "kind": "leaf", "conclusion": { "pred": "edge", "args": [{ "atom_str": "a" }, { "atom_str": "b" }] } },
+          { "kind": "rule", "conclusion": { "pred": "reach", "args": [{ "atom_str": "a" }, { "atom_str": "c" }] },
+            "clause": "reach_base", "subst": { "X": { "atom_str": "a" }, "Y": { "atom_str": "b" } }, "premises": [0] }
+        ],
+        "root": 1
+      },
+      "outcome": { "reject": "instantiation_mismatch" }
+    },
+    {
+      "name": "root_conclusion_mismatch",
+      "claim": { "pred": "reach", "args": [{ "atom_str": "a" }, { "atom_str": "b" }] },
+      "derivation": {
+        "nodes": [
+          { "kind": "leaf", "conclusion": { "pred": "edge", "args": [{ "atom_str": "a" }, { "atom_str": "b" }] } },
+          { "kind": "leaf", "conclusion": { "pred": "edge", "args": [{ "atom_str": "b" }, { "atom_str": "c" }] } },
+          { "kind": "rule", "conclusion": { "pred": "reach", "args": [{ "atom_str": "b" }, { "atom_str": "c" }] },
+            "clause": "reach_base", "subst": { "X": { "atom_str": "b" }, "Y": { "atom_str": "c" } }, "premises": [1] },
+          { "kind": "rule", "conclusion": { "pred": "reach", "args": [{ "atom_str": "a" }, { "atom_str": "c" }] },
+            "clause": "reach_rec", "subst": { "X": { "atom_str": "a" }, "Y": { "atom_str": "b" }, "Z": { "atom_str": "c" } }, "premises": [0, 2] }
+        ],
+        "root": 3
+      },
+      "outcome": { "reject": "root_conclusion_mismatch" }
+    },
+    {
+      "name": "sealed_violation_leaf_concludes_intensional",
+      "claim": { "pred": "reach", "args": [{ "atom_str": "a" }, { "atom_str": "b" }] },
+      "derivation": {
+        "nodes": [
+          { "kind": "leaf", "conclusion": { "pred": "reach", "args": [{ "atom_str": "a" }, { "atom_str": "b" }] } }
+        ],
+        "root": 0
+      },
+      "outcome": { "reject": "sealed_violation" }
+    },
+    {
+      "name": "predicate_partition_violation_builtin_unowned",
+      "claim": { "pred": "edge", "args": [{ "atom_str": "a" }, { "atom_str": "b" }] },
+      "derivation": {
+        "nodes": [
+          { "kind": "builtin", "conclusion": { "pred": "edge", "args": [{ "atom_str": "a" }, { "atom_str": "b" }] } }
+        ],
+        "root": 0
+      },
+      "outcome": { "reject": "predicate_partition_violation" }
+    },
+    {
+      "name": "term_too_deep_tuple_arg",
+      "note": "issue #253 — a single-term NESTING-depth cap in the trusted path. edge(pair(a,b), 0xff) carries a tuple argument of structural depth 2; with max_term_depth=1 it exceeds the bound and is REJECTED term_too_deep (a new FIRM structural code), tri-core. This pins the bound MECHANISM via a tight limit on a shallow term (a literally tens-of-thousands-deep JSON term would stress each CLI's recursive vector decoder); the no-stack-overflow property at the real crashing depth is proven in each core's adversarial unit tests. The depth measurement is itself iterative (Term::depth_le / value_depth_le), so checking an over-deep term does not overflow. Distinct from too_deep (DAG/premise-chain depth).",
+      "claim": { "pred": "edge", "args": [{ "tuple": [{ "atom_str": "pair" }, { "atom_str": "a" }, { "atom_str": "b" }] }, { "atom": "ff" }] },
+      "limits": { "max_nodes": 100000, "max_depth": 4096, "max_term_depth": 1 },
+      "derivation": {
+        "nodes": [
+          { "kind": "leaf", "conclusion": { "pred": "edge", "args": [{ "tuple": [{ "atom_str": "pair" }, { "atom_str": "a" }, { "atom_str": "b" }] }, { "atom": "ff" }] } }
+        ],
+        "root": 0
+      },
+      "outcome": { "reject": "term_too_deep" }
+    },
+    {
+      "name": "term_within_depth_bound_accept",
+      "note": "issue #253 — the SAME edge(pair(a,b), 0xff) term (depth 2) is ACCEPTED under max_term_depth=2: the bound only refuses a term that EXCEEDS it, never weakening the accept path. Pins that a within-bound term still passes, tri-core.",
+      "claim": { "pred": "edge", "args": [{ "tuple": [{ "atom_str": "pair" }, { "atom_str": "a" }, { "atom_str": "b" }] }, { "atom": "ff" }] },
+      "limits": { "max_nodes": 100000, "max_depth": 4096, "max_term_depth": 2 },
+      "derivation": {
+        "nodes": [
+          { "kind": "leaf", "conclusion": { "pred": "edge", "args": [{ "tuple": [{ "atom_str": "pair" }, { "atom_str": "a" }, { "atom_str": "b" }] }, { "atom": "ff" }] } }
+        ],
+        "root": 0
+      },
+      "outcome": "accept"
+    },
+    {
+      "name": "too_deep_under_one_budget_alone",
+      "claim": { "pred": "reach", "args": [{ "atom_str": "a" }, { "atom_str": "c" }] },
+      "limits": { "max_depth": 1 },
+      "derivation": {
+        "nodes": [
+          { "kind": "leaf", "conclusion": { "pred": "edge", "args": [{ "atom_str": "a" }, { "atom_str": "b" }] } },
+          { "kind": "leaf", "conclusion": { "pred": "edge", "args": [{ "atom_str": "b" }, { "atom_str": "c" }] } },
+          { "kind": "rule", "conclusion": { "pred": "reach", "args": [{ "atom_str": "b" }, { "atom_str": "c" }] },
+            "clause": "reach_base", "subst": { "X": { "atom_str": "b" }, "Y": { "atom_str": "c" } }, "premises": [1] },
+          { "kind": "rule", "conclusion": { "pred": "reach", "args": [{ "atom_str": "a" }, { "atom_str": "c" }] },
+            "clause": "reach_rec", "subst": { "X": { "atom_str": "a" }, "Y": { "atom_str": "b" }, "Z": { "atom_str": "c" } }, "premises": [0, 2] }
+        ],
+        "root": 3
+      },
+      "outcome": { "reject": "too_deep" }
+    },
+    {
+      "name": "term_depth_alone_keeps_the_other_budgets_accept",
+      "note": "issue #253 — the SAME edge(pair(a,b), 0xff) term (depth 2) is ACCEPTED under max_term_depth=2: the bound only refuses a term that EXCEEDS it, never weakening the accept path. Pins that a within-bound term still passes, tri-core.",
+      "claim": { "pred": "edge", "args": [{ "tuple": [{ "atom_str": "pair" }, { "atom_str": "a" }, { "atom_str": "b" }] }, { "atom": "ff" }] },
+      "limits": { "max_term_depth": 2 },
+      "derivation": {
+        "nodes": [
+          { "kind": "leaf", "conclusion": { "pred": "edge", "args": [{ "tuple": [{ "atom_str": "pair" }, { "atom_str": "a" }, { "atom_str": "b" }] }, { "atom": "ff" }] } }
+        ],
+        "root": 0
+      },
+      "outcome": "accept"
+    },
+    {
+      "name": "witness_lane_at_least_3_distinct_accept",
+      "note": "ADR-0023 / #589 monotone witness lane: '≥k distinct' is certifiable TODAY by positive witnesses + owned builtin nodes, NO certificate and NO new account node. at_least_3_distinct(a,b,c) over edge(a,b),edge(b,c) is pruned by the strict-order chain lt(a,b),lt(b,c),lt(a,c) — three owned `lt` Builtin nodes that witness a,b,c are pairwise distinct (a strict total order is irreflexive). demo_v1 owns `lt`, not `\\==`, so the tri-core ACCEPT vector uses lt as the owned disequality witness; the matching `\\==` TermTheory accept AND the bogus-witness REJECT (a repeated value fails an owned builtin, so check() refuses — host-extension band, language-local per this file's note) are pinned end-to-end in conformance/rs/tests/witness_lane_distinct.rs.",
+      "claim": { "pred": "at_least_3_distinct", "args": [{ "atom_str": "a" }, { "atom_str": "b" }, { "atom_str": "c" }] },
+      "derivation": {
+        "nodes": [
+          { "kind": "leaf", "conclusion": { "pred": "edge", "args": [{ "atom_str": "a" }, { "atom_str": "b" }] } },
+          { "kind": "leaf", "conclusion": { "pred": "edge", "args": [{ "atom_str": "b" }, { "atom_str": "c" }] } },
+          { "kind": "builtin", "conclusion": { "pred": "lt", "args": [{ "atom_str": "a" }, { "atom_str": "b" }] } },
+          { "kind": "builtin", "conclusion": { "pred": "lt", "args": [{ "atom_str": "b" }, { "atom_str": "c" }] } },
+          { "kind": "builtin", "conclusion": { "pred": "lt", "args": [{ "atom_str": "a" }, { "atom_str": "c" }] } },
+          { "kind": "rule", "conclusion": { "pred": "at_least_3_distinct", "args": [{ "atom_str": "a" }, { "atom_str": "b" }, { "atom_str": "c" }] },
+            "clause": "at_least_3_distinct", "subst": { "X": { "atom_str": "a" }, "Y": { "atom_str": "b" }, "Z": { "atom_str": "c" } }, "premises": [0, 1, 2, 3, 4] }
+        ],
+        "root": 5
+      },
+      "outcome": "accept"
+    },
+    {
+      "name": "term_depth_256_at_the_default_accept",
+      "note": "#2731 (seat:caa's ruling): the DEFAULT policy, with no limits override. edge(s(s(...s(z)...)), b) carries a first argument exactly 256 term levels deep (255 s-levels around the atom z, the atom counting as one level), which is check's default max_term_depth in every core, so it is ACCEPTED tri-core. derivation_wire.json's ground_arg_256_term_levels_decodes is the same conclusion on the wire, and it decodes in every core: rs's decoder refused it until #2731, which made the spec's tri-core promise false at the defaults.",
+      "claim": { "pred": "edge", "args": [{ "nest": { "functor": "s", "times": 255, "leaf": { "atom_str": "z" } } }, { "atom_str": "b" }] },
+      "derivation": {
+        "nodes": [
+          { "kind": "leaf", "conclusion": { "pred": "edge", "args": [{ "nest": { "functor": "s", "times": 255, "leaf": { "atom_str": "z" } } }, { "atom_str": "b" }] } }
+        ],
+        "root": 0
+      },
+      "outcome": "accept"
+    },
+    {
+      "name": "term_depth_257_past_the_default_term_too_deep",
+      "note": "#2731: the same at 257 term levels, one past the default max_term_depth, so check REFUSES it term_too_deep in every core. The decoder accepts the same conclusion (derivation_wire.json's ground_arg_257_term_levels_decodes): the depth refusal belongs to check alone.",
+      "claim": { "pred": "edge", "args": [{ "nest": { "functor": "s", "times": 256, "leaf": { "atom_str": "z" } } }, { "atom_str": "b" }] },
+      "derivation": {
+        "nodes": [
+          { "kind": "leaf", "conclusion": { "pred": "edge", "args": [{ "nest": { "functor": "s", "times": 256, "leaf": { "atom_str": "z" } } }, { "atom_str": "b" }] } }
+        ],
+        "root": 0
+      },
+      "outcome": { "reject": "term_too_deep" }
+    }
+  ]
+}

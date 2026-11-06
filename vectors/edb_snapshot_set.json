@@ -1,0 +1,21 @@
+{
+  "vector": "logos EDB snapshot hash reads its rows as a SET v1 (#2279)",
+  "note": "Hand-authored from seat:caa's ruling on #2279 (2026-09-24): `edb_table_hash` / `EdbTableHash` / `edbTableHash` hashes the canonical SET of rows, sorted by the ground key and deduplicated by the same key the sealed `RelationTable` uses, so order and multiplicity never change the hash. No digest is authored here (a digest needs the implementation under test); every case is an EQUIVALENCE over hashes, derived from the set rule alone. `rows` names ground literals of `pred` by their atom arguments. Each `equal` group lists row-name lists whose hashes must all be equal to each other. Each `differ` pair must hash differently, which keeps the equal groups from passing on a constant hash. `table_agrees` lists row lists whose hash must equal the hash over the rows of the sealed table built from them, so a snapshot and a certificate's table built from the same rows agree by construction. Replayed by contract/rs/tests/edb_snapshot_set_vectors.rs, contract/go/edb_snapshot_set_vectors_test.go and contract/ts/test/edb_snapshot_set_vectors.test.ts.",
+  "pred": "occurred",
+  "arity": 3,
+  "rows": {
+    "r1": ["a", "b", "x"],
+    "r2": ["a", "c", "y"],
+    "r3": ["b", "c", "x"]
+  },
+  "equal": [
+    { "name": "a_repeated_row_is_ignored", "lists": [["r1"], ["r1", "r1"], ["r1", "r1", "r1"]] },
+    { "name": "order_is_ignored", "lists": [["r1", "r2"], ["r2", "r1"]] },
+    { "name": "order_and_repetition_together", "lists": [["r1", "r2", "r3"], ["r3", "r2", "r1", "r2"], ["r2", "r1", "r3", "r1", "r3"]] }
+  ],
+  "differ": [
+    { "name": "a_missing_row_changes_the_hash", "lists": [["r1"], ["r1", "r2"]] },
+    { "name": "a_different_row_changes_the_hash", "lists": [["r1", "r1"], ["r2", "r2"]] }
+  ],
+  "table_agrees": [["r1", "r1"], ["r3", "r1", "r2", "r1"]]
+}

@@ -1,0 +1,70 @@
+{
+  "seam": "logos CompoundTheory decision+identity vector v1 (UNFROZEN v1)",
+  "note": "Language-AGNOSTIC tri-core vector for the CompoundTheory composed of [arithmetic, text] IN THAT ORDER. Each core builds CompoundTheory over [ArithmeticTheory, TextTheory] and MUST reproduce the pinned identity + owns + decisions byte-for-byte (the §7 dual-conformance / byte-parity law). identity.config_digest is a length-prefixed SHA-256 over the ORDERED member identities (logos-core/arithmetic-theory@1.0.0 and logos-core/text-theory@1.0.0, both zero config), domain-separated by 'logos-core/compound-theory/v1\\n' — so the digest commits to membership AND order (the swapped order has a different digest). owns is the UNION of the members' predicates; decide routes each predicate to the FIRST owning member (the members own disjoint sets, so 'first' is 'the' owner). Arg encodings match vectors/arithmetic.json + vectors/text.json: {atom}=bare Atom of UTF-8 bytes, {int}=ontos-data int embedding, {op}=operator compound Tuple(Atom(op), arg..), {text}=utf8-text embedding (a Tuple), {tuple}=raw Tuple.",
+  "members": ["arithmetic", "text"],
+  "identity": {
+    "id": "logos-core/compound-theory",
+    "version": "1.0.0",
+    "config_digest_hex": "c4d5be1e852aaf7269e1e8c805615d59cded258d435579d3b7ec6ac272f99979"
+  },
+  "owns": {
+    "owned": ["is", "=:=", "=\\=", "<", ">", ">=", "=<", "contains", "starts_with", "ends_with"],
+    "not_owned": ["concat", "substring", "length", "=", "text", "atom", "append"]
+  },
+  "decisions": [
+    {
+      "name": "routes_to_arith_is_holds",
+      "note": "is/2 routes to the arithmetic member: 5 is 2 + 3",
+      "pred": "is",
+      "args": [{ "int": 5 }, { "op": "+", "args": [{ "int": 2 }, { "int": 3 }] }],
+      "outcome": "holds"
+    },
+    {
+      "name": "routes_to_arith_compare_holds",
+      "note": "=:= routes to arithmetic: 4 =:= 2 + 2",
+      "pred": "=:=",
+      "args": [{ "int": 4 }, { "op": "+", "args": [{ "int": 2 }, { "int": 2 }] }],
+      "outcome": "holds"
+    },
+    {
+      "name": "routes_to_arith_compare_fails",
+      "note": "two non-int atoms -> the ARITHMETIC sub-code, proving =:= routed to arithmetic (not text)",
+      "pred": "=:=",
+      "args": [{ "atom": "x" }, { "atom": "y" }],
+      "outcome": { "fails": "arith_does_not_hold" }
+    },
+    {
+      "name": "routes_to_text_contains_hit",
+      "note": "contains routes to the text member: 'foobar' contains 'oba'",
+      "pred": "contains",
+      "args": [{ "atom": "foobar" }, { "atom": "oba" }],
+      "outcome": "holds"
+    },
+    {
+      "name": "routes_to_text_contains_miss",
+      "note": "absent -> the TEXT sub-code, proving contains routed to text (not arithmetic)",
+      "pred": "contains",
+      "args": [{ "atom": "abc" }, { "atom": "z" }],
+      "outcome": { "fails": "text_does_not_hold" }
+    },
+    {
+      "name": "routes_to_text_starts_with_hit",
+      "pred": "starts_with",
+      "args": [{ "atom": "crates_foo" }, { "atom": "crates_" }],
+      "outcome": "holds"
+    },
+    {
+      "name": "routes_to_text_ends_with_hit",
+      "pred": "ends_with",
+      "args": [{ "atom": "foo.tar.gz" }, { "atom": ".gz" }],
+      "outcome": "holds"
+    },
+    {
+      "name": "routes_to_text_bad_arity",
+      "note": "contains/1 -> text bad arity (routed to text, which owns the arity-error band)",
+      "pred": "contains",
+      "args": [{ "atom": "abc" }],
+      "outcome": { "fails": "text_bad_arity" }
+    }
+  ]
+}

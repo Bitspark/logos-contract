@@ -1,0 +1,73 @@
+{
+  "name": "lists",
+  "version": "1.0.0",
+  "program_digest": "59d7f32b8a3a7d936ce098d15b05d87d03b0727d920cedd2e24891a857176e25",
+  "note": "ADR 0016 Shelf-B `lists` bundle — the COMPLETE, multi-directional relational `append/3` and `length/2` over CONS-CELL lists (`[H|T]` = Tuple[Atom('.'), H, T]; nil = Atom('[]')). These are ordinary account `Rule` nodes the EXISTING check() verifies as the §7 dual-conformance derivations (zero new trusted code). The deterministic `append`/`length` builtins in core/rs/src/builtins.rs are A1 FAST PATHS of the same meaning (ADR 0016 Tie-break #1): for `append`, the builtin's answer is BYTE-IDENTICAL to this clause form (proven by vectors/append_length_differential.json); the clause form ADDITIONALLY supports the generative split (`append(X, Suffix, Whole)`) the builtin cannot. `length` counts with `is/2` over the FROZEN ontos/data `int` embedding (`int(N)` = Tuple[Atom('int'), Atom(<sign||magnitude>)], §5.1) — so the base case is `length([], int(0))` and the step is `N is N1 + 1`; the differential records that this clause yields the `int(3)` EMBEDDING where the legacy builtin yields the Stage-A SPELLING atom `Atom('3')` (same number, two representations — a reconciliation the builtin owns, tracked separately). `program_digest` = lowercase-hex SHA-256(PROGRAM_PREFIX 'logos/account/program/v1\\n' || concat of len-prefixed SORTED ontos-codec(quote(clause-as-term)) bytes), recomputed and verified by load_prelude. Each clause `id` = ClauseId::canonical. Term notation as in vectors/account.json: term = {atom:<hex>}|{atom_str:<utf8>}|{tuple:[...]}|{var:<id>}; goal = {pred:<utf8>, args:[term...]}; negated body literal = {neg:<goal>}. The `int` payloads here are: int(0)=atom 00, int(1)=atom 0001 (sign byte 0x00 then big-endian minimal magnitude).",
+  "clauses": [
+    {
+      "id": "1a5ba4ff5b419b62c7fb61f8199a0f30937777fd806f2b0f9dac5bc4d9f99ef4",
+      "clause": {
+        "head": {
+          "pred": "append",
+          "args": [
+            { "atom_str": "[]" },
+            { "var": "L" },
+            { "var": "L" }
+          ]
+        },
+        "body": []
+      }
+    },
+    {
+      "id": "19509a050ec3812926940144d56a3f423356c7802b5fa6e6280c8a3be5161b06",
+      "clause": {
+        "head": {
+          "pred": "append",
+          "args": [
+            { "tuple": [{ "atom_str": "." }, { "var": "H" }, { "var": "T1" }] },
+            { "var": "L2" },
+            { "tuple": [{ "atom_str": "." }, { "var": "H" }, { "var": "T3" }] }
+          ]
+        },
+        "body": [
+          { "pred": "append", "args": [{ "var": "T1" }, { "var": "L2" }, { "var": "T3" }] }
+        ]
+      }
+    },
+    {
+      "id": "a801e66eee9486b3d2d462db52ebb1c18d36d658969d4213f13c01b5c4f86c1e",
+      "clause": {
+        "head": {
+          "pred": "length",
+          "args": [
+            { "atom_str": "[]" },
+            { "tuple": [{ "atom_str": "int" }, { "atom": "00" }] }
+          ]
+        },
+        "body": []
+      }
+    },
+    {
+      "id": "00db4fb5e141fd2823f8d8a4f30ba0763f1f4e662ee8d1dd831d83033f33ae6c",
+      "clause": {
+        "head": {
+          "pred": "length",
+          "args": [
+            { "tuple": [{ "atom_str": "." }, { "var": "_" }, { "var": "T" }] },
+            { "var": "N" }
+          ]
+        },
+        "body": [
+          { "pred": "length", "args": [{ "var": "T" }, { "var": "N1" }] },
+          {
+            "pred": "is",
+            "args": [
+              { "var": "N" },
+              { "tuple": [{ "atom_str": "+" }, { "var": "N1" }, { "tuple": [{ "atom_str": "int" }, { "atom": "0001" }] }] }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,290 @@
+{
+  "vector": "decider_completion",
+  "note": "#3142 (research 0031 row 13; seat:caa's rulings on #3124 item 2 and on #3142): the INTERIM guard that refuses, at admission, a certified claim resting on a decider that may not complete. A decider that cannot finish answers Fails, a decided false, and a sealed closure reads that false as knowledge, so a table that misses a derivable row passes as exhaustive (#3123, #3126, #3121/#3125, #3130). HAND-AUTHORED from the rulings, never regenerated. Two sections. `declarations` pins what each core's standard deciders declare (DecisionCompletion: stops_are_typed | may_not_complete | undeclared; stops_are_typed means every stop is decide_ground's typed NotCompleted, so a Fails is always a decided false, seat:caa's ruling on #3189 Q3), per theory as ruled, with a compound routing to the owning member and a theory that declares nothing reading `undeclared` (fail closed). `seal_verdicts` is the CENSUS: inputs a certifying bottom-up route would seal, each with the guard's verdict. Every `refused` row certified before #3142, so this file fails on the old kernel; the `admits` rows are the controls that keep the guard scoped (the query's own clause, a seal nothing reads, a negation over relations only, #1712 R4's host program). A refused row names the typed cause (ADR 0012's capability_unavailable: scope, component = the decider, capability, subject = the literal's predicate, site = the sealed clause's id) and the explicit alternative the refusal offers and the kernel never takes (ADR 0035 D4): `remove_feature` (the NAF door) for a prefix seal a negation reads, `weaken_completeness` for the complete seal. Replayed: `declarations` by rs (contract/rs/tests/decider_completion_3142.rs), go (contract/go/decider_completion_3142_test.go) and ts (contract/ts/test/decider_completion_3142.test.ts); `seal_verdicts` by the guest's own verdict function (app/wasm/rs/src/tests_seal_verdict_3142.rs) and by the go and ts hosts through the guest's logos_seal_verdict export (kernel/go/wasm/seal_verdict_3142_test.go, kernel/ts/test/seal_verdict_3142.test.ts). Each replay checks the census below by exact set equality, so a row that starts or stops being refused is a reviewed change to this file. After #3313 arithmetic's stops are typed, so it declares stops_are_typed and its seal verdicts admit; the guard's refusals are the host builtins' (until #3506, when the host's own decider declares its completion) and undeclared deciders'. The mechanism retires at v2 (ADR 0036 D8).",
+  "declarations": [
+    {
+      "name": "arithmetic_is",
+      "theory": "arithmetic",
+      "pred": "is",
+      "completion": "stops_are_typed"
+    },
+    {
+      "name": "arithmetic_comparison",
+      "theory": "arithmetic",
+      "pred": ">",
+      "completion": "stops_are_typed"
+    },
+    {
+      "name": "text_contains",
+      "theory": "text",
+      "pred": "contains",
+      "completion": "stops_are_typed"
+    },
+    {
+      "name": "term_standard_order",
+      "theory": "term",
+      "pred": "@<",
+      "completion": "stops_are_typed"
+    },
+    {
+      "name": "list_length",
+      "theory": "list",
+      "pred": "length",
+      "completion": "stops_are_typed"
+    },
+    {
+      "name": "standard_routes_arithmetic",
+      "theory": "standard",
+      "pred": "=:=",
+      "completion": "stops_are_typed"
+    },
+    {
+      "name": "standard_routes_text",
+      "theory": "standard",
+      "pred": "starts_with",
+      "completion": "stops_are_typed"
+    },
+    {
+      "name": "standard_unowned_is_undeclared",
+      "theory": "standard",
+      "pred": "no_such_relation",
+      "completion": "undeclared",
+      "decider": "logos-core/compound-theory"
+    },
+    {
+      "name": "a_consumer_theory_that_declares_nothing",
+      "theory": "undeclared",
+      "pred": "p",
+      "completion": "undeclared",
+      "decider": "unidentified"
+    },
+    {
+      "name": "a_consumer_theory_whose_stops_surface_as_fails",
+      "theory": "stops_untyped",
+      "pred": "q",
+      "completion": "may_not_complete",
+      "decider": "demo/stops-untyped-theory"
+    }
+  ],
+  "seal_verdicts": [
+    {
+      "name": "decimal_alignment_past_the_cap_under_a_negation",
+      "note": "#3126's cause, reached by a certified negation. After #3313 arithmetic's one stop is decide_ground's typed NotCompleted(work_cap), never Fails, so it declares stops_are_typed and admission admits the seal (seat:caa's ruling on #3189, Q3). The certified run then ends on the decider's own typed stop, not_completed(capability_unavailable(decider, <the bound theory>, work_cap)) since #3343, and emits no certificate.",
+      "seal": "prefix",
+      "facts": "e(1e60000 + 1e-60000).",
+      "rules": [
+        {
+          "id": "bad",
+          "source": "bad(X) :- e(X), X > 0."
+        },
+        {
+          "id": "ok",
+          "source": "ok(X) :- e(X), \\+ bad(X)."
+        }
+      ],
+      "goal": "ok(X)",
+      "host_builtins": [],
+      "expect": {
+        "verdict": "admits"
+      }
+    },
+    {
+      "name": "decimal_alignment_past_the_cap_on_a_claimed_set",
+      "note": "The same cause under the complete seal: a certified set claim over `p` seals the query's own stratum, whose closure reads the failed alignment as a decided false. After #3313 arithmetic's one stop is decide_ground's typed NotCompleted(work_cap), never Fails, so it declares stops_are_typed and admission admits the seal (seat:caa's ruling on #3189, Q3). The certified run then ends on the decider's own typed stop, not_completed(capability_unavailable(decider, <the bound theory>, work_cap)) since #3343, and emits no certificate.",
+      "seal": "complete",
+      "facts": "e(1e60000 + 1e-60000).",
+      "rules": [
+        {
+          "id": "p",
+          "source": "p(X) :- e(X), X > 0."
+        }
+      ],
+      "goal": "p(X)",
+      "host_builtins": [],
+      "expect": {
+        "verdict": "admits"
+      }
+    },
+    {
+      "name": "declared_host_builtin_under_a_negation",
+      "note": "#3121/#3125/#3130's cause: a declared host builtin whose reply is refused or unreadable can read as Fails where a door does not surface it (#3130's streaming doors), so `blocked` is sealed short and `ok` certified for a sensor the host never decided. A declared host builtin may not complete, so the prefix seal a negation reads is refused at admission, naming the host's own component. Measured before #3142: the go negation door ADMITTED this program (its negotiated collecting path then surfaces a refusing host by name, #1712 R4.0, which is why the guard sits at admission, where every door agrees).",
+      "seal": "prefix",
+      "facts": "sensor(v0). sensor(v1).",
+      "rules": [
+        {
+          "id": "blocked",
+          "source": "blocked(V) :- sensor(V), window_shut(V)."
+        },
+        {
+          "id": "ok",
+          "source": "ok(V) :- sensor(V), \\+ blocked(V)."
+        }
+      ],
+      "goal": "ok(V)",
+      "host_builtins": [
+        {
+          "pred": "window_shut",
+          "arity": 1,
+          "id": "demo/window-theory",
+          "version": "1.0.0"
+        }
+      ],
+      "expect": {
+        "verdict": "refused",
+        "scope": "deployment",
+        "component": "demo/window-theory",
+        "capability": "complete_decision",
+        "subject": {
+          "pred": "window_shut",
+          "arity": 1
+        },
+        "site": "blocked",
+        "alternative": "remove_feature"
+      }
+    },
+    {
+      "name": "declared_host_builtin_on_a_claimed_set",
+      "note": "The host builtin under the complete seal: refused, and withdrawing the set claim is the alternative.",
+      "seal": "complete",
+      "facts": "sensor(v0). sensor(v1).",
+      "rules": [
+        {
+          "id": "open",
+          "source": "open(V) :- sensor(V), window_shut(V)."
+        }
+      ],
+      "goal": "open(V)",
+      "host_builtins": [
+        {
+          "pred": "window_shut",
+          "arity": 1,
+          "id": "demo/window-theory",
+          "version": "1.0.0"
+        }
+      ],
+      "expect": {
+        "verdict": "refused",
+        "scope": "deployment",
+        "component": "demo/window-theory",
+        "capability": "complete_decision",
+        "subject": {
+          "pred": "window_shut",
+          "arity": 1
+        },
+        "site": "open",
+        "alternative": "weaken_completeness"
+      }
+    },
+    {
+      "name": "integer_comparison_under_a_negation_admits",
+      "note": "An integer comparison in a sealed clause read by a negation. Before #3313 it was refused per theory (seat:caa's granularity ruling on #3142: operand sorts are not visible at admission). After #3313 arithmetic's one stop is decide_ground's typed NotCompleted(work_cap), never Fails, so it declares stops_are_typed and admission admits the seal (seat:caa's ruling on #3189, Q3). The certified run then ends on the decider's own typed stop, not_completed(capability_unavailable(decider, <the bound theory>, work_cap)) since #3343, and emits no certificate.",
+      "seal": "prefix",
+      "facts": "n(1). n(5).",
+      "rules": [
+        {
+          "id": "big",
+          "source": "big(X) :- n(X), X > 2."
+        },
+        {
+          "id": "small",
+          "source": "small(X) :- n(X), \\+ big(X)."
+        }
+      ],
+      "goal": "small(X)",
+      "host_builtins": [],
+      "expect": {
+        "verdict": "admits"
+      }
+    },
+    {
+      "name": "control_arithmetic_only_in_the_query_clause",
+      "note": "CONTROL: the prefix seal covers the strata strictly below the query's, so an arithmetic literal in the query's own clause is outside it. A decider that stops early there only drops an answer, and no certified claim rests on the answer's absence. Admitted.",
+      "seal": "prefix",
+      "facts": "n(1). n(5). muted(5).",
+      "rules": [
+        {
+          "id": "ok",
+          "source": "ok(X) :- n(X), X > 2, \\+ muted(X)."
+        }
+      ],
+      "goal": "ok(X)",
+      "host_builtins": [],
+      "expect": {
+        "verdict": "admits"
+      }
+    },
+    {
+      "name": "control_host_builtin_only_in_the_query_clause",
+      "note": "CONTROL, #1712 R4's program: the declared host builtin sits in the query's own clause, which the prefix seal does not cover. Admitted, so R4's certified negation over a host theory still certifies.",
+      "seal": "prefix",
+      "facts": "sensor(v0). sensor(v1). muted(v1).",
+      "rules": [
+        {
+          "id": "irrigate",
+          "source": "irrigate(V) :- sensor(V), window_open(dawn), \\+ muted(V)."
+        }
+      ],
+      "goal": "irrigate(V)",
+      "host_builtins": [
+        {
+          "pred": "window_open",
+          "arity": 1,
+          "id": "demo/window-theory",
+          "version": "1.0.0"
+        }
+      ],
+      "expect": {
+        "verdict": "admits"
+      }
+    },
+    {
+      "name": "control_a_prefix_seal_nothing_reads",
+      "note": "CONTROL for the load-bearing scoping (seat:caa's condition 2 on #3142): with no negation and no count reachable from the query, a prefix seal is minted and cited by nothing (#2533 drops an uncited certificate and never caches it), so no certified claim rests on it. Admitted, though a clause below the query holds arithmetic.",
+      "seal": "prefix",
+      "facts": "n(1). n(5).",
+      "rules": [
+        {
+          "id": "big",
+          "source": "big(X) :- n(X), X > 2."
+        },
+        {
+          "id": "q",
+          "source": "q(X) :- big(X)."
+        }
+      ],
+      "goal": "q(X)",
+      "host_builtins": [],
+      "expect": {
+        "verdict": "admits"
+      }
+    },
+    {
+      "name": "control_a_negation_over_relations_only",
+      "note": "CONTROL: a certified negation whose sealed stratum reaches no decider. Admitted, so the guard refuses by the decider, never by the negation.",
+      "seal": "prefix",
+      "facts": "grant(s1). grant(s2). revoked(s2).",
+      "rules": [
+        {
+          "id": "denied",
+          "source": "denied(S) :- revoked(S)."
+        },
+        {
+          "id": "permit",
+          "source": "permit(S) :- grant(S), \\+ denied(S)."
+        }
+      ],
+      "goal": "permit(S)",
+      "host_builtins": [],
+      "expect": {
+        "verdict": "admits"
+      }
+    }
+  ],
+  "census": {
+    "note": "The WATCHED COUNT of the refusal (ADR 0035 D1's gate shape; #3142 done-when 4): the names of the seal_verdicts rows the guard refuses. Every replay compares the rows it measures as refused against this list by set equality, so the count cannot move silently in either direction.",
+    "refused": [
+      "declared_host_builtin_under_a_negation",
+      "declared_host_builtin_on_a_claimed_set"
+    ]
+  }
+}

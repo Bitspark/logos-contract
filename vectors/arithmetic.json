@@ -1,0 +1,3412 @@
+{
+  "seam": "logos ArithmeticTheory decision vector v1 (UNFROZEN v1)",
+  "note": "Language-AGNOSTIC tri-core THEORY-DECISION agreement vectors for the exact ArithmeticTheory (logos-core/arithmetic-theory@1.0.0), over two DISTINCT exact sorts: integer and decimal (#331; no float). Each entry is a ground arithmetic atom (predicate + args) together with the PINNED Theory.decide_ground outcome (#3126; the legacy decide is derived from it). The decision oracle is the Rust ArithmeticTheory in contract/rs/src/arithmetic.rs (shared by the search-side core/rs/src/builtins.rs); the Go ArithmeticTheory in contract/go/arithmetic.go and the TS one in contract/ts/src/arithmetic.ts MUST reproduce every outcome byte-for-byte. Integers route through the FROZEN ontos-data §5.1 `int` embedding (encode_int) and decimals through the FROZEN §5.9 `decimal` embedding (encode_decimal: mantissa x 10^exponent, canonical), so operand values are byte-identical across rs/go/ts BY CONSTRUCTION. int(5) and decimal(5,0) are DISTINCT terms, so `5 is 2+3.0` FAILS while `5.0 is 2+3.0` HOLDS; the comparisons (=:= < ...) order by VALUE across sorts so `2 =:= 2.0` HOLDS. Decimal `/` succeeds iff the quotient TERMINATES in base 10 (else arith_does_not_hold); `//` (truncating toward zero, result int) and `mod` (ISO floored, sign of the divisor, result decimal when an operand is decimal) are defined over decimals too (ADR 0022 Amendment), the SAME convention as the integer domain, computed exactly via integer division on scaled mantissas (no decimal `/`, so always terminating). Args are encoded structurally so each core builds the identical ontos Value: {\"int\": N} = the int embedding; {\"bigint\": \"<digits>\"} = the int embedding of a value beyond the JSON-int range (a string-typed INT, NOT a decimal); {\"decimal\": \"<d.dddd>\"} = the decimal embedding of that decimal literal spelling; {\"atom\": \"<utf8>\"} = a bare Atom of those bytes; {\"op\": \"<op>\", \"args\": [..]} = an operator compound Tuple(Atom(op), arg..); {\"tuple\": [..]} = a raw Tuple of the encoded children (a malformed/explicit shape); {\"text\": \"<s>\"} = the ontos-data utf8-text embedding. Since #2679 the decimal VALUE domain |exponent| <= 65536 is pinned for * and / on both sides of the bound, and the `decimal_spellings` section pins the literal parser (its own note). Outcome is \"holds\", {\"fails\": \"<code>\"} where the code is one of the pinned host-band sub-codes arith_does_not_hold | arith_bad_arity | arith_unknown_predicate, or (#3126) {\"not_completed\": \"<kind>\"} where the evaluator STOPPED before it decided (the kind is the stop's NonCompletionKind tag; the decimal alignment work cap is work_cap): not decided, never false, and the legacy decide answers NotMine for it. owns: is, =:=, =\\=, <, >, >=, =<.",
+  "identity": {
+    "id": "logos-core/arithmetic-theory",
+    "version": "1.0.0",
+    "config_digest_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "owns": {
+    "owned": [
+      "is",
+      "=:=",
+      "=\\=",
+      "<",
+      ">",
+      ">=",
+      "=<"
+    ],
+    "not_owned": [
+      "+",
+      "-",
+      "*",
+      "/",
+      "//",
+      "mod",
+      "abs",
+      "min",
+      "max",
+      "edge",
+      "number",
+      "atom",
+      "="
+    ]
+  },
+  "decisions": [
+    {
+      "name": "is_bound_result_sum",
+      "note": "5 is 2 + 3 -> the LHS equals the int embedding of the evaluated RHS",
+      "pred": "is",
+      "args": [
+        {
+          "int": 5
+        },
+        {
+          "op": "+",
+          "args": [
+            {
+              "int": 2
+            },
+            {
+              "int": 3
+            }
+          ]
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "is_bound_result_wrong",
+      "note": "6 is 2 + 3 -> the LHS does not equal 5, the result does not hold",
+      "pred": "is",
+      "args": [
+        {
+          "int": 6
+        },
+        {
+          "op": "+",
+          "args": [
+            {
+              "int": 2
+            },
+            {
+              "int": 3
+            }
+          ]
+        }
+      ],
+      "outcome": {
+        "fails": "arith_does_not_hold"
+      }
+    },
+    {
+      "name": "is_identity_literal",
+      "note": "7 is 7 -> a literal int leaf evaluates to itself",
+      "pred": "is",
+      "args": [
+        {
+          "int": 7
+        },
+        {
+          "int": 7
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "is_unary_minus",
+      "note": "-4 is -(4) -> unary minus",
+      "pred": "is",
+      "args": [
+        {
+          "int": -4
+        },
+        {
+          "op": "-",
+          "args": [
+            {
+              "int": 4
+            }
+          ]
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "is_nested_product",
+      "note": "20 is (2 + 3) * 4 -> nested operator tree",
+      "pred": "is",
+      "args": [
+        {
+          "int": 20
+        },
+        {
+          "op": "*",
+          "args": [
+            {
+              "op": "+",
+              "args": [
+                {
+                  "int": 2
+                },
+                {
+                  "int": 3
+                }
+              ]
+            },
+            {
+              "int": 4
+            }
+          ]
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "is_exact_division_even",
+      "note": "3 is 6 / 2 -> exact division, divides evenly",
+      "pred": "is",
+      "args": [
+        {
+          "int": 3
+        },
+        {
+          "op": "/",
+          "args": [
+            {
+              "int": 6
+            },
+            {
+              "int": 2
+            }
+          ]
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "is_exact_division_uneven_fails",
+      "note": "X is 7 / 2 -> exact `/` is inexact here, so the RHS is unevaluable; `is` fails (no fractional int, no float)",
+      "pred": "is",
+      "args": [
+        {
+          "int": 3
+        },
+        {
+          "op": "/",
+          "args": [
+            {
+              "int": 7
+            },
+            {
+              "int": 2
+            }
+          ]
+        }
+      ],
+      "outcome": {
+        "fails": "arith_does_not_hold"
+      }
+    },
+    {
+      "name": "is_trunc_division",
+      "note": "3 is 7 // 2 -> truncating division (toward zero)",
+      "pred": "is",
+      "args": [
+        {
+          "int": 3
+        },
+        {
+          "op": "//",
+          "args": [
+            {
+              "int": 7
+            },
+            {
+              "int": 2
+            }
+          ]
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "is_trunc_division_negative",
+      "note": "-3 is -7 // 2 -> truncation toward zero (NOT floored -4)",
+      "pred": "is",
+      "args": [
+        {
+          "int": -3
+        },
+        {
+          "op": "//",
+          "args": [
+            {
+              "int": -7
+            },
+            {
+              "int": 2
+            }
+          ]
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "is_floored_mod_neg_dividend",
+      "note": "2 is (-7) mod 3 -> ISO floored modulo, result takes the sign of the divisor",
+      "pred": "is",
+      "args": [
+        {
+          "int": 2
+        },
+        {
+          "op": "mod",
+          "args": [
+            {
+              "int": -7
+            },
+            {
+              "int": 3
+            }
+          ]
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "is_floored_mod_neg_divisor",
+      "note": "-2 is 7 mod (-3) -> floored modulo onto the negative divisor's side",
+      "pred": "is",
+      "args": [
+        {
+          "int": -2
+        },
+        {
+          "op": "mod",
+          "args": [
+            {
+              "int": 7
+            },
+            {
+              "int": -3
+            }
+          ]
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "is_abs",
+      "note": "5 is abs(-5)",
+      "pred": "is",
+      "args": [
+        {
+          "int": 5
+        },
+        {
+          "op": "abs",
+          "args": [
+            {
+              "int": -5
+            }
+          ]
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "is_min",
+      "note": "3 is min(3, 5)",
+      "pred": "is",
+      "args": [
+        {
+          "int": 3
+        },
+        {
+          "op": "min",
+          "args": [
+            {
+              "int": 3
+            },
+            {
+              "int": 5
+            }
+          ]
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "is_max",
+      "note": "5 is max(3, 5)",
+      "pred": "is",
+      "args": [
+        {
+          "int": 5
+        },
+        {
+          "op": "max",
+          "args": [
+            {
+              "int": 3
+            },
+            {
+              "int": 5
+            }
+          ]
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "is_div_by_zero_fails",
+      "note": "X is 1 // 0 -> division by zero is a domain error; the RHS is unevaluable, `is` fails (never a panic, never inf/NaN)",
+      "pred": "is",
+      "args": [
+        {
+          "int": 0
+        },
+        {
+          "op": "//",
+          "args": [
+            {
+              "int": 1
+            },
+            {
+              "int": 0
+            }
+          ]
+        }
+      ],
+      "outcome": {
+        "fails": "arith_does_not_hold"
+      }
+    },
+    {
+      "name": "is_mod_by_zero_fails",
+      "note": "X is 1 mod 0 -> modulo by zero fails the same way",
+      "pred": "is",
+      "args": [
+        {
+          "int": 0
+        },
+        {
+          "op": "mod",
+          "args": [
+            {
+              "int": 1
+            },
+            {
+              "int": 0
+            }
+          ]
+        }
+      ],
+      "outcome": {
+        "fails": "arith_does_not_hold"
+      }
+    },
+    {
+      "name": "is_unknown_operator_fails",
+      "note": "X is 2 ^ 3 -> `^` is not a registered operator; the RHS is unevaluable, `is` fails loud",
+      "pred": "is",
+      "args": [
+        {
+          "int": 8
+        },
+        {
+          "op": "^",
+          "args": [
+            {
+              "int": 2
+            },
+            {
+              "int": 3
+            }
+          ]
+        }
+      ],
+      "outcome": {
+        "fails": "arith_does_not_hold"
+      }
+    },
+    {
+      "name": "is_bom_prefixed_operator_fails",
+      "note": "#2682: 3 is BOM+(1, 2), where the operator atom is the bytes EF BB BF 2B (a UTF-8 BOM, then `+`). An operator is its exact bytes, so this is not `+`: the RHS is unevaluable and `is` fails, as for `^` above. ts's default TextDecoder STRIPPED the BOM, read the operator as `+` and made this hold, while rs and go refused it; ts now decodes through one exact-bytes decoder (contract/ts/src/utf8.ts).",
+      "pred": "is",
+      "args": [
+        {
+          "int": 3
+        },
+        {
+          "op": "﻿+",
+          "args": [
+            {
+              "int": 1
+            },
+            {
+              "int": 2
+            }
+          ]
+        }
+      ],
+      "outcome": {
+        "fails": "arith_does_not_hold"
+      }
+    },
+    {
+      "name": "is_non_int_atom_rhs_fails",
+      "note": "X is foo -> a bare atom is not an evaluable number; `is` fails",
+      "pred": "is",
+      "args": [
+        {
+          "int": 0
+        },
+        {
+          "atom": "foo"
+        }
+      ],
+      "outcome": {
+        "fails": "arith_does_not_hold"
+      }
+    },
+    {
+      "name": "is_decimal_atom_rhs_fails",
+      "note": "X is \"3.14\" -> a decimal atom is opaque (no frozen decimal embedding); not an evaluable number; `is` fails",
+      "pred": "is",
+      "args": [
+        {
+          "int": 3
+        },
+        {
+          "atom": "3.14"
+        }
+      ],
+      "outcome": {
+        "fails": "arith_does_not_hold"
+      }
+    },
+    {
+      "name": "is_text_embedding_rhs_fails",
+      "note": "X is utf8-text(\"5\") -> the utf8-text embedding is not the int embedding; not evaluable; `is` fails",
+      "pred": "is",
+      "args": [
+        {
+          "int": 5
+        },
+        {
+          "text": "5"
+        }
+      ],
+      "outcome": {
+        "fails": "arith_does_not_hold"
+      }
+    },
+    {
+      "name": "is_arity3_bad_arity",
+      "note": "is(1, 2, 3) -> no is/3 builtin; an owned name at an unregistered arity is a malformed arithmetic goal",
+      "pred": "is",
+      "args": [
+        {
+          "int": 1
+        },
+        {
+          "int": 2
+        },
+        {
+          "int": 3
+        }
+      ],
+      "outcome": {
+        "fails": "arith_bad_arity"
+      }
+    },
+    {
+      "name": "is_arity1_bad_arity",
+      "note": "is(1) -> no is/1 builtin",
+      "pred": "is",
+      "args": [
+        {
+          "int": 1
+        }
+      ],
+      "outcome": {
+        "fails": "arith_bad_arity"
+      }
+    },
+    {
+      "name": "eq_true",
+      "note": "1 + 1 =:= 2 -> arithmetic equality holds",
+      "pred": "=:=",
+      "args": [
+        {
+          "op": "+",
+          "args": [
+            {
+              "int": 1
+            },
+            {
+              "int": 1
+            }
+          ]
+        },
+        {
+          "int": 2
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "eq_false",
+      "note": "2 =:= 3 -> arithmetic equality does not hold",
+      "pred": "=:=",
+      "args": [
+        {
+          "int": 2
+        },
+        {
+          "int": 3
+        }
+      ],
+      "outcome": {
+        "fails": "arith_does_not_hold"
+      }
+    },
+    {
+      "name": "ne_true",
+      "note": "2 =\\= 3 -> arithmetic inequality holds",
+      "pred": "=\\=",
+      "args": [
+        {
+          "int": 2
+        },
+        {
+          "int": 3
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "ne_false",
+      "note": "2 =\\= 2 -> arithmetic inequality does not hold",
+      "pred": "=\\=",
+      "args": [
+        {
+          "int": 2
+        },
+        {
+          "int": 2
+        }
+      ],
+      "outcome": {
+        "fails": "arith_does_not_hold"
+      }
+    },
+    {
+      "name": "lt_true",
+      "note": "2 < 3",
+      "pred": "<",
+      "args": [
+        {
+          "int": 2
+        },
+        {
+          "int": 3
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "lt_false_equal",
+      "note": "3 < 3 -> not strictly less",
+      "pred": "<",
+      "args": [
+        {
+          "int": 3
+        },
+        {
+          "int": 3
+        }
+      ],
+      "outcome": {
+        "fails": "arith_does_not_hold"
+      }
+    },
+    {
+      "name": "lt_false_greater",
+      "note": "3 < 2",
+      "pred": "<",
+      "args": [
+        {
+          "int": 3
+        },
+        {
+          "int": 2
+        }
+      ],
+      "outcome": {
+        "fails": "arith_does_not_hold"
+      }
+    },
+    {
+      "name": "lt_negative",
+      "note": "-5 < -3 -> negative ordering",
+      "pred": "<",
+      "args": [
+        {
+          "int": -5
+        },
+        {
+          "int": -3
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "gt_true",
+      "note": "3 > 2",
+      "pred": ">",
+      "args": [
+        {
+          "int": 3
+        },
+        {
+          "int": 2
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "gt_false",
+      "note": "2 > 3",
+      "pred": ">",
+      "args": [
+        {
+          "int": 2
+        },
+        {
+          "int": 3
+        }
+      ],
+      "outcome": {
+        "fails": "arith_does_not_hold"
+      }
+    },
+    {
+      "name": "ge_true_equal",
+      "note": "3 >= 3 -> greater-or-equal, equal branch",
+      "pred": ">=",
+      "args": [
+        {
+          "int": 3
+        },
+        {
+          "int": 3
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "ge_false",
+      "note": "2 >= 3",
+      "pred": ">=",
+      "args": [
+        {
+          "int": 2
+        },
+        {
+          "int": 3
+        }
+      ],
+      "outcome": {
+        "fails": "arith_does_not_hold"
+      }
+    },
+    {
+      "name": "le_true_equal",
+      "note": "3 =< 3 -> less-or-equal, equal branch",
+      "pred": "=<",
+      "args": [
+        {
+          "int": 3
+        },
+        {
+          "int": 3
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "le_false",
+      "note": "3 =< 2",
+      "pred": "=<",
+      "args": [
+        {
+          "int": 3
+        },
+        {
+          "int": 2
+        }
+      ],
+      "outcome": {
+        "fails": "arith_does_not_hold"
+      }
+    },
+    {
+      "name": "cmp_with_expression",
+      "note": "(2 * 3) < (3 + 4) -> both sides are expressions; 6 < 7 holds",
+      "pred": "<",
+      "args": [
+        {
+          "op": "*",
+          "args": [
+            {
+              "int": 2
+            },
+            {
+              "int": 3
+            }
+          ]
+        },
+        {
+          "op": "+",
+          "args": [
+            {
+              "int": 3
+            },
+            {
+              "int": 4
+            }
+          ]
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "cmp_non_int_operand_fails",
+      "note": "foo < 3 -> a non-int operand makes the comparison fail (eval error -> goal fails)",
+      "pred": "<",
+      "args": [
+        {
+          "atom": "foo"
+        },
+        {
+          "int": 3
+        }
+      ],
+      "outcome": {
+        "fails": "arith_does_not_hold"
+      }
+    },
+    {
+      "name": "cmp_div_by_zero_operand_fails",
+      "note": "(1 // 0) < 3 -> a division-by-zero operand makes the comparison fail loud",
+      "pred": "<",
+      "args": [
+        {
+          "op": "//",
+          "args": [
+            {
+              "int": 1
+            },
+            {
+              "int": 0
+            }
+          ]
+        },
+        {
+          "int": 3
+        }
+      ],
+      "outcome": {
+        "fails": "arith_does_not_hold"
+      }
+    },
+    {
+      "name": "cmp_arity1_bad_arity",
+      "note": "<(1) -> no </1 builtin; malformed arithmetic goal",
+      "pred": "<",
+      "args": [
+        {
+          "int": 1
+        }
+      ],
+      "outcome": {
+        "fails": "arith_bad_arity"
+      }
+    },
+    {
+      "name": "cmp_arity3_bad_arity",
+      "note": "=:=(1, 2, 3) -> no =:=/3 builtin",
+      "pred": "=:=",
+      "args": [
+        {
+          "int": 1
+        },
+        {
+          "int": 2
+        },
+        {
+          "int": 3
+        }
+      ],
+      "outcome": {
+        "fails": "arith_bad_arity"
+      }
+    },
+    {
+      "name": "is_boundary_i64_max",
+      "note": "9223372036854775807 is 9223372036854775806 + 1 -> i64::MAX boundary, exact (no overflow/wrap)",
+      "pred": "is",
+      "args": [
+        {
+          "int": 9223372036854775807
+        },
+        {
+          "op": "+",
+          "args": [
+            {
+              "int": 9223372036854775806
+            },
+            {
+              "int": 1
+            }
+          ]
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "is_overflow_beyond_i64",
+      "note": "9223372036854775808 is 9223372036854775807 + 1 -> crosses i64::MAX; exact unbounded integer, NO wrap to negative. The result is authored as `bigint` (a string-typed INT, NOT a decimal) because it exceeds the int64/JSON-int range; the operand 9223372036854775807 is i64::MAX (still a JSON int).",
+      "pred": "is",
+      "args": [
+        {
+          "bigint": "9223372036854775808"
+        },
+        {
+          "op": "+",
+          "args": [
+            {
+              "int": 9223372036854775807
+            },
+            {
+              "int": 1
+            }
+          ]
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "is_big_beyond_i128",
+      "note": "10^40 is 10^20 * 10^20 -> magnitude well past i128::MAX (~3.4e38); the unbounded bigint domain holds exactly",
+      "pred": "is",
+      "args": [
+        {
+          "bigint": "10000000000000000000000000000000000000000"
+        },
+        {
+          "op": "*",
+          "args": [
+            {
+              "bigint": "100000000000000000000"
+            },
+            {
+              "bigint": "100000000000000000000"
+            }
+          ]
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "cmp_big_beyond_i128",
+      "note": "10^40 > 10^39 -> ordering on values beyond i128",
+      "pred": ">",
+      "args": [
+        {
+          "bigint": "10000000000000000000000000000000000000000"
+        },
+        {
+          "bigint": "1000000000000000000000000000000000000000"
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "is_zero",
+      "note": "0 is 5 - 5 -> zero is canonical (no negative zero)",
+      "pred": "is",
+      "args": [
+        {
+          "int": 0
+        },
+        {
+          "op": "-",
+          "args": [
+            {
+              "int": 5
+            },
+            {
+              "int": 5
+            }
+          ]
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "is_max_tie",
+      "note": "5 is max(5,5) -> equal operands; pins the one spot rs (Ord::max -> 2nd arg) and go/ts (1st arg) differ, provably unobservable for equal ints",
+      "pred": "is",
+      "args": [
+        {
+          "int": 5
+        },
+        {
+          "op": "max",
+          "args": [
+            {
+              "int": 5
+            },
+            {
+              "int": 5
+            }
+          ]
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "is_min_neg_tie",
+      "note": "-3 is min(-3,-3) -> equal negative operands; the min tie-break is unobservable for equal ints",
+      "pred": "is",
+      "args": [
+        {
+          "int": -3
+        },
+        {
+          "op": "min",
+          "args": [
+            {
+              "int": -3
+            },
+            {
+              "int": -3
+            }
+          ]
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "is_exact_division_neg_neg",
+      "note": "2 is -6 / -3 -> exact division, two negatives give a positive quotient",
+      "pred": "is",
+      "args": [
+        {
+          "int": 2
+        },
+        {
+          "op": "/",
+          "args": [
+            {
+              "int": -6
+            },
+            {
+              "int": -3
+            }
+          ]
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "is_exact_division_neg_divisor",
+      "note": "-25 is 100 / -4 -> exact division, negative divisor yields a negative quotient",
+      "pred": "is",
+      "args": [
+        {
+          "int": -25
+        },
+        {
+          "op": "/",
+          "args": [
+            {
+              "int": 100
+            },
+            {
+              "int": -4
+            }
+          ]
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "is_trunc_division_neg_divisor",
+      "note": "-3 is 7 // -2 -> truncating (toward-zero) integer division: 7/-2 = -3.5 truncates to -3, not floor -4",
+      "pred": "is",
+      "args": [
+        {
+          "int": -3
+        },
+        {
+          "op": "//",
+          "args": [
+            {
+              "int": 7
+            },
+            {
+              "int": -2
+            }
+          ]
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "is_unary_minus_zero",
+      "note": "0 is -(0) -> unary minus of zero is canonical zero (no negative zero) across the three encoders",
+      "pred": "is",
+      "args": [
+        {
+          "int": 0
+        },
+        {
+          "op": "-",
+          "args": [
+            {
+              "int": 0
+            }
+          ]
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "is_abs_zero",
+      "note": "0 is abs(0) -> absolute value of zero is canonical zero (no negative zero)",
+      "pred": "is",
+      "args": [
+        {
+          "int": 0
+        },
+        {
+          "op": "abs",
+          "args": [
+            {
+              "int": 0
+            }
+          ]
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "is_op_wrong_arity_plus",
+      "note": "5 is +(1) -> a registered operator with the WRONG arity (+ needs 2) fails to evaluate, so the is does not hold (distinct from predicate bad-arity)",
+      "pred": "is",
+      "args": [
+        {
+          "int": 5
+        },
+        {
+          "op": "+",
+          "args": [
+            {
+              "int": 1
+            }
+          ]
+        }
+      ],
+      "outcome": {
+        "fails": "arith_does_not_hold"
+      }
+    },
+    {
+      "name": "is_op_wrong_arity_abs",
+      "note": "1 is abs(1,2) -> registered op abs with the WRONG arity (abs needs 1) fails to evaluate, so the is does not hold",
+      "pred": "is",
+      "args": [
+        {
+          "int": 1
+        },
+        {
+          "op": "abs",
+          "args": [
+            {
+              "int": 1
+            },
+            {
+              "int": 2
+            }
+          ]
+        }
+      ],
+      "outcome": {
+        "fails": "arith_does_not_hold"
+      }
+    },
+    {
+      "name": "dec_is_literal",
+      "note": "#331 3.14 is 3.14 -> a decimal literal evaluates to itself (decimal(314,-2))",
+      "pred": "is",
+      "args": [
+        {
+          "decimal": "3.14"
+        },
+        {
+          "decimal": "3.14"
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "dec_is_sum",
+      "note": "#331 4.0 is 1.5 + 2.5 -> exact decimal addition aligns scales; result decimal(4,0)",
+      "pred": "is",
+      "args": [
+        {
+          "decimal": "4.0"
+        },
+        {
+          "op": "+",
+          "args": [
+            {
+              "decimal": "1.5"
+            },
+            {
+              "decimal": "2.5"
+            }
+          ]
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "dec_is_sum_exact_tenths",
+      "note": "#331 0.3 is 0.1 + 0.2 -> EXACT (the float 0.1+0.2 != 0.3 trap does NOT apply; the domain is exact decimal)",
+      "pred": "is",
+      "args": [
+        {
+          "decimal": "0.3"
+        },
+        {
+          "op": "+",
+          "args": [
+            {
+              "decimal": "0.1"
+            },
+            {
+              "decimal": "0.2"
+            }
+          ]
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "dec_is_mul",
+      "note": "#331 0.06 is 0.2 * 0.3 -> multiply mantissas, add exponents; result decimal(6,-2)",
+      "pred": "is",
+      "args": [
+        {
+          "decimal": "0.06"
+        },
+        {
+          "op": "*",
+          "args": [
+            {
+              "decimal": "0.2"
+            },
+            {
+              "decimal": "0.3"
+            }
+          ]
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "dec_is_unary_minus",
+      "note": "#331 -3.14 is -(3.14) -> unary minus negates the decimal mantissa; result decimal(-314,-2)",
+      "pred": "is",
+      "args": [
+        {
+          "decimal": "-3.14"
+        },
+        {
+          "op": "-",
+          "args": [
+            {
+              "decimal": "3.14"
+            }
+          ]
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "dec_is_abs",
+      "note": "#331 3.14 is abs(-3.14) -> decimal absolute value",
+      "pred": "is",
+      "args": [
+        {
+          "decimal": "3.14"
+        },
+        {
+          "op": "abs",
+          "args": [
+            {
+              "decimal": "-3.14"
+            }
+          ]
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "dec_div_terminating_half",
+      "note": "#331 0.5 is 1.0 / 2 -> exact terminating division (denominator 2 has only factor 2); int operand promoted",
+      "pred": "is",
+      "args": [
+        {
+          "decimal": "0.5"
+        },
+        {
+          "op": "/",
+          "args": [
+            {
+              "decimal": "1.0"
+            },
+            {
+              "int": 2
+            }
+          ]
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "dec_div_terminating_quarter",
+      "note": "#331 2.5 is 5.0 / 2 -> exact terminating decimal division; result decimal(25,-1)",
+      "pred": "is",
+      "args": [
+        {
+          "decimal": "2.5"
+        },
+        {
+          "op": "/",
+          "args": [
+            {
+              "decimal": "5.0"
+            },
+            {
+              "int": 2
+            }
+          ]
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "dec_div_nonterminating_fails",
+      "note": "#331 0.3 is 1.0 / 3 -> 1/3 does NOT terminate in base 10 (denominator factor 3), so / fails and the is does not hold (no rounding, no float)",
+      "pred": "is",
+      "args": [
+        {
+          "decimal": "0.3"
+        },
+        {
+          "op": "/",
+          "args": [
+            {
+              "decimal": "1.0"
+            },
+            {
+              "int": 3
+            }
+          ]
+        }
+      ],
+      "outcome": {
+        "fails": "arith_does_not_hold"
+      }
+    },
+    {
+      "name": "dec_div_by_zero_fails",
+      "note": "#331 0.0 is 1.0 / 0 -> division by zero is a domain error; the is does not hold",
+      "pred": "is",
+      "args": [
+        {
+          "decimal": "0.0"
+        },
+        {
+          "op": "/",
+          "args": [
+            {
+              "decimal": "1.0"
+            },
+            {
+              "int": 0
+            }
+          ]
+        }
+      ],
+      "outcome": {
+        "fails": "arith_does_not_hold"
+      }
+    },
+    {
+      "name": "dec_floordiv_decimal",
+      "note": "#416 2 is 5.0 // 2 -> // over decimals is the exact quotient TRUNCATED toward zero, result an INTEGER (ADR 0022 Amendment); 5.0/2 = 2.5 truncates to int 2, so the is HOLDS (re-pins the prior #331 dec_floordiv_rejects_decimal, which made this a domain error)",
+      "pred": "is",
+      "args": [
+        {
+          "int": 2
+        },
+        {
+          "op": "//",
+          "args": [
+            {
+              "decimal": "5.0"
+            },
+            {
+              "int": 2
+            }
+          ]
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "dec_floordiv_dec_dec",
+      "note": "#416 3 is 7.5 // 2.5 -> decimal // decimal: 7.5/2.5 = 3.0 truncates to int 3 (result sort int)",
+      "pred": "is",
+      "args": [
+        {
+          "int": 3
+        },
+        {
+          "op": "//",
+          "args": [
+            {
+              "decimal": "7.5"
+            },
+            {
+              "decimal": "2.5"
+            }
+          ]
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "dec_floordiv_int_dec",
+      "note": "#416 2 is 7 // 2.5 -> int // decimal (int promoted): 7/2.5 = 2.8 truncates toward zero to int 2",
+      "pred": "is",
+      "args": [
+        {
+          "int": 2
+        },
+        {
+          "op": "//",
+          "args": [
+            {
+              "int": 7
+            },
+            {
+              "decimal": "2.5"
+            }
+          ]
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "dec_floordiv_neg_truncates_not_floors",
+      "note": "#416 -3 is -7.5 // 2 -> // truncates TOWARD ZERO, NOT floor: -7.5/2 = -3.75 truncates to int -3 (floor would be -4) — the floor-vs-truncate distinguishing case, mirroring the integer // convention",
+      "pred": "is",
+      "args": [
+        {
+          "int": -3
+        },
+        {
+          "op": "//",
+          "args": [
+            {
+              "decimal": "-7.5"
+            },
+            {
+              "int": 2
+            }
+          ]
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "dec_floordiv_result_is_int_not_decimal",
+      "note": "#416 2.0 is 5.0 // 2 -> // always yields an INTEGER, not a decimal; int 2 != decimal(2,0), so the decimal LHS FAILS (distinct sorts; pins the result sort)",
+      "pred": "is",
+      "args": [
+        {
+          "decimal": "2.0"
+        },
+        {
+          "op": "//",
+          "args": [
+            {
+              "decimal": "5.0"
+            },
+            {
+              "int": 2
+            }
+          ]
+        }
+      ],
+      "outcome": {
+        "fails": "arith_does_not_hold"
+      }
+    },
+    {
+      "name": "dec_floordiv_by_zero_fails",
+      "note": "#416 0 is 5.0 // 0 -> a zero divisor is a domain error (same as the integer //); the RHS is unevaluable, the is does not hold (never a panic)",
+      "pred": "is",
+      "args": [
+        {
+          "int": 0
+        },
+        {
+          "op": "//",
+          "args": [
+            {
+              "decimal": "5.0"
+            },
+            {
+              "int": 0
+            }
+          ]
+        }
+      ],
+      "outcome": {
+        "fails": "arith_does_not_hold"
+      }
+    },
+    {
+      "name": "dec_mod_exact",
+      "note": "#416 0.0 is 7.5 mod 0.25 -> mod over decimals is the EXACT ISO floored remainder, result a DECIMAL: floor(7.5/0.25)=30, 7.5 - 30*0.25 = 0.0 (decimal(0,0))",
+      "pred": "is",
+      "args": [
+        {
+          "decimal": "0.0"
+        },
+        {
+          "op": "mod",
+          "args": [
+            {
+              "decimal": "7.5"
+            },
+            {
+              "decimal": "0.25"
+            }
+          ]
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "dec_mod_dec_dec",
+      "note": "#416 1.5 is 7.5 mod 3.0 -> decimal mod decimal: floor(7.5/3.0)=2, 7.5 - 2*3.0 = 1.5 (decimal)",
+      "pred": "is",
+      "args": [
+        {
+          "decimal": "1.5"
+        },
+        {
+          "op": "mod",
+          "args": [
+            {
+              "decimal": "7.5"
+            },
+            {
+              "decimal": "3.0"
+            }
+          ]
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "dec_mod_int_dec",
+      "note": "#416 0.5 is 3 mod 2.5 -> int mod decimal (int promoted): floor(3/2.5)=floor(1.2)=1, 3 - 1*2.5 = 0.5 (decimal)",
+      "pred": "is",
+      "args": [
+        {
+          "decimal": "0.5"
+        },
+        {
+          "op": "mod",
+          "args": [
+            {
+              "int": 3
+            },
+            {
+              "decimal": "2.5"
+            }
+          ]
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "dec_mod_neg_dividend",
+      "note": "#416 0.5 is -7.5 mod 2 -> ISO floored mod, sign follows the (positive) divisor: floor(-7.5/2)=floor(-3.75)=-4, -7.5 - (-4)*2 = 0.5 (decimal)",
+      "pred": "is",
+      "args": [
+        {
+          "decimal": "0.5"
+        },
+        {
+          "op": "mod",
+          "args": [
+            {
+              "decimal": "-7.5"
+            },
+            {
+              "int": 2
+            }
+          ]
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "dec_mod_neg_divisor",
+      "note": "#416 -0.5 is 7.5 mod -2 -> floored mod onto the negative divisor's side: floor(7.5/-2)=floor(-3.75)=-4, 7.5 - (-4)*(-2) = -0.5 (decimal)",
+      "pred": "is",
+      "args": [
+        {
+          "decimal": "-0.5"
+        },
+        {
+          "op": "mod",
+          "args": [
+            {
+              "decimal": "7.5"
+            },
+            {
+              "int": -2
+            }
+          ]
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "dec_mod_result_is_decimal_not_int",
+      "note": "#416 0 is 6.0 mod 3 -> a decimal operand makes mod yield a DECIMAL: 6.0 mod 3 = decimal(0,0), which is NOT int 0, so the int LHS FAILS (distinct sorts; pins the result sort)",
+      "pred": "is",
+      "args": [
+        {
+          "int": 0
+        },
+        {
+          "op": "mod",
+          "args": [
+            {
+              "decimal": "6.0"
+            },
+            {
+              "int": 3
+            }
+          ]
+        }
+      ],
+      "outcome": {
+        "fails": "arith_does_not_hold"
+      }
+    },
+    {
+      "name": "dec_mod_by_zero_fails",
+      "note": "#416 0.0 is 5.0 mod 0 -> a zero divisor is a domain error (same as the integer mod); the is does not hold",
+      "pred": "is",
+      "args": [
+        {
+          "decimal": "0.0"
+        },
+        {
+          "op": "mod",
+          "args": [
+            {
+              "decimal": "5.0"
+            },
+            {
+              "int": 0
+            }
+          ]
+        }
+      ],
+      "outcome": {
+        "fails": "arith_does_not_hold"
+      }
+    },
+    {
+      "name": "mixed_is_distinct_sort_fails",
+      "note": "#331 5 is 2 + 3.0 -> a decimal operand promotes the result to decimal(5,0), which is NOT the int 5; distinct sorts, so the is FAILS",
+      "pred": "is",
+      "args": [
+        {
+          "int": 5
+        },
+        {
+          "op": "+",
+          "args": [
+            {
+              "int": 2
+            },
+            {
+              "decimal": "3.0"
+            }
+          ]
+        }
+      ],
+      "outcome": {
+        "fails": "arith_does_not_hold"
+      }
+    },
+    {
+      "name": "mixed_is_decimal_lhs_holds",
+      "note": "#331 5.0 is 2 + 3.0 -> the decimal LHS matches the decimal result decimal(5,0); HOLDS (companion to mixed_is_distinct_sort_fails)",
+      "pred": "is",
+      "args": [
+        {
+          "decimal": "5.0"
+        },
+        {
+          "op": "+",
+          "args": [
+            {
+              "int": 2
+            },
+            {
+              "decimal": "3.0"
+            }
+          ]
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "dec_min_mixed_keeps_int",
+      "note": "#331 2 is min(2, 2.5) -> min orders by value (2 < 2.5) and returns the chosen operand in its OWN sort (int 2)",
+      "pred": "is",
+      "args": [
+        {
+          "int": 2
+        },
+        {
+          "op": "min",
+          "args": [
+            {
+              "int": 2
+            },
+            {
+              "decimal": "2.5"
+            }
+          ]
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "dec_max_mixed_keeps_decimal",
+      "note": "#331 2.5 is max(2, 2.5) -> max returns the decimal 2.5 in its own sort",
+      "pred": "is",
+      "args": [
+        {
+          "decimal": "2.5"
+        },
+        {
+          "op": "max",
+          "args": [
+            {
+              "int": 2
+            },
+            {
+              "decimal": "2.5"
+            }
+          ]
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "cmp_int_eq_decimal",
+      "note": "#331 2 =:= 2.0 -> arithmetic equality compares by VALUE across sorts; HOLDS",
+      "pred": "=:=",
+      "args": [
+        {
+          "int": 2
+        },
+        {
+          "decimal": "2.0"
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "cmp_decimal_eq_scales",
+      "note": "#331 0.5 =:= 0.50 -> 0.50 canonicalizes to 0.5 (decimal(5,-1)); equal",
+      "pred": "=:=",
+      "args": [
+        {
+          "decimal": "0.5"
+        },
+        {
+          "decimal": "0.50"
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "cmp_int_lt_decimal",
+      "note": "#331 2 < 2.5 -> cross-sort value comparison",
+      "pred": "<",
+      "args": [
+        {
+          "int": 2
+        },
+        {
+          "decimal": "2.5"
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "cmp_decimal_gt_across_decades",
+      "note": "#331 10.0 > 2.5 -> different magnitude decades, decided by order without alignment",
+      "pred": ">",
+      "args": [
+        {
+          "decimal": "10.0"
+        },
+        {
+          "decimal": "2.5"
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "cmp_neg_decimal_lt",
+      "note": "#331 -3.14 < 2.0 -> sign decides the order",
+      "pred": "<",
+      "args": [
+        {
+          "decimal": "-3.14"
+        },
+        {
+          "decimal": "2.0"
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "dec_scale_add_exceeds_shift_fails",
+      "note": "#451 (ADR 0022 value domain) X is 1.0 + decimal(1, -65537) -> the operand decimal(1, -65537) is OUTSIDE the value domain (|exponent| <= 65536, #1385), so it is not a number and the is does not hold: a domain failure, the language's answer. (This row once read as the alignment cap; since #3126 a shift past MAX_DECIMAL_SCALE_SHIFT between two IN-domain operands is not decided, see dec_scale_gap_past_cap_add_not_decided.) The operand is authored as the raw tuple (decimal, int 1, int -65537).",
+      "pred": "is",
+      "args": [
+        {
+          "decimal": "1.0"
+        },
+        {
+          "op": "+",
+          "args": [
+            {
+              "decimal": "1.0"
+            },
+            {
+              "tuple": [
+                {
+                  "atom": "decimal"
+                },
+                {
+                  "int": 1
+                },
+                {
+                  "int": -65537
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "outcome": {
+        "fails": "arith_does_not_hold"
+      }
+    },
+    {
+      "name": "dec_scale_sub_exceeds_shift_fails",
+      "note": "#451 (ADR 0022 value domain) X is 1.0 - decimal(1, -65537) -> the operand is outside the value domain, as in dec_scale_add_exceeds_shift_fails, so the is does not hold. (Since #3126 the in-domain twin is dec_scale_gap_past_cap_sub_not_decided, not decided.)",
+      "pred": "is",
+      "args": [
+        {
+          "decimal": "1.0"
+        },
+        {
+          "op": "-",
+          "args": [
+            {
+              "decimal": "1.0"
+            },
+            {
+              "tuple": [
+                {
+                  "atom": "decimal"
+                },
+                {
+                  "int": 1
+                },
+                {
+                  "int": -65537
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "outcome": {
+        "fails": "arith_does_not_hold"
+      }
+    },
+    {
+      "name": "dec_scale_add_within_shift_holds",
+      "note": "#451 companion to the refusals: 1.00000001 is 1.0 + decimal(1, -8) -> a scale gap of 8 is WELL within MAX_DECIMAL_SCALE_SHIFT, so the + materializes the aligned integer and HOLDS; the bound refuses only the adversarial gap, never a realistic one. The small-exponent operand is the raw tuple (decimal, int 1, int -8) = decimal(1,-8).",
+      "pred": "is",
+      "args": [
+        {
+          "decimal": "1.00000001"
+        },
+        {
+          "op": "+",
+          "args": [
+            {
+              "decimal": "1.0"
+            },
+            {
+              "tuple": [
+                {
+                  "atom": "decimal"
+                },
+                {
+                  "int": 1
+                },
+                {
+                  "int": -8
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "dec_exponent_beyond_i128_operand_fails",
+      "note": "#451 (#331 scale bound) X is decimal(1, 10^39) + 1.0 -> a decimal whose exponent child (10^39, 40 digits) EXCEEDS i128::MAX (~1.7e38) is NOT a well-formed number: from_decimal_term narrows the frozen-int exponent to the bounded i128 scale and rejects it, so the operand is unevaluable and the is does not hold. The structure is canonical (mantissa 1 is not divisible by 10) — only the exponent magnitude is out of band — authored as the raw tuple (decimal, int 1, bigint 10^39).",
+      "pred": "is",
+      "args": [
+        {
+          "decimal": "1.0"
+        },
+        {
+          "op": "+",
+          "args": [
+            {
+              "tuple": [
+                {
+                  "atom": "decimal"
+                },
+                {
+                  "int": 1
+                },
+                {
+                  "bigint": "1000000000000000000000000000000000000000"
+                }
+              ]
+            },
+            {
+              "decimal": "1.0"
+            }
+          ]
+        }
+      ],
+      "outcome": {
+        "fails": "arith_does_not_hold"
+      }
+    },
+    {
+      "name": "dec_exponent_beyond_i128_neg_operand_fails",
+      "note": "#451 (#331 scale bound) the negative-exponent twin: X is decimal(1, -10^39) + 1.0 -> a beyond-i128 NEGATIVE exponent (|−10^39| > i128::MAX) is equally out of band; from_decimal_term rejects it on the |exponent| > i128::MAX magnitude check, so the is does not hold. Raw tuple (decimal, int 1, bigint -10^39).",
+      "pred": "is",
+      "args": [
+        {
+          "decimal": "1.0"
+        },
+        {
+          "op": "+",
+          "args": [
+            {
+              "tuple": [
+                {
+                  "atom": "decimal"
+                },
+                {
+                  "int": 1
+                },
+                {
+                  "bigint": "-1000000000000000000000000000000000000000"
+                }
+              ]
+            },
+            {
+              "decimal": "1.0"
+            }
+          ]
+        }
+      ],
+      "outcome": {
+        "fails": "arith_does_not_hold"
+      }
+    },
+    {
+      "name": "dec_mul_exponent_saturation_boundary",
+      "note": "#475 (canonicalization exponent boundary) X is decimal(2, i128::MAX) * decimal(5, 0) -> BOTH operands decode (mantissa 2 is canonical, exponent exactly i128::MAX is in band, so from_decimal_term accepts them — distinct from #451, where the operand itself is out of band). The exponent SUM (i128::MAX + 0 = i128::MAX) is in band, so the overflow guard passes; but the product mantissa 2*5 = 10 carries ONE trailing zero, so the canonical exponent wants i128::MAX + 1 — out of the i128 scale band. rs once SATURATED the canonicalization add to i128::MAX (lowering to decimal(1, i128::MAX), wrong but encoding) while go/ts carried the increment on an unbounded big.Int/bigint (decimal(1, i128::MAX+1), which fails re-decode): a live holds/fails tri-core divergence. The fix makes the canonicalization increment CHECKED in all three from_parts, so the boundary is REJECTED identically tri-core (the * is unevaluable, the is does not hold). The i128::MAX-scale operand is authored as the raw tuple (decimal, int 2, bigint i128::MAX) — an i128::MAX-scale literal spelling is impossible (~1.7e38 fraction digits). ⚠ #1385 AMENDED: the cap at decode makes the i128::MAX-scale operand refuse at DECODE, so the sentence above about both operands decoding and the rejection happening later at canonicalization no longer describes this case. The pinned OUTCOME is unchanged (the is still does not hold) - only the refusal SITE moved earlier, and this case no longer discriminates itself from the #451 out-of-band-operand shape. Kept because the checked canonicalization it was built to pin is still the live guard for values reached through from_parts, which the ruling leaves untouched.",
+      "pred": "is",
+      "args": [
+        {
+          "decimal": "1.0"
+        },
+        {
+          "op": "*",
+          "args": [
+            {
+              "tuple": [
+                {
+                  "atom": "decimal"
+                },
+                {
+                  "int": 2
+                },
+                {
+                  "bigint": "170141183460469231731687303715884105727"
+                }
+              ]
+            },
+            {
+              "decimal": "5.0"
+            }
+          ]
+        }
+      ],
+      "outcome": {
+        "fails": "arith_does_not_hold"
+      }
+    },
+    {
+      "name": "dec_div_exponent_saturation_boundary",
+      "note": "#475 div twin (canonicalization exponent boundary) X is decimal(2, i128::MAX) / decimal(8, -3) -> both operands decode. div_terminating computes the quotient exponent eₐ − e_b − k where k = max(v₂(8), v₅(8)) = 3, so eₐ − e_b − k = i128::MAX − (−3) − 3 = i128::MAX (in band on a big-int), and the quotient mantissa is (2·10^3)/8 = 250, which canonicalizes to 25 at exponent i128::MAX + 1 — out of band. All three cores now REJECT, so the is does not hold; the pinned outcome is identical, only the rejection SITE differs (rs rejects earlier on the checked_sub of the raw exponent difference i128::MAX − (−3), which overflows i128; go/ts compute the difference on an unbounded big.Int/bigint and reach the checked canonicalization). Before the fix go/ts saturated/diverged here. i128::MAX-scale operand authored as the raw tuple (decimal, int 2, bigint i128::MAX). ⚠ #1385 AMENDED: same as the mul twin - the i128::MAX-scale operand now refuses at DECODE, so the per-core rejection-SITE commentary above is historical. Outcome unchanged.",
+      "pred": "is",
+      "args": [
+        {
+          "decimal": "1.0"
+        },
+        {
+          "op": "/",
+          "args": [
+            {
+              "tuple": [
+                {
+                  "atom": "decimal"
+                },
+                {
+                  "int": 2
+                },
+                {
+                  "bigint": "170141183460469231731687303715884105727"
+                }
+              ]
+            },
+            {
+              "tuple": [
+                {
+                  "atom": "decimal"
+                },
+                {
+                  "int": 8
+                },
+                {
+                  "int": -3
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "outcome": {
+        "fails": "arith_does_not_hold"
+      }
+    },
+    {
+      "name": "dec_scale_bound_at_bound_decodes",
+      "note": "#1385 (ruling: cap at decode) decimal(1, 65536) =:= itself -> the exponent is EXACTLY MAX_DECIMAL_SCALE_SHIFT, so |exponent| <= 65536 admits it and both sides decode; equal values, so the comparison HOLDS. Authored as the raw tuple (decimal, int 1, bigint 65536) because the DECODE seam is under test - a {\"decimal\": \"...\"} literal would go through the parser, whose own literal-scale cap the ruling deliberately does NOT touch. Both args identical so decodability is the only variable across this case and its three siblings.",
+      "pred": "=:=",
+      "args": [
+        {
+          "tuple": [
+            {
+              "atom": "decimal"
+            },
+            {
+              "int": 1
+            },
+            {
+              "bigint": "65536"
+            }
+          ]
+        },
+        {
+          "tuple": [
+            {
+              "atom": "decimal"
+            },
+            {
+              "int": 1
+            },
+            {
+              "bigint": "65536"
+            }
+          ]
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "dec_scale_bound_at_negative_bound_decodes",
+      "note": "#1385 the negative twin: decimal(1, -65536) =:= itself -> the cap is two-sided (|exponent| <= 65536), so the lower end of the band is admitted identically and the comparison HOLDS. Pins that the bound is symmetric rather than an upper limit only.",
+      "pred": "=:=",
+      "args": [
+        {
+          "tuple": [
+            {
+              "atom": "decimal"
+            },
+            {
+              "int": 1
+            },
+            {
+              "bigint": "-65536"
+            }
+          ]
+        },
+        {
+          "tuple": [
+            {
+              "atom": "decimal"
+            },
+            {
+              "int": 1
+            },
+            {
+              "bigint": "-65536"
+            }
+          ]
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "dec_scale_bound_one_past_refused",
+      "note": "#1385 decimal(1, 65537) =:= itself -> ONE past the bound. from_decimal_term / decFromTerm / fromTerm refuse the operand at DECODE (the existing typed refusal, no new code space), so it is not an evaluable number and the comparison does not hold. The only difference from the at-bound sibling is the exponent, so this pins the boundary itself rather than a general refusal.",
+      "pred": "=:=",
+      "args": [
+        {
+          "tuple": [
+            {
+              "atom": "decimal"
+            },
+            {
+              "int": 1
+            },
+            {
+              "bigint": "65537"
+            }
+          ]
+        },
+        {
+          "tuple": [
+            {
+              "atom": "decimal"
+            },
+            {
+              "int": 1
+            },
+            {
+              "bigint": "65537"
+            }
+          ]
+        }
+      ],
+      "outcome": {
+        "fails": "arith_does_not_hold"
+      }
+    },
+    {
+      "name": "dec_scale_bound_i128_min_refused",
+      "note": "#1385 decimal(1, i128::MIN) =:= itself -> THE MEASURED DIVERGENCE VALUE, pinned so it cannot silently return: before this ruling rs ACCEPTED this exponent (its decode narrowed to i128 and i128::MIN fits) while go/ts REJECTED it (they compared |exponent| against i128::MAX, and 2^127 exceeds i128::MAX = 2^127-1). All three now refuse it at decode for the SAME reason - it is past the scale bound - so the cores agree by construction rather than by coincidence. Note the implementation must not test this with abs(): i128::MIN.abs() overflows.",
+      "pred": "=:=",
+      "args": [
+        {
+          "tuple": [
+            {
+              "atom": "decimal"
+            },
+            {
+              "int": 1
+            },
+            {
+              "bigint": "-170141183460469231731687303715884105728"
+            }
+          ]
+        },
+        {
+          "tuple": [
+            {
+              "atom": "decimal"
+            },
+            {
+              "int": 1
+            },
+            {
+              "bigint": "-170141183460469231731687303715884105728"
+            }
+          ]
+        }
+      ],
+      "outcome": {
+        "fails": "arith_does_not_hold"
+      }
+    },
+    {
+      "name": "div_past_the_decimal_domain_refused_2679",
+      "note": "#2679: 1e40000 / 1e-40000 is decimal(1, 80000), past |exponent| <= 65536. It is refused like every past-band result; before #2679 rs returned it and check accepted it, a value no core can decode",
+      "pred": "is",
+      "args": [
+        {
+          "tuple": [
+            {
+              "atom": "decimal"
+            },
+            {
+              "int": 1
+            },
+            {
+              "int": 80000
+            }
+          ]
+        },
+        {
+          "op": "/",
+          "args": [
+            {
+              "tuple": [
+                {
+                  "atom": "decimal"
+                },
+                {
+                  "int": 1
+                },
+                {
+                  "int": 40000
+                }
+              ]
+            },
+            {
+              "tuple": [
+                {
+                  "atom": "decimal"
+                },
+                {
+                  "int": 1
+                },
+                {
+                  "int": -40000
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "outcome": {
+        "fails": "arith_does_not_hold"
+      }
+    },
+    {
+      "name": "div_at_the_decimal_domain_bound_holds_2679",
+      "note": "#2679 control: a quotient exactly AT the bound (decimal(1, 65536)) is a value",
+      "pred": "is",
+      "args": [
+        {
+          "tuple": [
+            {
+              "atom": "decimal"
+            },
+            {
+              "int": 1
+            },
+            {
+              "int": 65536
+            }
+          ]
+        },
+        {
+          "op": "/",
+          "args": [
+            {
+              "tuple": [
+                {
+                  "atom": "decimal"
+                },
+                {
+                  "int": 1
+                },
+                {
+                  "int": 32768
+                }
+              ]
+            },
+            {
+              "tuple": [
+                {
+                  "atom": "decimal"
+                },
+                {
+                  "int": 1
+                },
+                {
+                  "int": -32768
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "div_past_the_decimal_domain_negative_refused_2679",
+      "note": "#2679: the negative direction, decimal(1, -65537)",
+      "pred": "is",
+      "args": [
+        {
+          "tuple": [
+            {
+              "atom": "decimal"
+            },
+            {
+              "int": 1
+            },
+            {
+              "int": -65537
+            }
+          ]
+        },
+        {
+          "op": "/",
+          "args": [
+            {
+              "tuple": [
+                {
+                  "atom": "decimal"
+                },
+                {
+                  "int": 1
+                },
+                {
+                  "int": -32769
+                }
+              ]
+            },
+            {
+              "tuple": [
+                {
+                  "atom": "decimal"
+                },
+                {
+                  "int": 1
+                },
+                {
+                  "int": 32768
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "outcome": {
+        "fails": "arith_does_not_hold"
+      }
+    },
+    {
+      "name": "div_at_the_decimal_domain_negative_bound_holds_2679",
+      "note": "#2679 control: decimal(1, -65536) is a value",
+      "pred": "is",
+      "args": [
+        {
+          "tuple": [
+            {
+              "atom": "decimal"
+            },
+            {
+              "int": 1
+            },
+            {
+              "int": -65536
+            }
+          ]
+        },
+        {
+          "op": "/",
+          "args": [
+            {
+              "tuple": [
+                {
+                  "atom": "decimal"
+                },
+                {
+                  "int": 1
+                },
+                {
+                  "int": -32768
+                }
+              ]
+            },
+            {
+              "tuple": [
+                {
+                  "atom": "decimal"
+                },
+                {
+                  "int": 1
+                },
+                {
+                  "int": 32768
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "mul_past_the_decimal_domain_refused_2679",
+      "note": "#2679 (#1022's cap, tri-core): 1e40000 * 1e40000 is decimal(1, 80000), refused in every core; before #2679 go and ts computed it while rs refused it",
+      "pred": "is",
+      "args": [
+        {
+          "tuple": [
+            {
+              "atom": "decimal"
+            },
+            {
+              "int": 1
+            },
+            {
+              "int": 80000
+            }
+          ]
+        },
+        {
+          "op": "*",
+          "args": [
+            {
+              "tuple": [
+                {
+                  "atom": "decimal"
+                },
+                {
+                  "int": 1
+                },
+                {
+                  "int": 40000
+                }
+              ]
+            },
+            {
+              "tuple": [
+                {
+                  "atom": "decimal"
+                },
+                {
+                  "int": 1
+                },
+                {
+                  "int": 40000
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "outcome": {
+        "fails": "arith_does_not_hold"
+      }
+    },
+    {
+      "name": "mul_at_the_decimal_domain_bound_holds_2679",
+      "note": "#2679 control: a product exactly AT the bound is a value",
+      "pred": "is",
+      "args": [
+        {
+          "tuple": [
+            {
+              "atom": "decimal"
+            },
+            {
+              "int": 1
+            },
+            {
+              "int": 65536
+            }
+          ]
+        },
+        {
+          "op": "*",
+          "args": [
+            {
+              "tuple": [
+                {
+                  "atom": "decimal"
+                },
+                {
+                  "int": 1
+                },
+                {
+                  "int": 32768
+                }
+              ]
+            },
+            {
+              "tuple": [
+                {
+                  "atom": "decimal"
+                },
+                {
+                  "int": 1
+                },
+                {
+                  "int": 32768
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "mul_past_the_decimal_domain_negative_refused_2679",
+      "note": "#2679: the negative direction, decimal(1, -65537)",
+      "pred": "is",
+      "args": [
+        {
+          "tuple": [
+            {
+              "atom": "decimal"
+            },
+            {
+              "int": 1
+            },
+            {
+              "int": -65537
+            }
+          ]
+        },
+        {
+          "op": "*",
+          "args": [
+            {
+              "tuple": [
+                {
+                  "atom": "decimal"
+                },
+                {
+                  "int": 1
+                },
+                {
+                  "int": -32769
+                }
+              ]
+            },
+            {
+              "tuple": [
+                {
+                  "atom": "decimal"
+                },
+                {
+                  "int": 1
+                },
+                {
+                  "int": -32768
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "outcome": {
+        "fails": "arith_does_not_hold"
+      }
+    },
+    {
+      "name": "mul_at_the_decimal_domain_negative_bound_holds_2679",
+      "note": "#2679 control: decimal(1, -65536) is a value",
+      "pred": "is",
+      "args": [
+        {
+          "tuple": [
+            {
+              "atom": "decimal"
+            },
+            {
+              "int": 1
+            },
+            {
+              "int": -65536
+            }
+          ]
+        },
+        {
+          "op": "*",
+          "args": [
+            {
+              "tuple": [
+                {
+                  "atom": "decimal"
+                },
+                {
+                  "int": 1
+                },
+                {
+                  "int": -32768
+                }
+              ]
+            },
+            {
+              "tuple": [
+                {
+                  "atom": "decimal"
+                },
+                {
+                  "int": 1
+                },
+                {
+                  "int": -32768
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "add_past_the_decimal_domain_refused_2679",
+      "note": "#2679: 5e65536 + 5e65536 = 10e65536, whose CANONICAL form is decimal(1, 65537): in-band operands, a past-band sum, reached through canonicalization. Refused; before #2679 every core returned it",
+      "pred": "is",
+      "args": [
+        {
+          "tuple": [
+            {
+              "atom": "decimal"
+            },
+            {
+              "int": 1
+            },
+            {
+              "int": 65537
+            }
+          ]
+        },
+        {
+          "op": "+",
+          "args": [
+            {
+              "tuple": [
+                {
+                  "atom": "decimal"
+                },
+                {
+                  "int": 5
+                },
+                {
+                  "int": 65536
+                }
+              ]
+            },
+            {
+              "tuple": [
+                {
+                  "atom": "decimal"
+                },
+                {
+                  "int": 5
+                },
+                {
+                  "int": 65536
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "outcome": {
+        "fails": "arith_does_not_hold"
+      }
+    },
+    {
+      "name": "add_at_the_decimal_domain_bound_holds_2679",
+      "note": "#2679 control: 4e65536 + 5e65536 = 9e65536 is a value",
+      "pred": "is",
+      "args": [
+        {
+          "tuple": [
+            {
+              "atom": "decimal"
+            },
+            {
+              "int": 9
+            },
+            {
+              "int": 65536
+            }
+          ]
+        },
+        {
+          "op": "+",
+          "args": [
+            {
+              "tuple": [
+                {
+                  "atom": "decimal"
+                },
+                {
+                  "int": 4
+                },
+                {
+                  "int": 65536
+                }
+              ]
+            },
+            {
+              "tuple": [
+                {
+                  "atom": "decimal"
+                },
+                {
+                  "int": 5
+                },
+                {
+                  "int": 65536
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "sub_past_the_decimal_domain_refused_2679",
+      "note": "#2679: 15e65536 - 5e65536 = 10e65536 = decimal(1, 65537), refused",
+      "pred": "is",
+      "args": [
+        {
+          "tuple": [
+            {
+              "atom": "decimal"
+            },
+            {
+              "int": 1
+            },
+            {
+              "int": 65537
+            }
+          ]
+        },
+        {
+          "op": "-",
+          "args": [
+            {
+              "tuple": [
+                {
+                  "atom": "decimal"
+                },
+                {
+                  "int": 15
+                },
+                {
+                  "int": 65536
+                }
+              ]
+            },
+            {
+              "tuple": [
+                {
+                  "atom": "decimal"
+                },
+                {
+                  "int": 5
+                },
+                {
+                  "int": 65536
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "outcome": {
+        "fails": "arith_does_not_hold"
+      }
+    },
+    {
+      "name": "sub_at_the_decimal_domain_bound_holds_2679",
+      "note": "#2679 control: 15e65535 - 5e65535 = decimal(1, 65536) is a value",
+      "pred": "is",
+      "args": [
+        {
+          "tuple": [
+            {
+              "atom": "decimal"
+            },
+            {
+              "int": 1
+            },
+            {
+              "int": 65536
+            }
+          ]
+        },
+        {
+          "op": "-",
+          "args": [
+            {
+              "tuple": [
+                {
+                  "atom": "decimal"
+                },
+                {
+                  "int": 15
+                },
+                {
+                  "int": 65535
+                }
+              ]
+            },
+            {
+              "tuple": [
+                {
+                  "atom": "decimal"
+                },
+                {
+                  "int": 5
+                },
+                {
+                  "int": 65535
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "mod_past_the_decimal_domain_refused_2679",
+      "note": "#2679: 23e65536 mod 13e65536 = 10e65536 = decimal(1, 65537), refused (mod is a producer too)",
+      "pred": "is",
+      "args": [
+        {
+          "tuple": [
+            {
+              "atom": "decimal"
+            },
+            {
+              "int": 1
+            },
+            {
+              "int": 65537
+            }
+          ]
+        },
+        {
+          "op": "mod",
+          "args": [
+            {
+              "tuple": [
+                {
+                  "atom": "decimal"
+                },
+                {
+                  "int": 23
+                },
+                {
+                  "int": 65536
+                }
+              ]
+            },
+            {
+              "tuple": [
+                {
+                  "atom": "decimal"
+                },
+                {
+                  "int": 13
+                },
+                {
+                  "int": 65536
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "outcome": {
+        "fails": "arith_does_not_hold"
+      }
+    },
+    {
+      "name": "mod_at_the_decimal_domain_bound_holds_2679",
+      "note": "#2679 control: 23e65535 mod 13e65535 = decimal(1, 65536) is a value",
+      "pred": "is",
+      "args": [
+        {
+          "tuple": [
+            {
+              "atom": "decimal"
+            },
+            {
+              "int": 1
+            },
+            {
+              "int": 65536
+            }
+          ]
+        },
+        {
+          "op": "mod",
+          "args": [
+            {
+              "tuple": [
+                {
+                  "atom": "decimal"
+                },
+                {
+                  "int": 23
+                },
+                {
+                  "int": 65535
+                }
+              ]
+            },
+            {
+              "tuple": [
+                {
+                  "atom": "decimal"
+                },
+                {
+                  "int": 13
+                },
+                {
+                  "int": 65535
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "decode_past_the_decimal_domain_refused_2679",
+      "note": "#2679 (#1385's wire decode, as a producer): a past-band decimal term does not evaluate, so it is not =:= itself (as dec_scale_bound_i128_min_refused, at the edge)",
+      "pred": "=:=",
+      "args": [
+        {
+          "tuple": [
+            {
+              "atom": "decimal"
+            },
+            {
+              "int": 1
+            },
+            {
+              "int": 65537
+            }
+          ]
+        },
+        {
+          "tuple": [
+            {
+              "atom": "decimal"
+            },
+            {
+              "int": 1
+            },
+            {
+              "int": 65537
+            }
+          ]
+        }
+      ],
+      "outcome": {
+        "fails": "arith_does_not_hold"
+      }
+    },
+    {
+      "name": "decode_at_the_decimal_domain_bound_holds_2679",
+      "note": "#2679 control: the bound itself decodes and evaluates",
+      "pred": "=:=",
+      "args": [
+        {
+          "tuple": [
+            {
+              "atom": "decimal"
+            },
+            {
+              "int": 1
+            },
+            {
+              "int": 65536
+            }
+          ]
+        },
+        {
+          "tuple": [
+            {
+              "atom": "decimal"
+            },
+            {
+              "int": 1
+            },
+            {
+              "int": 65536
+            }
+          ]
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "dec_scale_gap_past_cap_add_not_decided",
+      "note": "#3126 10^60000 + 10^-60000 > 1 -> decimal(1, 60000) and decimal(1, -60000) are both in ADR 0022's value domain (|exponent| <= 65536), and aligning them needs a shift of 120,000 > MAX_DECIMAL_SCALE_SHIFT (65,536): a WORK CAP, not a failure. The sum exists and exceeds 1, so the comparison holds; the evaluator stopped before it knew, so decide_ground is NotCompleted(work_cap), never Fails (until #3126 every core read the stop as arith_does_not_hold, a decided false that is untrue). The legacy decide answers NotMine for it, which every reader refuses by name.",
+      "pred": ">",
+      "args": [
+        {
+          "op": "+",
+          "args": [
+            {
+              "tuple": [
+                {
+                  "atom": "decimal"
+                },
+                {
+                  "int": 1
+                },
+                {
+                  "int": 60000
+                }
+              ]
+            },
+            {
+              "tuple": [
+                {
+                  "atom": "decimal"
+                },
+                {
+                  "int": 1
+                },
+                {
+                  "int": -60000
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "int": 1
+        }
+      ],
+      "outcome": {
+        "not_completed": "work_cap"
+      }
+    },
+    {
+      "name": "dec_scale_gap_past_cap_sub_not_decided",
+      "note": "#3126 10^60000 - 10^-60000 =:= 1 -> subtraction aligns the scales the same way: decimal(1, 60000) and decimal(1, -60000) are both in ADR 0022's value domain (|exponent| <= 65536), and aligning them needs a shift of 120,000 > MAX_DECIMAL_SCALE_SHIFT (65,536), not decided.",
+      "pred": "=:=",
+      "args": [
+        {
+          "op": "-",
+          "args": [
+            {
+              "tuple": [
+                {
+                  "atom": "decimal"
+                },
+                {
+                  "int": 1
+                },
+                {
+                  "int": 60000
+                }
+              ]
+            },
+            {
+              "tuple": [
+                {
+                  "atom": "decimal"
+                },
+                {
+                  "int": 1
+                },
+                {
+                  "int": -60000
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "int": 1
+        }
+      ],
+      "outcome": {
+        "not_completed": "work_cap"
+      }
+    },
+    {
+      "name": "is_scale_gap_past_cap_not_decided",
+      "note": "#3126 1 is 10^60000 + 10^-60000 -> is/2 evaluates its right side, which stops at the work cap: not decided, whatever the left side is.",
+      "pred": "is",
+      "args": [
+        {
+          "int": 1
+        },
+        {
+          "op": "+",
+          "args": [
+            {
+              "tuple": [
+                {
+                  "atom": "decimal"
+                },
+                {
+                  "int": 1
+                },
+                {
+                  "int": 60000
+                }
+              ]
+            },
+            {
+              "tuple": [
+                {
+                  "atom": "decimal"
+                },
+                {
+                  "int": 1
+                },
+                {
+                  "int": -60000
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "outcome": {
+        "not_completed": "work_cap"
+      }
+    },
+    {
+      "name": "dec_floordiv_scale_gap_past_cap_not_decided",
+      "note": "#3126 10^60000 // 10^-60000 =:= 0 -> `//` aligns the scaled mantissas first: decimal(1, 60000) and decimal(1, -60000) are both in ADR 0022's value domain (|exponent| <= 65536), and aligning them needs a shift of 120,000 > MAX_DECIMAL_SCALE_SHIFT (65,536), not decided.",
+      "pred": "=:=",
+      "args": [
+        {
+          "op": "//",
+          "args": [
+            {
+              "tuple": [
+                {
+                  "atom": "decimal"
+                },
+                {
+                  "int": 1
+                },
+                {
+                  "int": 60000
+                }
+              ]
+            },
+            {
+              "tuple": [
+                {
+                  "atom": "decimal"
+                },
+                {
+                  "int": 1
+                },
+                {
+                  "int": -60000
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "int": 0
+        }
+      ],
+      "outcome": {
+        "not_completed": "work_cap"
+      }
+    },
+    {
+      "name": "dec_mod_scale_gap_past_cap_not_decided",
+      "note": "#3126 10^60000 mod 10^-60000 =:= 0 -> `mod` aligns the scaled mantissas first: decimal(1, 60000) and decimal(1, -60000) are both in ADR 0022's value domain (|exponent| <= 65536), and aligning them needs a shift of 120,000 > MAX_DECIMAL_SCALE_SHIFT (65,536), not decided.",
+      "pred": "=:=",
+      "args": [
+        {
+          "op": "mod",
+          "args": [
+            {
+              "tuple": [
+                {
+                  "atom": "decimal"
+                },
+                {
+                  "int": 1
+                },
+                {
+                  "int": 60000
+                }
+              ]
+            },
+            {
+              "tuple": [
+                {
+                  "atom": "decimal"
+                },
+                {
+                  "int": 1
+                },
+                {
+                  "int": -60000
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "int": 0
+        }
+      ],
+      "outcome": {
+        "not_completed": "work_cap"
+      }
+    },
+    {
+      "name": "dec_scale_gap_in_bound_control_holds",
+      "note": "#3126 the control: 10^6 + 10^-6 > 1 aligns with a shift of 12, is computed, and holds.",
+      "pred": ">",
+      "args": [
+        {
+          "op": "+",
+          "args": [
+            {
+              "tuple": [
+                {
+                  "atom": "decimal"
+                },
+                {
+                  "int": 1
+                },
+                {
+                  "int": 6
+                }
+              ]
+            },
+            {
+              "tuple": [
+                {
+                  "atom": "decimal"
+                },
+                {
+                  "int": 1
+                },
+                {
+                  "int": -6
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "int": 1
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "cmp_stop_then_domain_error_first_stop_decides",
+      "note": "#3126 (10^60000 + 10^-60000) > 1 // 0 -> the operands are evaluated left to right and the first that gives no value settles the comparison, in every core: the left operand stops at the work cap first, so the comparison is not decided.",
+      "pred": ">",
+      "args": [
+        {
+          "op": "+",
+          "args": [
+            {
+              "tuple": [
+                {
+                  "atom": "decimal"
+                },
+                {
+                  "int": 1
+                },
+                {
+                  "int": 60000
+                }
+              ]
+            },
+            {
+              "tuple": [
+                {
+                  "atom": "decimal"
+                },
+                {
+                  "int": 1
+                },
+                {
+                  "int": -60000
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "op": "//",
+          "args": [
+            {
+              "int": 1
+            },
+            {
+              "int": 0
+            }
+          ]
+        }
+      ],
+      "outcome": {
+        "not_completed": "work_cap"
+      }
+    },
+    {
+      "name": "cmp_domain_error_then_stop_first_stop_decides",
+      "note": "#3126 (1 // 0) > 10^60000 + 10^-60000 -> the order-swapped twin: the left operand is a division by zero, a domain error, the language's answer that it has no value, so the comparison is false before the right operand is reached.",
+      "pred": ">",
+      "args": [
+        {
+          "op": "//",
+          "args": [
+            {
+              "int": 1
+            },
+            {
+              "int": 0
+            }
+          ]
+        },
+        {
+          "op": "+",
+          "args": [
+            {
+              "tuple": [
+                {
+                  "atom": "decimal"
+                },
+                {
+                  "int": 1
+                },
+                {
+                  "int": 60000
+                }
+              ]
+            },
+            {
+              "tuple": [
+                {
+                  "atom": "decimal"
+                },
+                {
+                  "int": 1
+                },
+                {
+                  "int": -60000
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "outcome": {
+        "fails": "arith_does_not_hold"
+      }
+    }
+  ],
+  "decimal_spellings": {
+    "note": "#2679 (seat:caa's ruling (a)): the contract's decimal-literal parser (rs BigDecimal::from_decimal_str, go decFromString, ts BigDecimal.fromString) returns through the one limit-checked constructor, so a spelling whose VALUE lies outside |exponent| <= max_exponent is refused, and 'in-band is every value the parser admits' holds by construction. Each row's spelling is prefix, then `zeros` ASCII zeros, then suffix (built by the replayer, since the strings are 65 KB). `parses` is [mantissa, exponent] (compare the decimal embedding) or null (the parser refuses). Trailing zeros are stripped before the check, so a long spelling of an in-domain value parses.",
+    "max_exponent": 65536,
+    "rows": [
+      {
+        "name": "fraction_at_the_bound",
+        "prefix": "0.",
+        "zeros": 65535,
+        "suffix": "1",
+        "parses": [
+          1,
+          -65536
+        ]
+      },
+      {
+        "name": "fraction_past_the_bound",
+        "prefix": "0.",
+        "zeros": 65536,
+        "suffix": "1",
+        "parses": null
+      },
+      {
+        "name": "integer_at_the_bound",
+        "prefix": "1",
+        "zeros": 65536,
+        "suffix": ".0",
+        "parses": [
+          1,
+          65536
+        ]
+      },
+      {
+        "name": "integer_past_the_bound",
+        "prefix": "1",
+        "zeros": 65537,
+        "suffix": ".0",
+        "parses": null
+      },
+      {
+        "name": "trailing_zeros_are_stripped_first",
+        "prefix": "1.",
+        "zeros": 65546,
+        "suffix": "",
+        "parses": [
+          1,
+          0
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "spi": "logos-account v1",
+  "note": "Frozen canonical account encoding (logos-contract §2a quote · §9 ClauseId). For each clause, `id` = lowercase-hex SHA-256(CLAUSE_PREFIX ‖ ontos-codec(quote(clause-as-term))), where CLAUSE_PREFIX = 'logos/account/clause/v1\\n' (hex below), clause-as-term = Tuple[head, Tuple[body...]], and head/body goals read as Tuple[Atom(pred), args...]. A POSITIVE body literal reads byte-identically to the bare goal; a NEGATED body literal `\\+ p(t...)` (ADR 0007) reads as Tuple[Atom(NEG_TAG=0x00), goal-as-term], authored as {neg: <goal>}. SYNTACTIC: variable names are part of the encoding (no alpha-normalization), so p(X):-q(X) and p(Y):-q(Y) differ. Any {rs,ts,go} binding's ClauseId::canonical MUST reproduce `id`. Term notation as in check.json: term = {atom:<hex>}|{atom_str:<utf8>}|{tuple:[...]}|{var:<id>}; goal = {pred:<utf8>, args:[term...]}; negated body literal = {neg: <goal>}.",
+  "clause_prefix_hex": "6c6f676f732f6163636f756e742f636c617573652f76310a",
+  "clauses": [
+    {
+      "name": "edge_ab_fact",
+      "head": { "pred": "edge", "args": [{ "atom_str": "a" }, { "atom_str": "b" }] },
+      "body": [],
+      "id": "0fa66252d400869a272c064a66c32d461b30f95f30e1d03a5fb961cb957bead3"
+    },
+    {
+      "name": "reach_base",
+      "head": { "pred": "reach", "args": [{ "var": "X" }, { "var": "Y" }] },
+      "body": [{ "pred": "edge", "args": [{ "var": "X" }, { "var": "Y" }] }],
+      "id": "c52ab14799945827045a4410caed08ca26f2704944da2a6fe48546c096702234"
+    },
+    {
+      "name": "reach_rec",
+      "head": { "pred": "reach", "args": [{ "var": "X" }, { "var": "Z" }] },
+      "body": [
+        { "pred": "edge", "args": [{ "var": "X" }, { "var": "Y" }] },
+        { "pred": "reach", "args": [{ "var": "Y" }, { "var": "Z" }] }
+      ],
+      "id": "d5cb2f8c0811500282cacd5cdf0db22d3356d0eadbdc64e73a149d1c8122dd5d"
+    },
+    {
+      "name": "reach_base_renamed_Y_to_Z_differs",
+      "head": { "pred": "reach", "args": [{ "var": "X" }, { "var": "Z" }] },
+      "body": [{ "pred": "edge", "args": [{ "var": "X" }, { "var": "Z" }] }],
+      "id": "fff905c2dd63fb17d66bd109e0940df053606dd0270fdfa02b6a43168f5197b1"
+    },
+    {
+      "name": "permit_neg",
+      "head": { "pred": "permit", "args": [{ "var": "S" }, { "var": "A" }] },
+      "body": [
+        { "pred": "grant", "args": [{ "var": "S" }, { "var": "A" }] },
+        { "neg": { "pred": "denied", "args": [{ "var": "S" }, { "var": "A" }] } }
+      ],
+      "id": "3670ee8eebbd14d90621ddf82d8244a555562194c64d11dcd9986bcfefed705d"
+    }
+  ]
+}

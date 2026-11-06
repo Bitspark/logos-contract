@@ -1,0 +1,1820 @@
+{
+  "seam": "logos Shelf-B prelude loader vector v1",
+  "note": "Language-AGNOSTIC tri-core loader-behaviour vectors for the ADR 0016 Shelf-B Horn-clause prelude. Each case is a complete `prelude/<name>@<version>.json` manifest plus the PINNED `load_prelude` outcome. The loader RECOMPUTES the `program_digest` over the deserialized clauses (frozen account codec: SHA-256(PROGRAM_PREFIX 'logos/account/program/v1\\n' || concat of length-prefixed byte-SORTED ontos-codec(quote(clause-as-term)))) and REJECTS a mismatch — the JSON parser is not the trust boundary. Outcome is {\"ok\": {name, version, program_digest, clause_ids:[...]}} or {\"err\": \"<variant>\"} where variant is one of malformed | bad_clause | clause_id_mismatch | duplicate_clause_id | digest_mismatch | empty. Term notation matches vectors/account.json: term = {atom:<hex>}|{atom_str:<utf8>}|{tuple:[...]}|{var:<id>}; goal = {pred:<utf8>, args:[term...]}; negated body literal = {neg:<goal>}. The Rust loader (contract/rs/src/prelude.rs) replays this via contract/rs/tests/prelude_vectors.rs; a go/ts loader mirror reproduces the same recomputed digest byte-for-byte (frozen ontos-codec + syntactic VarId).",
+  "program_prefix_hex": "6c6f676f732f6163636f756e742f70726f6772616d2f76310a",
+  "clause_prefix_hex": "6c6f676f732f6163636f756e742f636c617573652f76310a",
+  "cases": [
+    {
+      "name": "valid_sample_bundle_loads",
+      "note": "The shipped prelude/sample@1.0.0.json: nat(z) and nat(s(X)) :- nat(X). Digest recomputes and matches.",
+      "manifest": {
+        "name": "sample",
+        "version": "1.0.0",
+        "program_digest": "cb22fbb4f7fcaf55de33742c2ad0328cc9f964bbb97b62ab508fced396fbb5a7",
+        "clauses": [
+          {
+            "id": "8c245a7a0ea73dab49ff899cc27254953f7cb321e15a803bf832c174ab2d757c",
+            "clause": {
+              "head": { "pred": "nat", "args": [{ "tuple": [{ "atom_str": "z" }] }] },
+              "body": []
+            }
+          },
+          {
+            "id": "d02e98ca7fe546344c88c2bc5afdfea44779e90195c9432de6858d5055d46e84",
+            "clause": {
+              "head": { "pred": "nat", "args": [{ "tuple": [{ "atom_str": "s" }, { "var": "X" }] }] },
+              "body": [{ "pred": "nat", "args": [{ "var": "X" }] }]
+            }
+          }
+        ]
+      },
+      "outcome": {
+        "ok": {
+          "name": "sample",
+          "version": "1.0.0",
+          "program_digest": "cb22fbb4f7fcaf55de33742c2ad0328cc9f964bbb97b62ab508fced396fbb5a7",
+          "clause_ids": [
+            "8c245a7a0ea73dab49ff899cc27254953f7cb321e15a803bf832c174ab2d757c",
+            "d02e98ca7fe546344c88c2bc5afdfea44779e90195c9432de6858d5055d46e84"
+          ]
+        }
+      }
+    },
+    {
+      "name": "valid_bundle_loads_without_per_clause_ids",
+      "note": "Per-clause `id` is optional; the loader recomputes it. Same two clauses, no declared ids.",
+      "manifest": {
+        "name": "sample",
+        "version": "1.0.0",
+        "program_digest": "cb22fbb4f7fcaf55de33742c2ad0328cc9f964bbb97b62ab508fced396fbb5a7",
+        "clauses": [
+          {
+            "clause": {
+              "head": { "pred": "nat", "args": [{ "tuple": [{ "atom_str": "z" }] }] },
+              "body": []
+            }
+          },
+          {
+            "clause": {
+              "head": { "pred": "nat", "args": [{ "tuple": [{ "atom_str": "s" }, { "var": "X" }] }] },
+              "body": [{ "pred": "nat", "args": [{ "var": "X" }] }]
+            }
+          }
+        ]
+      },
+      "outcome": {
+        "ok": {
+          "name": "sample",
+          "version": "1.0.0",
+          "program_digest": "cb22fbb4f7fcaf55de33742c2ad0328cc9f964bbb97b62ab508fced396fbb5a7",
+          "clause_ids": [
+            "8c245a7a0ea73dab49ff899cc27254953f7cb321e15a803bf832c174ab2d757c",
+            "d02e98ca7fe546344c88c2bc5afdfea44779e90195c9432de6858d5055d46e84"
+          ]
+        }
+      }
+    },
+    {
+      "name": "valid_lists_1_0_0_bundle_loads",
+      "note": "The shipped prelude/lists@1.0.0.json: the multi-directional relational append/3 and length/2 base bundle (4 clauses over CONS-CELL lists). Digest recomputes and matches; this folds the lists Shelf-B library through the SAME tri-core loader oracle the sample cases use (it was previously covered only by the rs-ONLY append_length_differential.json, which go/ts never replay).",
+      "manifest": {
+        "name": "lists",
+        "version": "1.0.0",
+        "program_digest": "59d7f32b8a3a7d936ce098d15b05d87d03b0727d920cedd2e24891a857176e25",
+        "clauses": [
+          {
+            "id": "1a5ba4ff5b419b62c7fb61f8199a0f30937777fd806f2b0f9dac5bc4d9f99ef4",
+            "clause": {
+              "head": {
+                "pred": "append",
+                "args": [
+                  {
+                    "atom_str": "[]"
+                  },
+                  {
+                    "var": "L"
+                  },
+                  {
+                    "var": "L"
+                  }
+                ]
+              },
+              "body": []
+            }
+          },
+          {
+            "id": "19509a050ec3812926940144d56a3f423356c7802b5fa6e6280c8a3be5161b06",
+            "clause": {
+              "head": {
+                "pred": "append",
+                "args": [
+                  {
+                    "tuple": [
+                      {
+                        "atom_str": "."
+                      },
+                      {
+                        "var": "H"
+                      },
+                      {
+                        "var": "T1"
+                      }
+                    ]
+                  },
+                  {
+                    "var": "L2"
+                  },
+                  {
+                    "tuple": [
+                      {
+                        "atom_str": "."
+                      },
+                      {
+                        "var": "H"
+                      },
+                      {
+                        "var": "T3"
+                      }
+                    ]
+                  }
+                ]
+              },
+              "body": [
+                {
+                  "pred": "append",
+                  "args": [
+                    {
+                      "var": "T1"
+                    },
+                    {
+                      "var": "L2"
+                    },
+                    {
+                      "var": "T3"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "id": "a801e66eee9486b3d2d462db52ebb1c18d36d658969d4213f13c01b5c4f86c1e",
+            "clause": {
+              "head": {
+                "pred": "length",
+                "args": [
+                  {
+                    "atom_str": "[]"
+                  },
+                  {
+                    "tuple": [
+                      {
+                        "atom_str": "int"
+                      },
+                      {
+                        "atom": "00"
+                      }
+                    ]
+                  }
+                ]
+              },
+              "body": []
+            }
+          },
+          {
+            "id": "00db4fb5e141fd2823f8d8a4f30ba0763f1f4e662ee8d1dd831d83033f33ae6c",
+            "clause": {
+              "head": {
+                "pred": "length",
+                "args": [
+                  {
+                    "tuple": [
+                      {
+                        "atom_str": "."
+                      },
+                      {
+                        "var": "_"
+                      },
+                      {
+                        "var": "T"
+                      }
+                    ]
+                  },
+                  {
+                    "var": "N"
+                  }
+                ]
+              },
+              "body": [
+                {
+                  "pred": "length",
+                  "args": [
+                    {
+                      "var": "T"
+                    },
+                    {
+                      "var": "N1"
+                    }
+                  ]
+                },
+                {
+                  "pred": "is",
+                  "args": [
+                    {
+                      "var": "N"
+                    },
+                    {
+                      "tuple": [
+                        {
+                          "atom_str": "+"
+                        },
+                        {
+                          "var": "N1"
+                        },
+                        {
+                          "tuple": [
+                            {
+                              "atom_str": "int"
+                            },
+                            {
+                              "atom": "0001"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "outcome": {
+        "ok": {
+          "name": "lists",
+          "version": "1.0.0",
+          "program_digest": "59d7f32b8a3a7d936ce098d15b05d87d03b0727d920cedd2e24891a857176e25",
+          "clause_ids": [
+            "1a5ba4ff5b419b62c7fb61f8199a0f30937777fd806f2b0f9dac5bc4d9f99ef4",
+            "19509a050ec3812926940144d56a3f423356c7802b5fa6e6280c8a3be5161b06",
+            "a801e66eee9486b3d2d462db52ebb1c18d36d658969d4213f13c01b5c4f86c1e",
+            "00db4fb5e141fd2823f8d8a4f30ba0763f1f4e662ee8d1dd831d83033f33ae6c"
+          ]
+        }
+      }
+    },
+    {
+      "name": "valid_lists_1_1_0_bundle_loads",
+      "note": "The shipped prelude/lists@1.1.0.json: append/3 + length/2 plus the member/reverse/last family (14 clauses). RE-INCLUDES lists@1.0.0's 4 clauses BYTE-IDENTICALLY (the ADR 0016 byte-frozen-superset discipline, asserted as a theorem by the cross-version superset test). Digest recomputes and matches.",
+      "manifest": {
+        "name": "lists",
+        "version": "1.1.0",
+        "program_digest": "9451f99428fd18a60eb19c9ef26a72b94b4db5b5a8f755ed851fe159ffcf0e35",
+        "clauses": [
+          {
+            "id": "1a5ba4ff5b419b62c7fb61f8199a0f30937777fd806f2b0f9dac5bc4d9f99ef4",
+            "clause": {
+              "head": {
+                "pred": "append",
+                "args": [
+                  {
+                    "atom_str": "[]"
+                  },
+                  {
+                    "var": "L"
+                  },
+                  {
+                    "var": "L"
+                  }
+                ]
+              },
+              "body": []
+            }
+          },
+          {
+            "id": "19509a050ec3812926940144d56a3f423356c7802b5fa6e6280c8a3be5161b06",
+            "clause": {
+              "head": {
+                "pred": "append",
+                "args": [
+                  {
+                    "tuple": [
+                      {
+                        "atom_str": "."
+                      },
+                      {
+                        "var": "H"
+                      },
+                      {
+                        "var": "T1"
+                      }
+                    ]
+                  },
+                  {
+                    "var": "L2"
+                  },
+                  {
+                    "tuple": [
+                      {
+                        "atom_str": "."
+                      },
+                      {
+                        "var": "H"
+                      },
+                      {
+                        "var": "T3"
+                      }
+                    ]
+                  }
+                ]
+              },
+              "body": [
+                {
+                  "pred": "append",
+                  "args": [
+                    {
+                      "var": "T1"
+                    },
+                    {
+                      "var": "L2"
+                    },
+                    {
+                      "var": "T3"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "id": "a801e66eee9486b3d2d462db52ebb1c18d36d658969d4213f13c01b5c4f86c1e",
+            "clause": {
+              "head": {
+                "pred": "length",
+                "args": [
+                  {
+                    "atom_str": "[]"
+                  },
+                  {
+                    "tuple": [
+                      {
+                        "atom_str": "int"
+                      },
+                      {
+                        "atom": "00"
+                      }
+                    ]
+                  }
+                ]
+              },
+              "body": []
+            }
+          },
+          {
+            "id": "00db4fb5e141fd2823f8d8a4f30ba0763f1f4e662ee8d1dd831d83033f33ae6c",
+            "clause": {
+              "head": {
+                "pred": "length",
+                "args": [
+                  {
+                    "tuple": [
+                      {
+                        "atom_str": "."
+                      },
+                      {
+                        "var": "_"
+                      },
+                      {
+                        "var": "T"
+                      }
+                    ]
+                  },
+                  {
+                    "var": "N"
+                  }
+                ]
+              },
+              "body": [
+                {
+                  "pred": "length",
+                  "args": [
+                    {
+                      "var": "T"
+                    },
+                    {
+                      "var": "N1"
+                    }
+                  ]
+                },
+                {
+                  "pred": "is",
+                  "args": [
+                    {
+                      "var": "N"
+                    },
+                    {
+                      "tuple": [
+                        {
+                          "atom_str": "+"
+                        },
+                        {
+                          "var": "N1"
+                        },
+                        {
+                          "tuple": [
+                            {
+                              "atom_str": "int"
+                            },
+                            {
+                              "atom": "0001"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "id": "4d11a6ac1c4aea6588c7b536afb135870b7d77e76a3caa6a8e97495111043d9e",
+            "clause": {
+              "head": {
+                "pred": "member",
+                "args": [
+                  {
+                    "var": "X"
+                  },
+                  {
+                    "tuple": [
+                      {
+                        "atom_str": "."
+                      },
+                      {
+                        "var": "X"
+                      },
+                      {
+                        "var": "_"
+                      }
+                    ]
+                  }
+                ]
+              },
+              "body": []
+            }
+          },
+          {
+            "id": "82fa1f6218390e749c48ff3353881c39c57fe83bc3c49e012d155e554c21665e",
+            "clause": {
+              "head": {
+                "pred": "member",
+                "args": [
+                  {
+                    "var": "X"
+                  },
+                  {
+                    "tuple": [
+                      {
+                        "atom_str": "."
+                      },
+                      {
+                        "var": "_"
+                      },
+                      {
+                        "var": "T"
+                      }
+                    ]
+                  }
+                ]
+              },
+              "body": [
+                {
+                  "pred": "member",
+                  "args": [
+                    {
+                      "var": "X"
+                    },
+                    {
+                      "var": "T"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "id": "137451838dc8996520b088223720f75c6db7df24f7295e57da263a8feccc02a4",
+            "clause": {
+              "head": {
+                "pred": "reverse",
+                "args": [
+                  {
+                    "var": "L"
+                  },
+                  {
+                    "var": "R"
+                  }
+                ]
+              },
+              "body": [
+                {
+                  "pred": "rev_",
+                  "args": [
+                    {
+                      "var": "L"
+                    },
+                    {
+                      "atom_str": "[]"
+                    },
+                    {
+                      "var": "R"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "id": "6c20c91fd6b3bd828b079ec5d64bbde49d48733a7cb9bb99228aef9c1c31f43d",
+            "clause": {
+              "head": {
+                "pred": "rev_",
+                "args": [
+                  {
+                    "atom_str": "[]"
+                  },
+                  {
+                    "var": "A"
+                  },
+                  {
+                    "var": "A"
+                  }
+                ]
+              },
+              "body": []
+            }
+          },
+          {
+            "id": "8af5b2d6a1a7af85e809b4b376a8065ab4c84ee8584d91fadf66a8b05c7313b2",
+            "clause": {
+              "head": {
+                "pred": "rev_",
+                "args": [
+                  {
+                    "tuple": [
+                      {
+                        "atom_str": "."
+                      },
+                      {
+                        "var": "H"
+                      },
+                      {
+                        "var": "T"
+                      }
+                    ]
+                  },
+                  {
+                    "var": "A"
+                  },
+                  {
+                    "var": "R"
+                  }
+                ]
+              },
+              "body": [
+                {
+                  "pred": "rev_",
+                  "args": [
+                    {
+                      "var": "T"
+                    },
+                    {
+                      "tuple": [
+                        {
+                          "atom_str": "."
+                        },
+                        {
+                          "var": "H"
+                        },
+                        {
+                          "var": "A"
+                        }
+                      ]
+                    },
+                    {
+                      "var": "R"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "id": "27d3bc63c30698f316e8d5762373f077401c5b40ee0f0586a526b270aa3c0e17",
+            "clause": {
+              "head": {
+                "pred": "nth0",
+                "args": [
+                  {
+                    "var": "I"
+                  },
+                  {
+                    "var": "L"
+                  },
+                  {
+                    "var": "X"
+                  }
+                ]
+              },
+              "body": [
+                {
+                  "pred": "nth0_",
+                  "args": [
+                    {
+                      "var": "L"
+                    },
+                    {
+                      "tuple": [
+                        {
+                          "atom_str": "int"
+                        },
+                        {
+                          "atom": "00"
+                        }
+                      ]
+                    },
+                    {
+                      "var": "I"
+                    },
+                    {
+                      "var": "X"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "id": "c2fb69faf4eeef8f1de9533a71235c4efbfcdb20086b78a13f19f3f8be82a4e2",
+            "clause": {
+              "head": {
+                "pred": "nth0_",
+                "args": [
+                  {
+                    "tuple": [
+                      {
+                        "atom_str": "."
+                      },
+                      {
+                        "var": "H"
+                      },
+                      {
+                        "var": "_"
+                      }
+                    ]
+                  },
+                  {
+                    "var": "I"
+                  },
+                  {
+                    "var": "I"
+                  },
+                  {
+                    "var": "H"
+                  }
+                ]
+              },
+              "body": []
+            }
+          },
+          {
+            "id": "1027c37860b9c6f88d9c070f46485ae6e267c42c06a24c116823a72bc2398723",
+            "clause": {
+              "head": {
+                "pred": "nth0_",
+                "args": [
+                  {
+                    "tuple": [
+                      {
+                        "atom_str": "."
+                      },
+                      {
+                        "var": "_"
+                      },
+                      {
+                        "var": "T"
+                      }
+                    ]
+                  },
+                  {
+                    "var": "I0"
+                  },
+                  {
+                    "var": "I"
+                  },
+                  {
+                    "var": "X"
+                  }
+                ]
+              },
+              "body": [
+                {
+                  "pred": "is",
+                  "args": [
+                    {
+                      "var": "I1"
+                    },
+                    {
+                      "tuple": [
+                        {
+                          "atom_str": "+"
+                        },
+                        {
+                          "var": "I0"
+                        },
+                        {
+                          "tuple": [
+                            {
+                              "atom_str": "int"
+                            },
+                            {
+                              "atom": "0001"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "pred": "nth0_",
+                  "args": [
+                    {
+                      "var": "T"
+                    },
+                    {
+                      "var": "I1"
+                    },
+                    {
+                      "var": "I"
+                    },
+                    {
+                      "var": "X"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "id": "13253c652b5cd84f582f0d1bacb548dbf9d72793743fb598eea2949f165c320a",
+            "clause": {
+              "head": {
+                "pred": "last",
+                "args": [
+                  {
+                    "tuple": [
+                      {
+                        "atom_str": "."
+                      },
+                      {
+                        "var": "X"
+                      },
+                      {
+                        "atom_str": "[]"
+                      }
+                    ]
+                  },
+                  {
+                    "var": "X"
+                  }
+                ]
+              },
+              "body": []
+            }
+          },
+          {
+            "id": "3782861c639b0acb68f91ca56a4351fffaad5a497a404143d129a730d890b25a",
+            "clause": {
+              "head": {
+                "pred": "last",
+                "args": [
+                  {
+                    "tuple": [
+                      {
+                        "atom_str": "."
+                      },
+                      {
+                        "var": "_"
+                      },
+                      {
+                        "var": "T"
+                      }
+                    ]
+                  },
+                  {
+                    "var": "X"
+                  }
+                ]
+              },
+              "body": [
+                {
+                  "pred": "last",
+                  "args": [
+                    {
+                      "var": "T"
+                    },
+                    {
+                      "var": "X"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "outcome": {
+        "ok": {
+          "name": "lists",
+          "version": "1.1.0",
+          "program_digest": "9451f99428fd18a60eb19c9ef26a72b94b4db5b5a8f755ed851fe159ffcf0e35",
+          "clause_ids": [
+            "1a5ba4ff5b419b62c7fb61f8199a0f30937777fd806f2b0f9dac5bc4d9f99ef4",
+            "19509a050ec3812926940144d56a3f423356c7802b5fa6e6280c8a3be5161b06",
+            "a801e66eee9486b3d2d462db52ebb1c18d36d658969d4213f13c01b5c4f86c1e",
+            "00db4fb5e141fd2823f8d8a4f30ba0763f1f4e662ee8d1dd831d83033f33ae6c",
+            "4d11a6ac1c4aea6588c7b536afb135870b7d77e76a3caa6a8e97495111043d9e",
+            "82fa1f6218390e749c48ff3353881c39c57fe83bc3c49e012d155e554c21665e",
+            "137451838dc8996520b088223720f75c6db7df24f7295e57da263a8feccc02a4",
+            "6c20c91fd6b3bd828b079ec5d64bbde49d48733a7cb9bb99228aef9c1c31f43d",
+            "8af5b2d6a1a7af85e809b4b376a8065ab4c84ee8584d91fadf66a8b05c7313b2",
+            "27d3bc63c30698f316e8d5762373f077401c5b40ee0f0586a526b270aa3c0e17",
+            "c2fb69faf4eeef8f1de9533a71235c4efbfcdb20086b78a13f19f3f8be82a4e2",
+            "1027c37860b9c6f88d9c070f46485ae6e267c42c06a24c116823a72bc2398723",
+            "13253c652b5cd84f582f0d1bacb548dbf9d72793743fb598eea2949f165c320a",
+            "3782861c639b0acb68f91ca56a4351fffaad5a497a404143d129a730d890b25a"
+          ]
+        }
+      }
+    },
+    {
+      "name": "valid_lists_1_2_0_bundle_loads",
+      "note": "The shipped prelude/lists@1.2.0.json: the full lists library (19 clauses). RE-INCLUDES lists@1.1.0's 14 clauses BYTE-IDENTICALLY. Digest recomputes and matches — the canonical pin (c2cb5164…) the go/ts shipped-bundle tests literal-pin.",
+      "manifest": {
+        "name": "lists",
+        "version": "1.2.0",
+        "program_digest": "c2cb5164002b89db421463d3d98e057646545a6b25c3b3145ae170443bd1b056",
+        "clauses": [
+          {
+            "id": "1a5ba4ff5b419b62c7fb61f8199a0f30937777fd806f2b0f9dac5bc4d9f99ef4",
+            "clause": {
+              "head": {
+                "pred": "append",
+                "args": [
+                  {
+                    "atom_str": "[]"
+                  },
+                  {
+                    "var": "L"
+                  },
+                  {
+                    "var": "L"
+                  }
+                ]
+              },
+              "body": []
+            }
+          },
+          {
+            "id": "19509a050ec3812926940144d56a3f423356c7802b5fa6e6280c8a3be5161b06",
+            "clause": {
+              "head": {
+                "pred": "append",
+                "args": [
+                  {
+                    "tuple": [
+                      {
+                        "atom_str": "."
+                      },
+                      {
+                        "var": "H"
+                      },
+                      {
+                        "var": "T1"
+                      }
+                    ]
+                  },
+                  {
+                    "var": "L2"
+                  },
+                  {
+                    "tuple": [
+                      {
+                        "atom_str": "."
+                      },
+                      {
+                        "var": "H"
+                      },
+                      {
+                        "var": "T3"
+                      }
+                    ]
+                  }
+                ]
+              },
+              "body": [
+                {
+                  "pred": "append",
+                  "args": [
+                    {
+                      "var": "T1"
+                    },
+                    {
+                      "var": "L2"
+                    },
+                    {
+                      "var": "T3"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "id": "a801e66eee9486b3d2d462db52ebb1c18d36d658969d4213f13c01b5c4f86c1e",
+            "clause": {
+              "head": {
+                "pred": "length",
+                "args": [
+                  {
+                    "atom_str": "[]"
+                  },
+                  {
+                    "tuple": [
+                      {
+                        "atom_str": "int"
+                      },
+                      {
+                        "atom": "00"
+                      }
+                    ]
+                  }
+                ]
+              },
+              "body": []
+            }
+          },
+          {
+            "id": "00db4fb5e141fd2823f8d8a4f30ba0763f1f4e662ee8d1dd831d83033f33ae6c",
+            "clause": {
+              "head": {
+                "pred": "length",
+                "args": [
+                  {
+                    "tuple": [
+                      {
+                        "atom_str": "."
+                      },
+                      {
+                        "var": "_"
+                      },
+                      {
+                        "var": "T"
+                      }
+                    ]
+                  },
+                  {
+                    "var": "N"
+                  }
+                ]
+              },
+              "body": [
+                {
+                  "pred": "length",
+                  "args": [
+                    {
+                      "var": "T"
+                    },
+                    {
+                      "var": "N1"
+                    }
+                  ]
+                },
+                {
+                  "pred": "is",
+                  "args": [
+                    {
+                      "var": "N"
+                    },
+                    {
+                      "tuple": [
+                        {
+                          "atom_str": "+"
+                        },
+                        {
+                          "var": "N1"
+                        },
+                        {
+                          "tuple": [
+                            {
+                              "atom_str": "int"
+                            },
+                            {
+                              "atom": "0001"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "id": "4d11a6ac1c4aea6588c7b536afb135870b7d77e76a3caa6a8e97495111043d9e",
+            "clause": {
+              "head": {
+                "pred": "member",
+                "args": [
+                  {
+                    "var": "X"
+                  },
+                  {
+                    "tuple": [
+                      {
+                        "atom_str": "."
+                      },
+                      {
+                        "var": "X"
+                      },
+                      {
+                        "var": "_"
+                      }
+                    ]
+                  }
+                ]
+              },
+              "body": []
+            }
+          },
+          {
+            "id": "82fa1f6218390e749c48ff3353881c39c57fe83bc3c49e012d155e554c21665e",
+            "clause": {
+              "head": {
+                "pred": "member",
+                "args": [
+                  {
+                    "var": "X"
+                  },
+                  {
+                    "tuple": [
+                      {
+                        "atom_str": "."
+                      },
+                      {
+                        "var": "_"
+                      },
+                      {
+                        "var": "T"
+                      }
+                    ]
+                  }
+                ]
+              },
+              "body": [
+                {
+                  "pred": "member",
+                  "args": [
+                    {
+                      "var": "X"
+                    },
+                    {
+                      "var": "T"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "id": "137451838dc8996520b088223720f75c6db7df24f7295e57da263a8feccc02a4",
+            "clause": {
+              "head": {
+                "pred": "reverse",
+                "args": [
+                  {
+                    "var": "L"
+                  },
+                  {
+                    "var": "R"
+                  }
+                ]
+              },
+              "body": [
+                {
+                  "pred": "rev_",
+                  "args": [
+                    {
+                      "var": "L"
+                    },
+                    {
+                      "atom_str": "[]"
+                    },
+                    {
+                      "var": "R"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "id": "6c20c91fd6b3bd828b079ec5d64bbde49d48733a7cb9bb99228aef9c1c31f43d",
+            "clause": {
+              "head": {
+                "pred": "rev_",
+                "args": [
+                  {
+                    "atom_str": "[]"
+                  },
+                  {
+                    "var": "A"
+                  },
+                  {
+                    "var": "A"
+                  }
+                ]
+              },
+              "body": []
+            }
+          },
+          {
+            "id": "8af5b2d6a1a7af85e809b4b376a8065ab4c84ee8584d91fadf66a8b05c7313b2",
+            "clause": {
+              "head": {
+                "pred": "rev_",
+                "args": [
+                  {
+                    "tuple": [
+                      {
+                        "atom_str": "."
+                      },
+                      {
+                        "var": "H"
+                      },
+                      {
+                        "var": "T"
+                      }
+                    ]
+                  },
+                  {
+                    "var": "A"
+                  },
+                  {
+                    "var": "R"
+                  }
+                ]
+              },
+              "body": [
+                {
+                  "pred": "rev_",
+                  "args": [
+                    {
+                      "var": "T"
+                    },
+                    {
+                      "tuple": [
+                        {
+                          "atom_str": "."
+                        },
+                        {
+                          "var": "H"
+                        },
+                        {
+                          "var": "A"
+                        }
+                      ]
+                    },
+                    {
+                      "var": "R"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "id": "27d3bc63c30698f316e8d5762373f077401c5b40ee0f0586a526b270aa3c0e17",
+            "clause": {
+              "head": {
+                "pred": "nth0",
+                "args": [
+                  {
+                    "var": "I"
+                  },
+                  {
+                    "var": "L"
+                  },
+                  {
+                    "var": "X"
+                  }
+                ]
+              },
+              "body": [
+                {
+                  "pred": "nth0_",
+                  "args": [
+                    {
+                      "var": "L"
+                    },
+                    {
+                      "tuple": [
+                        {
+                          "atom_str": "int"
+                        },
+                        {
+                          "atom": "00"
+                        }
+                      ]
+                    },
+                    {
+                      "var": "I"
+                    },
+                    {
+                      "var": "X"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "id": "c2fb69faf4eeef8f1de9533a71235c4efbfcdb20086b78a13f19f3f8be82a4e2",
+            "clause": {
+              "head": {
+                "pred": "nth0_",
+                "args": [
+                  {
+                    "tuple": [
+                      {
+                        "atom_str": "."
+                      },
+                      {
+                        "var": "H"
+                      },
+                      {
+                        "var": "_"
+                      }
+                    ]
+                  },
+                  {
+                    "var": "I"
+                  },
+                  {
+                    "var": "I"
+                  },
+                  {
+                    "var": "H"
+                  }
+                ]
+              },
+              "body": []
+            }
+          },
+          {
+            "id": "1027c37860b9c6f88d9c070f46485ae6e267c42c06a24c116823a72bc2398723",
+            "clause": {
+              "head": {
+                "pred": "nth0_",
+                "args": [
+                  {
+                    "tuple": [
+                      {
+                        "atom_str": "."
+                      },
+                      {
+                        "var": "_"
+                      },
+                      {
+                        "var": "T"
+                      }
+                    ]
+                  },
+                  {
+                    "var": "I0"
+                  },
+                  {
+                    "var": "I"
+                  },
+                  {
+                    "var": "X"
+                  }
+                ]
+              },
+              "body": [
+                {
+                  "pred": "is",
+                  "args": [
+                    {
+                      "var": "I1"
+                    },
+                    {
+                      "tuple": [
+                        {
+                          "atom_str": "+"
+                        },
+                        {
+                          "var": "I0"
+                        },
+                        {
+                          "tuple": [
+                            {
+                              "atom_str": "int"
+                            },
+                            {
+                              "atom": "0001"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "pred": "nth0_",
+                  "args": [
+                    {
+                      "var": "T"
+                    },
+                    {
+                      "var": "I1"
+                    },
+                    {
+                      "var": "I"
+                    },
+                    {
+                      "var": "X"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "id": "13253c652b5cd84f582f0d1bacb548dbf9d72793743fb598eea2949f165c320a",
+            "clause": {
+              "head": {
+                "pred": "last",
+                "args": [
+                  {
+                    "tuple": [
+                      {
+                        "atom_str": "."
+                      },
+                      {
+                        "var": "X"
+                      },
+                      {
+                        "atom_str": "[]"
+                      }
+                    ]
+                  },
+                  {
+                    "var": "X"
+                  }
+                ]
+              },
+              "body": []
+            }
+          },
+          {
+            "id": "3782861c639b0acb68f91ca56a4351fffaad5a497a404143d129a730d890b25a",
+            "clause": {
+              "head": {
+                "pred": "last",
+                "args": [
+                  {
+                    "tuple": [
+                      {
+                        "atom_str": "."
+                      },
+                      {
+                        "var": "_"
+                      },
+                      {
+                        "var": "T"
+                      }
+                    ]
+                  },
+                  {
+                    "var": "X"
+                  }
+                ]
+              },
+              "body": [
+                {
+                  "pred": "last",
+                  "args": [
+                    {
+                      "var": "T"
+                    },
+                    {
+                      "var": "X"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "id": "d2b463a5a3e2b3811022d1abb8d4de87e5af6c19bf9b5c1093b2755209e6ca21",
+            "clause": {
+              "head": {
+                "pred": "nth1",
+                "args": [
+                  {
+                    "var": "I"
+                  },
+                  {
+                    "var": "L"
+                  },
+                  {
+                    "var": "X"
+                  }
+                ]
+              },
+              "body": [
+                {
+                  "pred": "nth1_",
+                  "args": [
+                    {
+                      "var": "L"
+                    },
+                    {
+                      "tuple": [
+                        {
+                          "atom_str": "int"
+                        },
+                        {
+                          "atom": "0001"
+                        }
+                      ]
+                    },
+                    {
+                      "var": "I"
+                    },
+                    {
+                      "var": "X"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "id": "c1384fc090bf71ebc60734dc80858b853201bbd7bfa7bbbd781232c675561f8f",
+            "clause": {
+              "head": {
+                "pred": "nth1_",
+                "args": [
+                  {
+                    "tuple": [
+                      {
+                        "atom_str": "."
+                      },
+                      {
+                        "var": "H"
+                      },
+                      {
+                        "var": "_"
+                      }
+                    ]
+                  },
+                  {
+                    "var": "I"
+                  },
+                  {
+                    "var": "I"
+                  },
+                  {
+                    "var": "H"
+                  }
+                ]
+              },
+              "body": []
+            }
+          },
+          {
+            "id": "6383eb8c75669f586950c7ccd175a5f4852dad217df52b6d03fb0e2623e8840b",
+            "clause": {
+              "head": {
+                "pred": "nth1_",
+                "args": [
+                  {
+                    "tuple": [
+                      {
+                        "atom_str": "."
+                      },
+                      {
+                        "var": "_"
+                      },
+                      {
+                        "var": "T"
+                      }
+                    ]
+                  },
+                  {
+                    "var": "I0"
+                  },
+                  {
+                    "var": "I"
+                  },
+                  {
+                    "var": "X"
+                  }
+                ]
+              },
+              "body": [
+                {
+                  "pred": "is",
+                  "args": [
+                    {
+                      "var": "I1"
+                    },
+                    {
+                      "tuple": [
+                        {
+                          "atom_str": "+"
+                        },
+                        {
+                          "var": "I0"
+                        },
+                        {
+                          "tuple": [
+                            {
+                              "atom_str": "int"
+                            },
+                            {
+                              "atom": "0001"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "pred": "nth1_",
+                  "args": [
+                    {
+                      "var": "T"
+                    },
+                    {
+                      "var": "I1"
+                    },
+                    {
+                      "var": "I"
+                    },
+                    {
+                      "var": "X"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "id": "e7fd9235c665e91233f254a8045f3ff8e33f77549f049708a3eddf89ffcae237",
+            "clause": {
+              "head": {
+                "pred": "select",
+                "args": [
+                  {
+                    "var": "X"
+                  },
+                  {
+                    "tuple": [
+                      {
+                        "atom_str": "."
+                      },
+                      {
+                        "var": "X"
+                      },
+                      {
+                        "var": "T"
+                      }
+                    ]
+                  },
+                  {
+                    "var": "T"
+                  }
+                ]
+              },
+              "body": []
+            }
+          },
+          {
+            "id": "4ece2c3e86ea7a2ce2d67c41bf4068e56c9d8d6cdf76754c37fa753fa5b6cf70",
+            "clause": {
+              "head": {
+                "pred": "select",
+                "args": [
+                  {
+                    "var": "X"
+                  },
+                  {
+                    "tuple": [
+                      {
+                        "atom_str": "."
+                      },
+                      {
+                        "var": "H"
+                      },
+                      {
+                        "var": "T"
+                      }
+                    ]
+                  },
+                  {
+                    "tuple": [
+                      {
+                        "atom_str": "."
+                      },
+                      {
+                        "var": "H"
+                      },
+                      {
+                        "var": "R"
+                      }
+                    ]
+                  }
+                ]
+              },
+              "body": [
+                {
+                  "pred": "select",
+                  "args": [
+                    {
+                      "var": "X"
+                    },
+                    {
+                      "var": "T"
+                    },
+                    {
+                      "var": "R"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "outcome": {
+        "ok": {
+          "name": "lists",
+          "version": "1.2.0",
+          "program_digest": "c2cb5164002b89db421463d3d98e057646545a6b25c3b3145ae170443bd1b056",
+          "clause_ids": [
+            "1a5ba4ff5b419b62c7fb61f8199a0f30937777fd806f2b0f9dac5bc4d9f99ef4",
+            "19509a050ec3812926940144d56a3f423356c7802b5fa6e6280c8a3be5161b06",
+            "a801e66eee9486b3d2d462db52ebb1c18d36d658969d4213f13c01b5c4f86c1e",
+            "00db4fb5e141fd2823f8d8a4f30ba0763f1f4e662ee8d1dd831d83033f33ae6c",
+            "4d11a6ac1c4aea6588c7b536afb135870b7d77e76a3caa6a8e97495111043d9e",
+            "82fa1f6218390e749c48ff3353881c39c57fe83bc3c49e012d155e554c21665e",
+            "137451838dc8996520b088223720f75c6db7df24f7295e57da263a8feccc02a4",
+            "6c20c91fd6b3bd828b079ec5d64bbde49d48733a7cb9bb99228aef9c1c31f43d",
+            "8af5b2d6a1a7af85e809b4b376a8065ab4c84ee8584d91fadf66a8b05c7313b2",
+            "27d3bc63c30698f316e8d5762373f077401c5b40ee0f0586a526b270aa3c0e17",
+            "c2fb69faf4eeef8f1de9533a71235c4efbfcdb20086b78a13f19f3f8be82a4e2",
+            "1027c37860b9c6f88d9c070f46485ae6e267c42c06a24c116823a72bc2398723",
+            "13253c652b5cd84f582f0d1bacb548dbf9d72793743fb598eea2949f165c320a",
+            "3782861c639b0acb68f91ca56a4351fffaad5a497a404143d129a730d890b25a",
+            "d2b463a5a3e2b3811022d1abb8d4de87e5af6c19bf9b5c1093b2755209e6ca21",
+            "c1384fc090bf71ebc60734dc80858b853201bbd7bfa7bbbd781232c675561f8f",
+            "6383eb8c75669f586950c7ccd175a5f4852dad217df52b6d03fb0e2623e8840b",
+            "e7fd9235c665e91233f254a8045f3ff8e33f77549f049708a3eddf89ffcae237",
+            "4ece2c3e86ea7a2ce2d67c41bf4068e56c9d8d6cdf76754c37fa753fa5b6cf70"
+          ]
+        }
+      }
+    },
+    {
+      "name": "digest_mismatch_rejected",
+      "note": "A correct clause set but a wrong pinned program_digest (all zeros) is refused — the tamper anchor.",
+      "manifest": {
+        "name": "sample",
+        "version": "1.0.0",
+        "program_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+        "clauses": [
+          {
+            "clause": {
+              "head": { "pred": "nat", "args": [{ "tuple": [{ "atom_str": "z" }] }] },
+              "body": []
+            }
+          },
+          {
+            "clause": {
+              "head": { "pred": "nat", "args": [{ "tuple": [{ "atom_str": "s" }, { "var": "X" }] }] },
+              "body": [{ "pred": "nat", "args": [{ "var": "X" }] }]
+            }
+          }
+        ]
+      },
+      "outcome": { "err": "digest_mismatch" }
+    },
+    {
+      "name": "tampered_clause_rejected_by_digest",
+      "note": "A clause body silently dropped (nat(s(X)) :- . instead of :- nat(X)). The clause set changed, so the recomputed digest no longer matches the pinned one — the loader refuses it even though the JSON parsed fine.",
+      "manifest": {
+        "name": "sample",
+        "version": "1.0.0",
+        "program_digest": "cb22fbb4f7fcaf55de33742c2ad0328cc9f964bbb97b62ab508fced396fbb5a7",
+        "clauses": [
+          {
+            "clause": {
+              "head": { "pred": "nat", "args": [{ "tuple": [{ "atom_str": "z" }] }] },
+              "body": []
+            }
+          },
+          {
+            "clause": {
+              "head": { "pred": "nat", "args": [{ "tuple": [{ "atom_str": "s" }, { "var": "X" }] }] },
+              "body": []
+            }
+          }
+        ]
+      },
+      "outcome": { "err": "digest_mismatch" }
+    },
+    {
+      "name": "duplicate_clause_id_rejected",
+      "note": "The same clause (nat(z)) appears twice; the canonical ids collide.",
+      "manifest": {
+        "name": "dup",
+        "version": "1.0.0",
+        "program_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+        "clauses": [
+          {
+            "clause": {
+              "head": { "pred": "nat", "args": [{ "tuple": [{ "atom_str": "z" }] }] },
+              "body": []
+            }
+          },
+          {
+            "clause": {
+              "head": { "pred": "nat", "args": [{ "tuple": [{ "atom_str": "z" }] }] },
+              "body": []
+            }
+          }
+        ]
+      },
+      "outcome": { "err": "duplicate_clause_id" }
+    },
+    {
+      "name": "clause_id_mismatch_rejected",
+      "note": "A declared per-clause id that does not equal the recomputed canonical id is refused.",
+      "manifest": {
+        "name": "s",
+        "version": "1.0.0",
+        "program_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+        "clauses": [
+          {
+            "id": "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef0",
+            "clause": {
+              "head": { "pred": "nat", "args": [{ "tuple": [{ "atom_str": "z" }] }] },
+              "body": []
+            }
+          }
+        ]
+      },
+      "outcome": { "err": "clause_id_mismatch" }
+    },
+    {
+      "name": "empty_bundle_rejected",
+      "note": "A prelude with no clauses is an authoring error.",
+      "manifest": {
+        "name": "empty",
+        "version": "1.0.0",
+        "program_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+        "clauses": []
+      },
+      "outcome": { "err": "empty" }
+    },
+    {
+      "name": "malformed_clause_rejected",
+      "note": "A clause object missing its `head` cannot be deserialized.",
+      "manifest": {
+        "name": "m",
+        "version": "1.0.0",
+        "program_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+        "clauses": [{ "clause": { "body": [] } }]
+      },
+      "outcome": { "err": "bad_clause" }
+    }
+  ]
+}

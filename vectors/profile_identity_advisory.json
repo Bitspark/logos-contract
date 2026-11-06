@@ -1,0 +1,109 @@
+{
+  "spi": "logos-contract profile-identity-advisory pins v1",
+  "issue": 786,
+  "note": "Pins the unidentified-component advisory (#708 leg (a)) ACROSS the three cores: unidentified_profile_slots / UnidentifiedProfileSlots / unidentifiedProfileSlots. Before this vector the advisory was asserted by three independent per-core fixtures and compared nowhere, so any core could change slot ordering, start reporting the admit slot, or return early with all three suites still green. ORACLE DISCIPLINE (AGENTS.md): every expected slot list below is hand-derived from the RULE, never from running a core's helper — the rule is 'report each bound component whose identity() reads as ComponentIdentity::unidentified(), in the fold order theory then leaves then admit', so each row is a direct reading of its own slot spec and needs no implementation to produce. This is a pure predicate over which slots attest, which is why it is hand-authorable at all; a self-generated expectation would assert only that a core agrees with itself. ORDER IS IDENTITY-BEARING: unidentified_slots is a SEQUENCE, not a set — replays MUST compare it as an ordered list, because a set comparison passes under reordering and reordering is the drift most likely to happen silently. ACCEPTANCE, both directions: the advisory MUST name every anonymous slot (all_anonymous_three pins the full fold order with all three present) and MUST stay silent for a fully-identified profile (fully_identified). ADMIT SLOT: AlwaysAdmit attests core/always-admit@1.0.0 in all three cores, so a profile using the no-op must NOT report admit — a regression there gives every profile in the fleet a phantom advisory. That absence is pinned DISCRIMINATINGLY by every case that binds always_admit and still expects a NON-EMPTY report (all_anonymous, leaves_only, theory_only): an empty report would lack 'admit' vacuously, so a dedicated all-identified case would assert nothing and is deliberately NOT included. The converse is pinned too: an admissibility that does NOT attest MUST be reported (anonymous_admit), a case no per-core fixture covered because they all bound AlwaysAdmit. FIXTURE DOMAIN: 'mistfen' (brook/heron) is an INVENTED vocabulary reused from vectors/identity_audit.json, declared as such per ADR 0025 — it names no consumer domain. ADVISORY, NOT ENFORCEMENT: this vector pins what is REPORTED; it deliberately pins nothing about refusal, because leg (a) refuses nothing. When the refusal flip lands, the pinned reports below become the inputs that decide it, which is why they are frozen first. ALLOWANCE (ADR 0026 gate G4): a case MAY carry allow_unidentified, the slots the caller has EXPLICITLY DECLARED it accepts as anonymous; an ABSENT field means the empty allowance, so every case predating G4 keeps its exact prior meaning and the unallowed entry point is definitionally the empty-allowance case. The allowance is a FILTER OVER THE REPORT, never an assertion about the profile: allowing an already-identified slot is a no-op rather than an error (allow_a_slot_that_is_not_anonymous_is_a_no_op), allowing one slot silences EXACTLY that slot (allow_leaves_silences_only_leaves and its theory mirror), and a near-total allowance must NOT collapse into allow-all (allow_two_of_three_still_reports_the_third). There is deliberately NO allow-all shorthand in any core, so allow_all_three_silences_everything spells the full escape out — that verbosity is the point, since the value of an escape is the legible trace it leaves at the call site. The allowance NEVER touches the digest: it changes what a caller is TOLD, never what is DERIVED.",
+  "slot_order": ["theory", "leaves", "admit"],
+  "bindings": {
+    "anonymous": {
+      "note": "a component that does NOT attest an identity — the rs defaulted identity(), the go component not implementing contract.Identified, the ts component with no identity?() — all three read as ComponentIdentity::unidentified()"
+    },
+    "brook": { "id": "mistfen/brook-theory", "version": "2.1.0", "config_digest": "4242424242424242424242424242424242424242424242424242424242424242" },
+    "heron": { "id": "mistfen/heron-theory", "version": "0.3.7", "config_digest": "0707070707070707070707070707070707070707070707070707070707070707" },
+    "always_admit": { "id": "core/always-admit", "version": "1.0.0", "config_digest": "0000000000000000000000000000000000000000000000000000000000000000" }
+  },
+  "cases": [
+    {
+      "name": "all_anonymous_three",
+      "why": "the full fold order, observable only when every slot is anonymous — the primary order pin",
+      "theory": "anonymous",
+      "leaves": "anonymous",
+      "admit": "anonymous",
+      "unidentified_slots": ["theory", "leaves", "admit"]
+    },
+    {
+      "name": "all_anonymous",
+      "why": "the common shape: a consumer that wrote its own theory and verifier and took the no-op admissibility",
+      "theory": "anonymous",
+      "leaves": "anonymous",
+      "admit": "always_admit",
+      "unidentified_slots": ["theory", "leaves"]
+    },
+    {
+      "name": "leaves_only",
+      "why": "LeafVerifier is the slot every consumer hand-writes; it must be nameable alone",
+      "theory": "brook",
+      "leaves": "anonymous",
+      "admit": "always_admit",
+      "unidentified_slots": ["leaves"]
+    },
+    {
+      "name": "theory_only",
+      "why": "the mirror of leaves_only — proves the report is per-slot and not positional luck",
+      "theory": "anonymous",
+      "leaves": "heron",
+      "admit": "always_admit",
+      "unidentified_slots": ["theory"]
+    },
+    {
+      "name": "anonymous_admit",
+      "why": "the admit slot IS reportable when the bound admissibility does not attest — the converse of always_admit_never_reported, and uncovered by every per-core fixture",
+      "theory": "brook",
+      "leaves": "heron",
+      "admit": "anonymous",
+      "unidentified_slots": ["admit"]
+    },
+    {
+      "name": "fully_identified",
+      "why": "the discriminating silent case — an advisory that cannot stay silent reports nothing useful",
+      "theory": "brook",
+      "leaves": "heron",
+      "admit": "always_admit",
+      "unidentified_slots": []
+    },
+    {
+      "name": "allow_leaves_silences_only_leaves",
+      "why": "G4's core property: a declared allowance silences EXACTLY the named slot and nothing else — theory stays reported",
+      "theory": "anonymous",
+      "leaves": "anonymous",
+      "admit": "always_admit",
+      "allow_unidentified": ["leaves"],
+      "unidentified_slots": ["theory"]
+    },
+    {
+      "name": "allow_theory_silences_only_theory",
+      "why": "the mirror — proves the allowance is per-slot and not positional, so a single-element allowance cannot be silencing by accident of order",
+      "theory": "anonymous",
+      "leaves": "anonymous",
+      "admit": "always_admit",
+      "allow_unidentified": ["theory"],
+      "unidentified_slots": ["leaves"]
+    },
+    {
+      "name": "allow_a_slot_that_is_not_anonymous_is_a_no_op",
+      "why": "allowing an already-identified slot must neither error nor silence anything else — an allowance is a filter over the report, not an assertion about the profile",
+      "theory": "anonymous",
+      "leaves": "heron",
+      "admit": "always_admit",
+      "allow_unidentified": ["leaves", "admit"],
+      "unidentified_slots": ["theory"]
+    },
+    {
+      "name": "allow_all_three_silences_everything",
+      "why": "the full escape, and it must be spelled out in full — there is deliberately no allow-all shorthand, so this case is what taking the escape completely looks like at a call site",
+      "theory": "anonymous",
+      "leaves": "anonymous",
+      "admit": "anonymous",
+      "allow_unidentified": ["theory", "leaves", "admit"],
+      "unidentified_slots": []
+    },
+    {
+      "name": "allow_two_of_three_still_reports_the_third",
+      "why": "the discriminating half of the full escape — a near-total allowance must NOT collapse into allow-all",
+      "theory": "anonymous",
+      "leaves": "anonymous",
+      "admit": "anonymous",
+      "allow_unidentified": ["theory", "admit"],
+      "unidentified_slots": ["leaves"]
+    }
+  ]
+}

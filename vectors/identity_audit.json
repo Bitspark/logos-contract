@@ -1,0 +1,21 @@
+{
+  "spi": "logos-contract identity-audit pins v1",
+  "issue": 767,
+  "note": "Pins the identity-audit surface (#767): ComponentIdentity equality/is-unidentified and the compound_identity_of/CompoundIdentityOf/compoundIdentityOf baseline fold — and, as a consequence, FREEZES the CompoundTheory identity byte layout tri-core for the first time (prefix 'logos-core/compound-theory/v1\\n', then per member u64-BE len(id) + id + u64-BE len(version) + version + 32-byte config_digest; wrapper identity logos-core/compound-theory@1.0.0). ORACLE DISCIPLINE (AGENTS.md): every config_digest hex below was hand-derived from that documented layout with an INDEPENDENT SHA-256 tool (.NET System.Security.Cryptography over hand-assembled bytes), never by running any core's helper — a self-generated expectation for a discriminating test would assert only that the helper agrees with itself. FIXTURE DOMAIN: 'mistfen' (and its brook/heron components) is an INVENTED vocabulary, declared as such per ADR 0025 — it names no consumer domain. ACCEPTANCE, both directions: the derived identity MUST MOVE when an identified member is substituted for an unidentified one (identified_* vs baseline_* rows), MUST MOVE under member reordering (identified_first vs identified_second — order is identity-bearing) and member-count change (baseline_n* differ), and the DISTINGUISHABILITY VERDICT must NOT move under an irrelevant change (different_member_same_verdict: a different identified member changes the digest but not the verdict). 'distinguishable' means: the case's identity differs from the all-unidentified baseline of the same member count.",
+  "unidentified": { "id": "unidentified", "version": "", "config_digest": "0000000000000000000000000000000000000000000000000000000000000000" },
+  "components": {
+    "brook": { "id": "mistfen/brook-theory", "version": "2.1.0", "config_digest": "4242424242424242424242424242424242424242424242424242424242424242" },
+    "heron": { "id": "mistfen/heron-theory", "version": "0.3.7", "config_digest": "0707070707070707070707070707070707070707070707070707070707070707" }
+  },
+  "compound_wrapper": { "id": "logos-core/compound-theory", "version": "1.0.0" },
+  "cases": [
+    { "name": "baseline_n0", "members": [], "config_digest": "8456a45246d900fab0fd0623299ed22fe5fa6165918a5c8d1f6ee9a9e2eb3d8d", "distinguishable": false },
+    { "name": "baseline_n1", "members": ["unidentified"], "config_digest": "f4ba81b706605760542b5a617cf7884755cb90d611e0a9239f3db300f6a31dad", "distinguishable": false },
+    { "name": "baseline_n2", "members": ["unidentified", "unidentified"], "config_digest": "730602336675ff7f94ba4f311f92f5186cbe364e84f4ff60a9a42d06cff78e47", "distinguishable": false },
+    { "name": "baseline_n4", "members": ["unidentified", "unidentified", "unidentified", "unidentified"], "config_digest": "3bc0fc1685b2aedb8ad0b93b511e4254aee8d77aa7866760425ba6d70d2d4007", "distinguishable": false },
+    { "name": "identified_single", "members": ["brook"], "config_digest": "092e49ca4058209b60cf18814ec18bb88e170365b3ea3d40435e9d77b2901b0a", "distinguishable": true },
+    { "name": "identified_first", "members": ["brook", "unidentified"], "config_digest": "a271bd2d7adb92e35f73f618159ab6541dd2eaa3b4585100bf7403f0ac183633", "distinguishable": true },
+    { "name": "identified_second", "members": ["unidentified", "brook"], "config_digest": "d8a4e1284f161fc29cf42546b22aab97baac06f843c963886e07c9a9db46504b", "distinguishable": true },
+    { "name": "different_member_same_verdict", "members": ["heron", "unidentified"], "config_digest": "000a59802b52c90be522a1054cbf7f207a615dae1cc2dc07cc45c1a1aab919dd", "distinguishable": true }
+  ]
+}

@@ -1,0 +1,1421 @@
+{
+  "note": "HAND-AUTHORED identity rows (#2763, research 0021 E(1)): a name that folds into an IDENTITY (a digest, a pin, a key) is its atom's exact BYTES in every core, never decoded text. Decoding lossily turns every ill-formed run into U+FFFD, so two different wires would read as one value and a digest recomputed over it would pin bytes the wire never carried. A round-trip row is a RECIPE over a base wire: replace ONE name atom's leading bytes with an ill-formed run of the same length (FF, FE, C3 28, FF FE FD), so framing is untouched. The base is REFERENCED from its source vector (base_ref: file, dotted path to a row list, the row's name, the hex field), never copied, so a change to the source reaches these rows by construction. Derive each row: take the base, find the utf-8 bytes of substitute.atom, and replace its Nth occurrence (1-based, wire order) with substitute.with_hex. EXPECTED in every core: the base and every row DECODE and RE-ENCODE BYTE-IDENTICALLY to their own wire (the base is the control, checked first), and a row naming collides_with decodes to a value DIFFERENT from that row's: the two differ only in an ill-formed byte that a lossy decoder maps to the same U+FFFD.",
+  "checker_feature_set": {
+    "base": "resolution_decode.json unsupported_registration_refused_arity5; its requested certification's check profile carries the feature set, and Count and DirectLookup each occur ONCE in the wire",
+    "base_ref": {
+      "file": "resolution_decode.json",
+      "path": "cases",
+      "name": "unsupported_registration_refused_arity5",
+      "field": "wire"
+    },
+    "decoder": "the UnsupportedReport inside an unsupported Resolution: Tuple[Atom(\"unsupported\"), report], re-encoded through the same envelope",
+    "cases": [
+      {
+        "name": "premise_name_ff",
+        "slot": "the requested certification's checker feature set: a premise variant name",
+        "substitute": {
+          "atom": "Count",
+          "with_hex": "ff6f756e74",
+          "occurrence": 1
+        }
+      },
+      {
+        "name": "premise_name_fe",
+        "slot": "the requested certification's checker feature set: a premise variant name",
+        "substitute": {
+          "atom": "Count",
+          "with_hex": "fe6f756e74",
+          "occurrence": 1
+        },
+        "collides_with": "premise_name_ff"
+      },
+      {
+        "name": "non_member_proof_name_c3_28",
+        "slot": "the requested certification's checker feature set: a non-member-proof variant name",
+        "substitute": {
+          "atom": "DirectLookup",
+          "with_hex": "c328726563744c6f6f6b7570",
+          "occurrence": 1
+        }
+      },
+      {
+        "name": "non_member_proof_name_ff_fe_fd",
+        "slot": "the requested certification's checker feature set: a non-member-proof variant name",
+        "substitute": {
+          "atom": "DirectLookup",
+          "with_hex": "fffefd6563744c6f6f6b7570",
+          "occurrence": 1
+        }
+      }
+    ]
+  },
+  "escaped_name": {
+    "rule": "THE injective rendering of identity bytes as text (#1961's ruling, shared by #2763): valid UTF-8 verbatim except %, which becomes %25; every byte outside valid UTF-8 (Unicode Table 3-7) as %XX, uppercase hex. Injective because % only ever starts an escape. Every core renders bytes_hex to rendered EXACTLY; a row naming collides_with renders differently from that row, where a lossy render gave both U+FFFD.",
+    "cases": [
+      {
+        "name": "well_formed_ascii",
+        "bytes_hex": "436f756e74",
+        "rendered": "Count",
+        "note": "well-formed text without % is unchanged"
+      },
+      {
+        "name": "percent",
+        "bytes_hex": "353025",
+        "rendered": "50%25",
+        "note": "a literal % escapes, or the rendering stops being decodable"
+      },
+      {
+        "name": "ff",
+        "bytes_hex": "ff",
+        "rendered": "%FF",
+        "note": "a byte that never occurs in UTF-8"
+      },
+      {
+        "name": "fe",
+        "bytes_hex": "fe",
+        "rendered": "%FE",
+        "note": "the pair #2873's display collided on: lossy, both are U+FFFD",
+        "collides_with": "ff"
+      },
+      {
+        "name": "literal_escape_lookalike",
+        "bytes_hex": "254646",
+        "rendered": "%25FF",
+        "note": "ASCII %FF renders apart from the byte FF",
+        "collides_with": "ff"
+      },
+      {
+        "name": "replacement_character",
+        "bytes_hex": "efbfbd",
+        "rendered": "�",
+        "note": "a real U+FFFD is text and renders as itself, apart from an ill-formed byte",
+        "collides_with": "ff"
+      },
+      {
+        "name": "lead_without_continuation",
+        "bytes_hex": "c328",
+        "rendered": "%C3(",
+        "note": "C3 needs a continuation; 28 is ASCII"
+      },
+      {
+        "name": "truncated_three_byte",
+        "bytes_hex": "e28241",
+        "rendered": "%E2%82A",
+        "note": "E2 82 is a truncated sequence: both bytes escape, A does not"
+      },
+      {
+        "name": "encoded_surrogate",
+        "bytes_hex": "eda080",
+        "rendered": "%ED%A0%80",
+        "note": "a UTF-8-encoded surrogate is not well-formed"
+      },
+      {
+        "name": "overlong",
+        "bytes_hex": "c0af",
+        "rendered": "%C0%AF",
+        "note": "an overlong encoding is not well-formed"
+      },
+      {
+        "name": "above_the_code_space",
+        "bytes_hex": "f4908080",
+        "rendered": "%F4%90%80%80",
+        "note": "F4 90 is past U+10FFFF"
+      },
+      {
+        "name": "well_formed_two_byte",
+        "bytes_hex": "c3a9",
+        "rendered": "é",
+        "note": "valid multi-byte text passes verbatim"
+      },
+      {
+        "name": "well_formed_four_byte",
+        "bytes_hex": "f09f9880",
+        "rendered": "😀",
+        "note": "valid four-byte text passes verbatim"
+      }
+    ]
+  },
+  "projection_kind": {
+    "rule": "The kind a projection names for a dropped POSITIVE body literal (literal_kind / LiteralKind / literalKind) is an IDENTITY: it is deduplicated, carried in AttestationScope.limited and encoded into the certified answer, so it is the predicate's exact BYTES, then '/' (2F), then the arity in decimal ASCII. Never decoded text. EXPECTED in every core: build a positive literal whose predicate is pred_hex with `arity` variable arguments; its kind is kind_hex EXACTLY; a row naming collides_with has a kind different from that row's. The first row is the control and must pass on every core, fixed or not.",
+    "cores": [
+      "rs",
+      "go",
+      "ts"
+    ],
+    "cases": [
+      {
+        "name": "well_formed_edge_2",
+        "pred_hex": "65646765",
+        "arity": 2,
+        "kind_hex": "656467652f32",
+        "note": "control: a well-formed name renders as it always did, edge/2"
+      },
+      {
+        "name": "pred_ff_1",
+        "pred_hex": "ff",
+        "arity": 1,
+        "kind_hex": "ff2f31"
+      },
+      {
+        "name": "pred_fe_1",
+        "pred_hex": "fe",
+        "arity": 1,
+        "kind_hex": "fe2f31",
+        "collides_with": "pred_ff_1",
+        "note": "differs from pred_ff_1 in one ill-formed byte; a lossy kind named both U+FFFD/1"
+      },
+      {
+        "name": "pred_c3_28_3",
+        "pred_hex": "c328",
+        "arity": 3,
+        "kind_hex": "c3282f33",
+        "note": "a truncated two-byte sequence"
+      },
+      {
+        "name": "pred_ff_fe_fd_10",
+        "pred_hex": "fffefd",
+        "arity": 10,
+        "kind_hex": "fffefd2f3130",
+        "note": "three ill-formed bytes and a two-digit arity"
+      }
+    ]
+  },
+  "bindings_key": {
+    "rule": "A Bindings' canonical encoding (the input a SnapshotId digests) keys each bound relation by an Atom holding the predicate's exact BYTES, then '/' (2F), then the arity in decimal ASCII: Tuple[ Tuple[Atom(key), Tuple[fact...]] ... ]. EXPECTED: bind pred_hex at `arity` with NO facts into empty Bindings (rs bind_symbol, go Bind on the byte string pred/arity); its encoding is EXACTLY Tuple[ Tuple[Atom(key_hex), Tuple[]] ]; a row naming collides_with encodes differently from that row.",
+    "cores": [
+      "rs",
+      "go"
+    ],
+    "not_reachable_in": {
+      "ts": "ts binds only through a string key (Bindings.bind(key: string)), and a string cannot carry a predicate name that is not UTF-8. A lone surrogate in that string is the UTF-16 half, #2763 C."
+    },
+    "cases": [
+      {
+        "name": "well_formed_edge_2",
+        "pred_hex": "65646765",
+        "arity": 2,
+        "key_hex": "656467652f32",
+        "note": "control: the key a well-formed name always had, edge/2"
+      },
+      {
+        "name": "pred_ff_1",
+        "pred_hex": "ff",
+        "arity": 1,
+        "key_hex": "ff2f31"
+      },
+      {
+        "name": "pred_fe_1",
+        "pred_hex": "fe",
+        "arity": 1,
+        "key_hex": "fe2f31",
+        "collides_with": "pred_ff_1",
+        "note": "differs from pred_ff_1 in one ill-formed byte; a lossy key named both U+FFFD/1, and a SnapshotId names the complete input"
+      },
+      {
+        "name": "pred_c3_28_12",
+        "pred_hex": "c328",
+        "arity": 12,
+        "key_hex": "c3282f3132",
+        "note": "a truncated two-byte sequence and a two-digit arity"
+      }
+    ]
+  },
+  "param_names": {
+    "rule": "A param identity's parameter names are a SET of wire atoms, compared as BYTES: two names are the same parameter only when their bytes are equal (#2763 A1c). Decode the requirement's identity (items[1] of Tuple[Atom(\"at_least\"), identity]) with the core's identity decoder. The BASE carries a real duplicate (both names are org.example/b) and is REFUSED in every core: that is the control, checked first. Derive each row by applying EVERY entry of `substitutes` to the base, each occurrence counted in the BASE (1-based). expect=accept: the identity decodes, and its canonical bytes equal the wire's identity bytes. expect=refuse: the identity decoder refuses. A decoder that compares names as lossily decoded text sees FE and FF as one U+FFFD and refuses distinct_ill_formed_names.",
+    "base_ref": {
+      "file": "semantic_identity.json",
+      "path": "malformed",
+      "name": "param_duplicate_name",
+      "field": "wire_hex"
+    },
+    "base_expect": "refuse",
+    "cores": [
+      "rs",
+      "go",
+      "ts"
+    ],
+    "cases": [
+      {
+        "name": "distinct_well_formed_names",
+        "substitutes": [
+          {
+            "atom": "org.example/b",
+            "with_hex": "6f72672e6578616d706c652f61",
+            "occurrence": 1
+          },
+          {
+            "atom": "org.example/b",
+            "with_hex": "6f72672e6578616d706c652f63",
+            "occurrence": 2
+          }
+        ],
+        "expect": "accept",
+        "note": "control: two different well-formed names, in codec order, accepted by every core fixed or not"
+      },
+      {
+        "name": "distinct_ill_formed_names",
+        "substitutes": [
+          {
+            "atom": "org.example/b",
+            "with_hex": "6f72672e6578616d706c652ffe",
+            "occurrence": 1
+          },
+          {
+            "atom": "org.example/b",
+            "with_hex": "6f72672e6578616d706c652fff",
+            "occurrence": 2
+          }
+        ],
+        "expect": "accept",
+        "note": "two DIFFERENT names that differ only in an ill-formed last byte (FE before FF, so codec order holds); a lossy key reads both as org.example/U+FFFD"
+      },
+      {
+        "name": "same_ill_formed_name",
+        "substitutes": [
+          {
+            "atom": "org.example/b",
+            "with_hex": "6f72672e6578616d706c652fff",
+            "occurrence": 1
+          },
+          {
+            "atom": "org.example/b",
+            "with_hex": "6f72672e6578616d706c652fff",
+            "occurrence": 2
+          }
+        ],
+        "expect": "refuse",
+        "note": "the counterpart: equal bytes are one parameter named twice, refused in every core"
+      }
+    ]
+  },
+  "bare_name": {
+    "rule": "An identity's bare name (what a declaration NAMES, ADR 0033 D3) is the atom's exact BYTES; a param identity has none (#2763 A1c, seat:caa's ruling: bytes in every core, never 'not UTF-8 means not bare', never decoded text). Decode identity_hex with the codec, then with the core's identity decoder; its bare name is bare_hex EXACTLY, or absent when bare_hex is null. A row naming collides_with has a bare name different from that row's.",
+    "cores": [
+      "rs",
+      "go",
+      "ts"
+    ],
+    "cases": [
+      {
+        "name": "well_formed_namespaced",
+        "identity_hex": "00116f72672e6578616d706c652f66616e6379",
+        "bare_hex": "6f72672e6578616d706c652f66616e6379",
+        "note": "control"
+      },
+      {
+        "name": "name_ff",
+        "identity_hex": "0001ff",
+        "bare_hex": "ff"
+      },
+      {
+        "name": "name_fe",
+        "identity_hex": "0001fe",
+        "bare_hex": "fe",
+        "collides_with": "name_ff",
+        "note": "a lossy bare name read both as U+FFFD, and so matched a declaration NAMED U+FFFD"
+      },
+      {
+        "name": "name_c3_28",
+        "identity_hex": "0002c328",
+        "bare_hex": "c328"
+      },
+      {
+        "name": "param_identity_has_no_bare_name",
+        "identity_hex": "01030005706172616d00116f72672e6578616d706c652f66616e637901010102000d6f72672e6578616d706c652f6200026f6e",
+        "bare_hex": null,
+        "note": "control: a parameterized identity relates by equality alone"
+      }
+    ]
+  },
+  "open_mode_identity": {
+    "rule": "An open query mode's declaration identity (rs mode_identity / requirement_identity, go QueryModeIdentity / QueryRequirementIdentity, ts queryModeIdentity) is its identity's name as exact BYTES (#2763 A1c). Decode identity_hex as an open query mode (NonCoreQueryMode); wrapped as an open answer mode AND as an open answer requirement, its declaration identity is name_hex EXACTLY. A row naming collides_with has an identity different from that row's.",
+    "cores": [
+      "rs",
+      "go",
+      "ts"
+    ],
+    "cases": [
+      {
+        "name": "well_formed_namespaced",
+        "identity_hex": "000b64656d6f2f73616d706c65",
+        "name_hex": "64656d6f2f73616d706c65",
+        "note": "control"
+      },
+      {
+        "name": "name_ff",
+        "identity_hex": "0001ff",
+        "name_hex": "ff"
+      },
+      {
+        "name": "name_fe",
+        "identity_hex": "0001fe",
+        "name_hex": "fe",
+        "collides_with": "name_ff"
+      },
+      {
+        "name": "name_ff_fe_fd",
+        "identity_hex": "0003fffefd",
+        "name_hex": "fffefd"
+      }
+    ]
+  },
+  "closure_producer_version": {
+    "rule": "A closure certificate's producer version is an IDENTITY (it folds into a pin, a digest or a selection), so it is the atom's exact BYTES in every core, never decoded text (#2763 B). Derive each row by replacing the Nth occurrence (1-based, in the BASE) of substitute.atom's UTF-8 bytes with substitute.with_hex, the same length. Decode the wire with the codec, take the value at value_path (empty: the whole wire), decode it with the section's decoder, and re-encode it: the bytes must equal the codec encoding of that value (the base first, as the control). A row's value must differ from the base's, so the substitution landed inside the carrier; and a row naming collides_with decodes to a value different from that row's.",
+    "base_ref": {
+      "file": "closure_certificate.json",
+      "path": "closure_certificate.positive",
+      "name": "asserted_partial",
+      "field": "wire_hex"
+    },
+    "decoder": "closure_certificate",
+    "value_path": [],
+    "cores": [
+      "rs",
+      "go",
+      "ts"
+    ],
+    "cases": [
+      {
+        "name": "producer_version_ff",
+        "slot": "the certificate's producer_version",
+        "substitute": {
+          "atom": "1.0.0",
+          "with_hex": "ff2e302e30",
+          "occurrence": 1
+        }
+      },
+      {
+        "name": "producer_version_fe",
+        "slot": "the certificate's producer_version",
+        "substitute": {
+          "atom": "1.0.0",
+          "with_hex": "fe2e302e30",
+          "occurrence": 1
+        },
+        "collides_with": "producer_version_ff"
+      },
+      {
+        "name": "producer_version_c3_28",
+        "slot": "the certificate's producer_version",
+        "substitute": {
+          "atom": "1.0.0",
+          "with_hex": "c328302e30",
+          "occurrence": 1
+        }
+      }
+    ]
+  },
+  "theory_version": {
+    "rule": "A required theory's version constraint is an IDENTITY (it folds into a pin, a digest or a selection), so it is the atom's exact BYTES in every core, never decoded text (#2763 B). Derive each row by replacing the Nth occurrence (1-based, in the BASE) of substitute.atom's UTF-8 bytes with substitute.with_hex, the same length. Decode the wire with the codec, take the value at value_path (empty: the whole wire), decode it with the section's decoder, and re-encode it: the bytes must equal the codec encoding of that value (the base first, as the control). A row's value must differ from the base's, so the substitution landed inside the carrier; and a row naming collides_with decodes to a value different from that row's.",
+    "base_ref": {
+      "file": "negotiate.json",
+      "path": "profile",
+      "name": "required_demo",
+      "field": "wire"
+    },
+    "decoder": "required_profile",
+    "value_path": [],
+    "cores": [
+      "rs",
+      "go",
+      "ts"
+    ],
+    "cases": [
+      {
+        "name": "theory_version_ff",
+        "slot": "a required theory reference's version constraint",
+        "substitute": {
+          "atom": "1.0.0",
+          "with_hex": "ff2e302e30",
+          "occurrence": 1
+        }
+      },
+      {
+        "name": "theory_version_fe",
+        "slot": "a required theory reference's version constraint",
+        "substitute": {
+          "atom": "1.0.0",
+          "with_hex": "fe2e302e30",
+          "occurrence": 1
+        },
+        "collides_with": "theory_version_ff"
+      },
+      {
+        "name": "theory_version_c3_28",
+        "slot": "a required theory reference's version constraint",
+        "substitute": {
+          "atom": "1.0.0",
+          "with_hex": "c328302e30",
+          "occurrence": 1
+        }
+      }
+    ]
+  },
+  "component_binding_version": {
+    "rule": "A check-profile component binding's version is an IDENTITY (it folds into a pin, a digest or a selection), so it is the atom's exact BYTES in every core, never decoded text (#2763 B). Derive each row by replacing the Nth occurrence (1-based, in the BASE) of substitute.atom's UTF-8 bytes with substitute.with_hex, the same length. Decode the wire with the codec, take the value at value_path (empty: the whole wire), decode it with the section's decoder, and re-encode it: the bytes must equal the codec encoding of that value (the base first, as the control). A row's value must differ from the base's, so the substitution landed inside the carrier; and a row naming collides_with decodes to a value different from that row's.",
+    "base_ref": {
+      "file": "resolution_decode.json",
+      "path": "cases",
+      "name": "plan_non_empty_physical",
+      "field": "wire"
+    },
+    "decoder": "required_profile",
+    "value_path": [
+      1,
+      3
+    ],
+    "cores": [
+      "rs",
+      "go",
+      "ts"
+    ],
+    "cases": [
+      {
+        "name": "binding_version_ff",
+        "slot": "the requested certification's first component binding's version",
+        "substitute": {
+          "atom": "1.0.0",
+          "with_hex": "ff2e302e30",
+          "occurrence": 1
+        }
+      },
+      {
+        "name": "binding_version_fe",
+        "slot": "the requested certification's first component binding's version",
+        "substitute": {
+          "atom": "1.0.0",
+          "with_hex": "fe2e302e30",
+          "occurrence": 1
+        },
+        "collides_with": "binding_version_ff"
+      },
+      {
+        "name": "binding_version_c3_28",
+        "slot": "the requested certification's first component binding's version",
+        "substitute": {
+          "atom": "1.0.0",
+          "with_hex": "c328302e30",
+          "occurrence": 1
+        }
+      }
+    ]
+  },
+  "plan_contract_version": {
+    "rule": "A plan's replay contract version is an IDENTITY (it folds into a pin, a digest or a selection), so it is the atom's exact BYTES in every core, never decoded text (#2763 B). Derive each row by replacing the Nth occurrence (1-based, in the BASE) of substitute.atom's UTF-8 bytes with substitute.with_hex, the same length. Decode the wire with the codec, take the value at value_path (empty: the whole wire), decode it with the section's decoder, and re-encode it: the bytes must equal the codec encoding of that value (the base first, as the control). A row's value must differ from the base's, so the substitution landed inside the carrier; and a row naming collides_with decodes to a value different from that row's.",
+    "base_ref": {
+      "file": "resolution_decode.json",
+      "path": "cases",
+      "name": "plan_non_empty_physical",
+      "field": "wire"
+    },
+    "decoder": "resolution",
+    "value_path": [],
+    "cores": [
+      "go",
+      "ts"
+    ],
+    "not_decoded_by": {
+      "rs": "rs has no Resolution or PlanEnvelope decoder; it only encodes one, so no rs read decodes this atom at all."
+    },
+    "cases": [
+      {
+        "name": "contract_version_ff",
+        "slot": "the plan envelope's replay info: contract_version (the 4th v1; the first three are inside derivation_v1)",
+        "substitute": {
+          "atom": "v1",
+          "with_hex": "ff31",
+          "occurrence": 4
+        }
+      },
+      {
+        "name": "contract_version_fe",
+        "slot": "the same",
+        "substitute": {
+          "atom": "v1",
+          "with_hex": "fe31",
+          "occurrence": 4
+        },
+        "collides_with": "contract_version_ff"
+      }
+    ]
+  },
+  "decomposition_rule_version": {
+    "rule": "A decomposition rule's version is an IDENTITY (it folds into a pin, a digest or a selection), so it is the atom's exact BYTES in every core, never decoded text (#2763 B). Derive each row by replacing the Nth occurrence (1-based, in the BASE) of substitute.atom's UTF-8 bytes with substitute.with_hex, the same length. Decode the wire with the codec, take the value at value_path (empty: the whole wire), decode it with the section's decoder, and re-encode it: the bytes must equal the codec encoding of that value (the base first, as the control). A row's value must differ from the base's, so the substitution landed inside the carrier; and a row naming collides_with decodes to a value different from that row's.",
+    "base_ref": {
+      "file": "decomposition_witness.json",
+      "path": "decomposition_witness.positive",
+      "name": "single_positive_component",
+      "field": "wire_hex"
+    },
+    "decoder": "decomposition_witness",
+    "value_path": [],
+    "cores": [
+      "rs",
+      "go",
+      "ts"
+    ],
+    "cases": [
+      {
+        "name": "rule_version_ff",
+        "slot": "the witness's rule version",
+        "substitute": {
+          "atom": "1",
+          "with_hex": "ff",
+          "occurrence": 1
+        }
+      },
+      {
+        "name": "rule_version_fe",
+        "slot": "the witness's rule version",
+        "substitute": {
+          "atom": "1",
+          "with_hex": "fe",
+          "occurrence": 1
+        },
+        "collides_with": "rule_version_ff"
+      }
+    ]
+  },
+  "selector_engine_id": {
+    "rule": "A resolution selector's engine id (pin, admitted, excluded) is an IDENTITY (it folds into a pin, a digest or a selection), so it is the atom's exact BYTES in every core, never decoded text (#2763 B). Derive each row by replacing the Nth occurrence (1-based, in the BASE) of substitute.atom's UTF-8 bytes with substitute.with_hex, the same length. Decode the wire with the codec, take the value at value_path (empty: the whole wire), decode it with the section's decoder, and re-encode it: the bytes must equal the codec encoding of that value (the base first, as the control). A row's value must differ from the base's, so the substitution landed inside the carrier; and a row naming collides_with decodes to a value different from that row's.",
+    "base_ref": {
+      "file": "resolve.json",
+      "path": "resolve",
+      "name": "pin_misses_is_selection_refused",
+      "field": "wire"
+    },
+    "decoder": "resolution",
+    "value_path": [
+      1
+    ],
+    "cores": [
+      "go",
+      "ts"
+    ],
+    "not_decoded_by": {
+      "rs": "rs has no Resolution or PlanEnvelope decoder; it only encodes one, so no rs read decodes this atom at all."
+    },
+    "cases": [
+      {
+        "name": "pin_ff",
+        "slot": "the selector's pinned engine id",
+        "substitute": {
+          "atom": "gamma",
+          "with_hex": "ff616d6d61",
+          "occurrence": 1
+        }
+      },
+      {
+        "name": "pin_fe",
+        "slot": "the selector's pinned engine id",
+        "substitute": {
+          "atom": "gamma",
+          "with_hex": "fe616d6d61",
+          "occurrence": 1
+        },
+        "collides_with": "pin_ff"
+      },
+      {
+        "name": "excluded_ff",
+        "slot": "an excluded engine id",
+        "substitute": {
+          "atom": "alpha",
+          "with_hex": "ff6c706861",
+          "occurrence": 1
+        }
+      }
+    ]
+  },
+  "analysis_order": {
+    "rule": "Analysis orders predicates by their BYTES in every core (#2763 C; seat:caa's Q2: a latent tri-core parity defect). rs and go order the dependency edges by (from, to, negated) over the predicates' bytes, and the edges reach the analysis digest in that order. JS strings compare by UTF-16 code units, which is not bytewise order where a supplementary-plane character (U+10000 and above) meets one in U+E000..U+FFFF: UTF-16 puts the surrogate pair FIRST, UTF-8 bytes put it LAST. Build each program over arity-1 predicates named by hex: a `program` entry with a `body` is the rule head(X) :- body..., each body literal pred(X), negated when `neg` is true; an entry without `body` is the ground fact head(c). Analyze it for the goal goal(X) with the core's production analyze. The dependency edges must equal `edges` in order, each [from_hex, to_hex, negated]; the strata must equal `strata` in order, each stratum's members compared as a set (the wire encodes a stratum as a sorted set); the recursion shape must equal `recursion`.",
+    "cores": [
+      "rs",
+      "go",
+      "ts"
+    ],
+    "cases": [
+      {
+        "name": "ascii_control",
+        "slot": "two ASCII leaves under one head: the control, byte and UTF-16 order agree",
+        "program": [
+          {
+            "head": "72",
+            "body": [
+              {
+                "pred": "61"
+              }
+            ]
+          },
+          {
+            "head": "72",
+            "body": [
+              {
+                "pred": "62"
+              }
+            ]
+          },
+          {
+            "head": "61"
+          },
+          {
+            "head": "62"
+          }
+        ],
+        "goal": "72",
+        "edges": [
+          [
+            "72",
+            "61",
+            false
+          ],
+          [
+            "72",
+            "62",
+            false
+          ]
+        ],
+        "strata": [
+          [
+            "72"
+          ]
+        ],
+        "recursion": "none"
+      },
+      {
+        "name": "bmp_leaf_before_supplementary_leaf",
+        "slot": "U+FF5E (EF BD 9E) sorts before U+1F600 (F0 9F 98 80) by bytes; UTF-16 puts U+1F600's surrogate pair (D83D DE00) before U+FF5E",
+        "program": [
+          {
+            "head": "72",
+            "body": [
+              {
+                "pred": "efbd9e"
+              }
+            ]
+          },
+          {
+            "head": "72",
+            "body": [
+              {
+                "pred": "f09f9880"
+              }
+            ]
+          },
+          {
+            "head": "efbd9e"
+          },
+          {
+            "head": "f09f9880"
+          }
+        ],
+        "goal": "72",
+        "edges": [
+          [
+            "72",
+            "efbd9e",
+            false
+          ],
+          [
+            "72",
+            "f09f9880",
+            false
+          ]
+        ],
+        "strata": [
+          [
+            "72"
+          ]
+        ],
+        "recursion": "none"
+      },
+      {
+        "name": "mutual_recursion_across_the_planes",
+        "slot": "the edges' FROM order: every edge from U+FF5E precedes every edge from U+1F600",
+        "program": [
+          {
+            "head": "efbd9e",
+            "body": [
+              {
+                "pred": "f09f9880"
+              }
+            ]
+          },
+          {
+            "head": "f09f9880",
+            "body": [
+              {
+                "pred": "efbd9e"
+              }
+            ]
+          },
+          {
+            "head": "f09f9880",
+            "body": [
+              {
+                "pred": "71"
+              }
+            ]
+          },
+          {
+            "head": "71"
+          }
+        ],
+        "goal": "efbd9e",
+        "edges": [
+          [
+            "efbd9e",
+            "f09f9880",
+            false
+          ],
+          [
+            "f09f9880",
+            "71",
+            false
+          ],
+          [
+            "f09f9880",
+            "efbd9e",
+            false
+          ]
+        ],
+        "strata": [
+          [
+            "efbd9e",
+            "f09f9880"
+          ]
+        ],
+        "recursion": "mutual"
+      }
+    ]
+  },
+  "analysis_predicate_identity": {
+    "rule": "A predicate's identity in analysis is its BYTES (#2763 C): two predicates whose names differ only in an ill-formed byte are two predicates. Decoding lossily maps both p\\xff (70 FF) and p\\xfe (70 FE) to p U+FFFD, so a dependency graph keyed on decoded names merges them into one node: a positive edge between them reads as a self-loop (recursion), and a negation between them reads as a negative cycle, which analysis refuses. Same recipe and the same pins as analysis_order; every row must analyze.",
+    "cores": [
+      "rs",
+      "go",
+      "ts"
+    ],
+    "cases": [
+      {
+        "name": "well_formed_control",
+        "slot": "pa :- pb, two well-formed names",
+        "program": [
+          {
+            "head": "7061",
+            "body": [
+              {
+                "pred": "7062"
+              }
+            ]
+          },
+          {
+            "head": "7062"
+          }
+        ],
+        "goal": "7061",
+        "edges": [
+          [
+            "7061",
+            "7062",
+            false
+          ]
+        ],
+        "strata": [
+          [
+            "7061"
+          ]
+        ],
+        "recursion": "none"
+      },
+      {
+        "name": "positive_edge_between_ill_formed_names",
+        "slot": "p\\xff :- p\\xfe is an edge between two predicates, not a self-loop",
+        "program": [
+          {
+            "head": "70ff",
+            "body": [
+              {
+                "pred": "70fe"
+              }
+            ]
+          },
+          {
+            "head": "70fe"
+          }
+        ],
+        "goal": "70ff",
+        "edges": [
+          [
+            "70ff",
+            "70fe",
+            false
+          ]
+        ],
+        "strata": [
+          [
+            "70ff"
+          ]
+        ],
+        "recursion": "none"
+      },
+      {
+        "name": "negation_between_ill_formed_names",
+        "slot": "p\\xff :- q, \\+ p\\xfe negates a strictly lower predicate, not the head itself",
+        "program": [
+          {
+            "head": "70ff",
+            "body": [
+              {
+                "pred": "71"
+              },
+              {
+                "pred": "70fe",
+                "neg": true
+              }
+            ]
+          },
+          {
+            "head": "71"
+          },
+          {
+            "head": "70fe"
+          }
+        ],
+        "goal": "70ff",
+        "edges": [
+          [
+            "70ff",
+            "70fe",
+            true
+          ],
+          [
+            "70ff",
+            "71",
+            false
+          ]
+        ],
+        "strata": [
+          [
+            "70ff"
+          ]
+        ],
+        "recursion": "none"
+      }
+    ]
+  },
+  "cone_predicate_identity": {
+    "rule": "The cone of a goal is keyed by its predicates' BYTES (#2763 C). The recursion shape of the clauses the goal reaches through body dependencies ranks engines, and a lossy key merges p\\xff with p\\xfe, so the cone of p\\xff would take in p\\xfe's recursive rule. Build each program over arity-1 predicates named by hex: a `program` entry with a `body` is the rule head(X) :- body..., each body literal pred(X), negated when `neg` is true; an entry without `body` is the ground fact head(c). Compute the cone's recursion shape for the goal goal(X); it must equal `recursion`.",
+    "cores": [
+      "go",
+      "ts"
+    ],
+    "not_reachable_in": {
+      "rs": "rs's cone_recursion is pub(crate), reachable from no integration test. It keys by_head and reached on &Symbol, the predicate's bytes, so rs holds this rule by construction."
+    },
+    "cases": [
+      {
+        "name": "well_formed_control",
+        "slot": "the cone of pa is {pa, q}; pb's recursive rule is outside it",
+        "program": [
+          {
+            "head": "7061",
+            "body": [
+              {
+                "pred": "71"
+              }
+            ]
+          },
+          {
+            "head": "7062",
+            "body": [
+              {
+                "pred": "71"
+              }
+            ]
+          },
+          {
+            "head": "7062",
+            "body": [
+              {
+                "pred": "7062"
+              },
+              {
+                "pred": "71"
+              }
+            ]
+          },
+          {
+            "head": "71"
+          }
+        ],
+        "goal": "7061",
+        "recursion": "none"
+      },
+      {
+        "name": "ill_formed_names_are_two_cones",
+        "slot": "the cone of p\\xff is {p\\xff, q}; p\\xfe's recursive rule is outside it",
+        "program": [
+          {
+            "head": "70ff",
+            "body": [
+              {
+                "pred": "71"
+              }
+            ]
+          },
+          {
+            "head": "70fe",
+            "body": [
+              {
+                "pred": "71"
+              }
+            ]
+          },
+          {
+            "head": "70fe",
+            "body": [
+              {
+                "pred": "70fe"
+              },
+              {
+                "pred": "71"
+              }
+            ]
+          },
+          {
+            "head": "71"
+          }
+        ],
+        "goal": "70ff",
+        "recursion": "none"
+      }
+    ]
+  },
+  "goal_predicate": {
+    "rule": "A goal's predicate is an IDENTITY (it folds into a pin, a digest or a selection), so it is the atom's exact BYTES in every core, never decoded text (#2763 C). Derive each row by replacing the Nth occurrence (1-based, in the BASE) of substitute.atom's UTF-8 bytes with substitute.with_hex, the same length. Decode the wire with the codec, take the value at value_path (empty: the whole wire), decode it with the section's decoder, and re-encode it: the bytes must equal the codec encoding of that value (the base first, as the control). A row's value must differ from the base's, so the substitution landed inside the carrier; and a row naming collides_with decodes to a value different from that row's.",
+    "base_ref": {
+      "file": "parse.json",
+      "path": "cases",
+      "name": "goal_with_a_variable",
+      "field": "goal_wire"
+    },
+    "decoder": "goal",
+    "value_path": [],
+    "cores": [
+      "rs",
+      "go",
+      "ts"
+    ],
+    "cases": [
+      {
+        "name": "pred_ff",
+        "slot": "the goal's predicate",
+        "substitute": {
+          "atom": "reach",
+          "with_hex": "ff65616368",
+          "occurrence": 1
+        }
+      },
+      {
+        "name": "pred_fe",
+        "slot": "the goal's predicate",
+        "substitute": {
+          "atom": "reach",
+          "with_hex": "fe65616368",
+          "occurrence": 1
+        },
+        "collides_with": "pred_ff"
+      }
+    ]
+  },
+  "seal_plan_identity": {
+    "rule": "The certifying producer's SEAL PLAN keys a predicate by its BYTES (#2763 C2; seat:caa's ruling: the load-bearing site, because the function-symbol floor a request needs is computed from this plan). Two predicates whose names differ only in an ill-formed byte (p\\xff = 70 FF, p\\xfe = 70 FE) are two predicates: a lossy key merges them, so one predicate's clauses count as reached, ruled or sealed for the other. Build each program as in analysis_order (arity-1 predicates named by hex; an entry with a `body` is the rule head(X) :- body, each literal pred(X), negated when `neg`; without one it is the ground fact head(c)); an entry with `head_compound` true heads its rule with head(t(X)), an OPEN compound. For the goal goal(X): the syntactic extensional set (predicates only body-less clauses head) must equal `extensional` (hex, compared as a set); the COMPLETE seal (the query's stratum sealed too) over that set must render its relations, sorted by bytes then arity, as `relations_complete`, each name through the one injective escape (#1961's escaped_name, so p\\xff renders p%FF); and the function-symbol level a request needs must equal `level` under an untrusted request, a certifiable one (the prefix seal) and a certifiable one asking for a certified answer set (the complete seal).",
+    "cores": [
+      "rs",
+      "go",
+      "ts"
+    ],
+    "cases": [
+      {
+        "name": "well_formed_control",
+        "slot": "pa :- q, with an unrelated fact pb: ASCII names, byte and text keys agree",
+        "program": [
+          {
+            "head": "7061",
+            "body": [
+              {
+                "pred": "71"
+              }
+            ]
+          },
+          {
+            "head": "71"
+          },
+          {
+            "head": "7062"
+          }
+        ],
+        "goal": "7061",
+        "extensional": [
+          "71",
+          "7062"
+        ],
+        "relations_complete": [
+          "pa/1",
+          "q/1"
+        ],
+        "level": {
+          "untrusted": "none",
+          "certifiable": "none",
+          "certified_set": "none"
+        }
+      },
+      {
+        "name": "extensional_keeps_the_fact_beside_a_rule_of_its_twin",
+        "slot": "p\\xfe(c) heads only a fact; its twin p\\xff heads a rule. It stays extensional",
+        "program": [
+          {
+            "head": "70ff",
+            "body": [
+              {
+                "pred": "71"
+              }
+            ]
+          },
+          {
+            "head": "71"
+          },
+          {
+            "head": "70fe"
+          }
+        ],
+        "goal": "70ff",
+        "extensional": [
+          "71",
+          "70fe"
+        ],
+        "relations_complete": [
+          "p%FF/1",
+          "q/1"
+        ],
+        "level": {
+          "untrusted": "none",
+          "certifiable": "none",
+          "certified_set": "none"
+        }
+      },
+      {
+        "name": "floor_is_not_raised_by_an_unreached_twin",
+        "slot": "the load-bearing row: p\\xfe(t(X)) :- q(X) carries an OPEN compound, but the query p\\xff never reaches p\\xfe, so the complete seal does not seal it and the floor stays unsealed",
+        "program": [
+          {
+            "head": "70ff",
+            "body": [
+              {
+                "pred": "71"
+              }
+            ]
+          },
+          {
+            "head": "71"
+          },
+          {
+            "head": "70fe",
+            "head_compound": true,
+            "body": [
+              {
+                "pred": "71"
+              }
+            ]
+          }
+        ],
+        "goal": "70ff",
+        "extensional": [
+          "71"
+        ],
+        "relations_complete": [
+          "p%FF/1",
+          "q/1"
+        ],
+        "level": {
+          "untrusted": "unsealed",
+          "certifiable": "unsealed",
+          "certified_set": "unsealed"
+        }
+      },
+      {
+        "name": "relations_render_both_twins",
+        "slot": "p\\xff :- q, \\+ p\\xfe: the complete seal holds p\\xff and reads p\\xfe and q, three relations",
+        "program": [
+          {
+            "head": "70ff",
+            "body": [
+              {
+                "pred": "71"
+              },
+              {
+                "pred": "70fe",
+                "neg": true
+              }
+            ]
+          },
+          {
+            "head": "71"
+          },
+          {
+            "head": "70fe"
+          }
+        ],
+        "goal": "70ff",
+        "extensional": [
+          "71",
+          "70fe"
+        ],
+        "relations_complete": [
+          "p%FE/1",
+          "p%FF/1",
+          "q/1"
+        ],
+        "level": {
+          "untrusted": "none",
+          "certifiable": "none",
+          "certified_set": "none"
+        }
+      },
+      {
+        "name": "relations_sort_by_bytes_not_by_escaped_text",
+        "slot": "pA :- q, \\+ p\\x80, with q(c) and p\\x80(c): by bytes pA (70 41) precedes p\\x80 (70 80). Sorted by the escaped text, p%80/1 would come first, because % (0x25) precedes A (0x41) (seat:caa's condition on #2763)",
+        "program": [
+          {
+            "head": "7041",
+            "body": [
+              {
+                "pred": "71"
+              },
+              {
+                "pred": "7080",
+                "neg": true
+              }
+            ]
+          },
+          {
+            "head": "71"
+          },
+          {
+            "head": "7080"
+          }
+        ],
+        "goal": "7041",
+        "extensional": [
+          "71",
+          "7080"
+        ],
+        "relations_complete": [
+          "pA/1",
+          "p%80/1",
+          "q/1"
+        ],
+        "level": {
+          "untrusted": "none",
+          "certifiable": "none",
+          "certified_set": "none"
+        }
+      },
+      {
+        "name": "relations_sort_a_prefix_name_first",
+        "slot": "p :- q, \\+ p!, with q(c) and p!(c): by bytes the prefix p (70) precedes p! (70 21). Sorted by the rendered text, p!/1 would come first, because ! (0x21) precedes / (0x2F). This stands in for an arity-2 vs arity-10 row, which a seal plan cannot hold: it records a name once, at its larger arity",
+        "program": [
+          {
+            "head": "70",
+            "body": [
+              {
+                "pred": "71"
+              },
+              {
+                "pred": "7021",
+                "neg": true
+              }
+            ]
+          },
+          {
+            "head": "71"
+          },
+          {
+            "head": "7021"
+          }
+        ],
+        "goal": "70",
+        "extensional": [
+          "71",
+          "7021"
+        ],
+        "relations_complete": [
+          "p/1",
+          "p!/1",
+          "q/1"
+        ],
+        "level": {
+          "untrusted": "none",
+          "certifiable": "none",
+          "certified_set": "none"
+        }
+      }
+    ]
+  },
+  "undefined_predicate_name": {
+    "rule": "The undefined-predicate diagnostic names each predicate name/arity, the name through the one injective escape (#2984 sites 1 and 2; #1961's ruling, the escaped_name section above). It is text a reader sees, and the CLI's machine sink carries it as its predicate field, so two predicates whose names differ only in an ill-formed byte (p\\xff = 70 FF, p\\xfe = 70 FE) must never render as one, as a lossy decode renders both p U+FFFD. Build each program as in analysis_order. For the goal goal(X), under the standard theory with no declared extensional set, the undefined predicates, in the diagnostic's order (by name bytes, then arity), must render exactly as `undefined`: rs through UndefinedPredicate's Display, go through its String, ts through undefinedPredicateKey.",
+    "cores": [
+      "rs",
+      "go",
+      "ts"
+    ],
+    "cases": [
+      {
+        "name": "well_formed_control",
+        "slot": "pa :- q, with q defined nowhere: an ASCII name renders as itself",
+        "program": [
+          {
+            "head": "7061",
+            "body": [
+              {
+                "pred": "71"
+              }
+            ]
+          }
+        ],
+        "goal": "7061",
+        "undefined": [
+          "q/1"
+        ]
+      },
+      {
+        "name": "ill_formed_pair",
+        "slot": "pa :- p\\xff, p\\xfe, both defined nowhere: two predicates, told apart",
+        "program": [
+          {
+            "head": "7061",
+            "body": [
+              {
+                "pred": "70ff"
+              },
+              {
+                "pred": "70fe"
+              }
+            ]
+          }
+        ],
+        "goal": "7061",
+        "undefined": [
+          "p%FE/1",
+          "p%FF/1"
+        ]
+      },
+      {
+        "name": "percent",
+        "slot": "pa :- 50%, defined nowhere: a literal % escapes, or the rendering stops being decodable",
+        "program": [
+          {
+            "head": "7061",
+            "body": [
+              {
+                "pred": "353025"
+              }
+            ]
+          }
+        ],
+        "goal": "7061",
+        "undefined": [
+          "50%25/1"
+        ]
+      },
+      {
+        "name": "literal_escape_lookalike",
+        "slot": "pa :- p%FF (ASCII), p\\xff: the ASCII name renders apart from the byte",
+        "program": [
+          {
+            "head": "7061",
+            "body": [
+              {
+                "pred": "70254646"
+              },
+              {
+                "pred": "70ff"
+              }
+            ]
+          }
+        ],
+        "goal": "7061",
+        "undefined": [
+          "p%25FF/1",
+          "p%FF/1"
+        ]
+      }
+    ]
+  },
+  "pin_mismatch_binding": {
+    "rule": "A pinned certifiable offer whose theory list differs from the required check profile's is refused on the guarantee axis by the theory check, whose cause carries that check's two operands (#2734, seat:caa's operand rule; #2984 site 4): `required_operand_hex` is the required profile's theory list and `offered_operand_hex` the offer's pinned one, each the codec bytes of Tuple[Atom(\"theories\"), list], the list tagged with its slot (seat:caa's self-describing-operand condition) and each binding Tuple[Atom(id), Atom(version), Atom(hex config digest)]. The bytes are the binding's own, so two bindings that differ only in an ill-formed byte are two operands, never one. Before #2734 this section pinned the refusal's prose, which ruling D2 took off the wire. The spec is the demo spec (demo/lt@1.0.0 as its one theory, demo/edge-leaves@1.0.0 leaves, core/always-admit@1.0.0 admit, limits 100000/4096, all config digests zero, the current checker feature set), with its one theory replaced by `offered` for the offer and by `required` for the requirement, each with a zero config digest. The offer's pins are that spec's pins serving the spec's own term identity. Admitting the required spec must fail on the theory check with exactly these operands.",
+    "cores": [
+      "rs",
+      "go",
+      "ts"
+    ],
+    "cases": [
+      {
+        "name": "well_formed_control",
+        "slot": "two well-formed ids: ASCII renders as itself",
+        "offered": {
+          "id_hex": "64656d6f2f6c74",
+          "version_hex": "312e302e30"
+        },
+        "required": {
+          "id_hex": "64656d6f2f6f746865722d6c74",
+          "version_hex": "312e302e30"
+        },
+        "required_operand_hex": "010200087468656f7269657301010103000d64656d6f2f6f746865722d6c740005312e302e30004030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030",
+        "offered_operand_hex": "010200087468656f7269657301010103000764656d6f2f6c740005312e302e30004030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030"
+      },
+      {
+        "name": "ill_formed_id_pair",
+        "slot": "ids p\\xff and p\\xfe: two pins a lossy render shows as one",
+        "offered": {
+          "id_hex": "70ff",
+          "version_hex": "312e302e30"
+        },
+        "required": {
+          "id_hex": "70fe",
+          "version_hex": "312e302e30"
+        },
+        "required_operand_hex": "010200087468656f7269657301010103000270fe0005312e302e30004030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030",
+        "offered_operand_hex": "010200087468656f7269657301010103000270ff0005312e302e30004030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030"
+      },
+      {
+        "name": "ill_formed_version_pair",
+        "slot": "versions 1\\xff and 1\\xfe of one id: the version escapes too",
+        "offered": {
+          "id_hex": "64656d6f2f6c74",
+          "version_hex": "31ff"
+        },
+        "required": {
+          "id_hex": "64656d6f2f6c74",
+          "version_hex": "31fe"
+        },
+        "required_operand_hex": "010200087468656f7269657301010103000764656d6f2f6c74000231fe004030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030",
+        "offered_operand_hex": "010200087468656f7269657301010103000764656d6f2f6c74000231ff004030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030"
+      },
+      {
+        "name": "percent",
+        "slot": "an id with a literal %: it escapes, or the rendering stops being decodable",
+        "offered": {
+          "id_hex": "64656d6f2f6c74",
+          "version_hex": "312e302e30"
+        },
+        "required": {
+          "id_hex": "353025",
+          "version_hex": "312e302e30"
+        },
+        "required_operand_hex": "010200087468656f726965730101010300033530250005312e302e30004030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030",
+        "offered_operand_hex": "010200087468656f7269657301010103000764656d6f2f6c740005312e302e30004030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030"
+      }
+    ]
+  }
+}

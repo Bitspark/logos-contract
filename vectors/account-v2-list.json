@@ -1,0 +1,51 @@
+{
+  "vector": "logos-account-v2 list reification (ADDITIVE · NON-DEFAULT · UNFROZEN)",
+  "note": "ADDITIVE, OPT-IN list-reification vector (#159) + the reify-aware account-equality CHECK cases (#277). This is NOT a surface of the default account and changes NO default byte. The DEFAULT account emits a list in the FROZEN Prolog-style cons form (`[H|T]` = Tuple[Atom('.'), H, T]; `[]` = Atom('[]')) -- that byte form is pinned by vectors/search.json and is untouched. This file pins the OPT-IN normalization that DerivationBuilder::with_list_reification() applies via logos_contract::reify_lists (a thin re-export of the FIRM term-algebra primitive logos_contract::canonicalize_lists): a ground PROPER cons-list is rewritten to the ontos/data flat `list` embedding Tuple[Atom('list'), e0, ...] (ontos-data spec 5.5) before the wire form is taken. For each named fixture, `cons_wire_hex` is the DEFAULT (verbatim) lowercase-hex ontos-codec wire form of the cons-shaped ground claim Tuple[Atom(pred), quote(arg)...] (same reading as search.json), and `list_wire_hex` is the REIFIED wire form (after reify_lists). For empty_nil (a bare []) and improper_tail ([a|b]), the two are EQUAL by design -- a non-list value is never reified. The wire-hex fixtures are replayed by conformance/rs/tests/list_reification_vectors.rs against the FROZEN ontos-codec + the real reify_lists. #277 made the reified form dual-conformant by applying canonicalize_lists at check()'s head, premise and root comparisons. #3022 (seat:caa's ruling) WITHDREW that: every certified literal claim is EXACT, check() compares every site structurally under every term identity, and a derivation whose nodes conclude the reified list(...) spelling of a cons-form instance is REFUSED (contract/{rs/tests/account_v2_reify.rs, go/account_v2_reify_test.go, ts/test/account_v2_reify.test.ts} pin the refusal). The reified form is PRESENTATION: DerivationBuilder::with_list_reification() keeps every node conclusion exact and answers present() with the reified spelling beside the exact fact. The `check_correspondence` cases below pin the canonical-form equality, which is now the presentation equivalence (two spellings present one list), never a certification equivalence.",
+  "default": "cons (frozen, search.json)",
+  "reified": "list (ontos-data §5.5 embedding, opt-in)",
+  "check_correspondence": {
+    "note": "The presentation equivalence (#277, and since #3022 presentation only): canonicalize_lists(a) == canonicalize_lists(b) holds exactly when two spellings present the same list. check() does NOT use it: every certified claim is exact, so each `account_equal` pair is two distinct terms to the checker. `account_equal` lists ground-value pairs that present one list (cons form vs the equivalent list embedding); `account_distinct` lists pairs that MUST stay distinct (no conflation) -- a wrong sequence, the two empty spellings [] vs list(), and a proper list vs an improper cons.",
+    "account_equal": [
+      { "case": "proper_pair_cons_vs_list", "cons": "p([a, b])", "list": "p(list(a, b))", "canonical": "p(list(a, b))" },
+      { "case": "singleton_cons_vs_list", "cons": "p([a])", "list": "p(list(a))", "canonical": "p(list(a))" },
+      { "case": "nested_cons_vs_list", "cons": "p([[a], b])", "list": "p(list(list(a), b))", "canonical": "p(list(list(a), b))" }
+    ],
+    "account_distinct": [
+      { "case": "wrong_order", "a": "p(list(a, b))", "b": "p(list(b, a))", "why": "distinct sequences never conflate" },
+      { "case": "empty_nil_vs_empty_list", "a": "p([])", "b": "p(list())", "why": "a bare [] atom is NOT the empty list embedding list()" },
+      { "case": "proper_vs_improper", "a": "p(list(a, b))", "b": "p([a | b])", "why": "a proper list is not the improper cons .(a, b)" }
+    ]
+  },
+  "fixtures": [
+    {
+      "name": "proper_pair",
+      "claim": "p([a, b])",
+      "cons_wire_hex": "010200017001020001010103010200010000012e010200010000016101020001010103010200010000012e0102000100000162010200010000025b5d",
+      "list_wire_hex": "010200017001020001010103010200010000046c69737401020001000001610102000100000162"
+    },
+    {
+      "name": "proper_singleton",
+      "claim": "p([a])",
+      "cons_wire_hex": "010200017001020001010103010200010000012e0102000100000161010200010000025b5d",
+      "list_wire_hex": "010200017001020001010102010200010000046c6973740102000100000161"
+    },
+    {
+      "name": "empty_nil",
+      "claim": "p([])",
+      "cons_wire_hex": "0102000170010200010000025b5d",
+      "list_wire_hex": "0102000170010200010000025b5d"
+    },
+    {
+      "name": "improper_tail",
+      "claim": "p([a | b])",
+      "cons_wire_hex": "010200017001020001010103010200010000012e01020001000001610102000100000162",
+      "list_wire_hex": "010200017001020001010103010200010000012e01020001000001610102000100000162"
+    },
+    {
+      "name": "nested_list",
+      "claim": "p([[a], b])",
+      "cons_wire_hex": "010200017001020001010103010200010000012e01020001010103010200010000012e0102000100000161010200010000025b5d01020001010103010200010000012e0102000100000162010200010000025b5d",
+      "list_wire_hex": "010200017001020001010103010200010000046c69737401020001010102010200010000046c69737401020001000001610102000100000162"
+    }
+  ]
+}

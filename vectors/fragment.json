@@ -1,0 +1,225 @@
+{
+  "note": "#3067 (research 0028 row A15; seat:caa's rulings on #3067, Q1 to Q3): the ONE classification of a sealed clause, HAND-AUTHORED from the checker's gates, which every core replays through `check`'s scope gate and through the contract tier's one function. A case is one sealed clause of `program` (`clause` is its index), classified in a context: `seals` (the relations its certificate seals), `reads_lower` (the relations it reads from a strictly lower certificate) and `owns` (the relations a theory owns, decided live). The dependency graph is built over `program` with `seals` as its scope, as check builds it. `expect` is null when the clause is inside the certifiable fragment, else the FIRST gate it fails and that gate's subject. The gates, in their one order (seat:caa's Q1, the checker's order): (1) the count gate, per count literal in body order, `count_not_lower` then `count_open_compound`; (2) `constructor_cycle`; (3) the read gate, per body literal in body order, `unserved` then `intra_scope_negation`; (4) range restriction, `unbound_count_filter` per count literal in body order, then `unbound_variable`. Where a gate names a variable it names the first unbound one in name order. Notation: a string starting with an upper-case letter is a variable, any other string an atom, an array a compound `[functor, args...]`; a body literal is a goal, `{\"neg\": goal}` or `{\"count\": {pred, arity, filter: [[position, term]...], result}}` (a `count` over rows).",
+  "cases": [
+    {
+      "name": "a_count_over_this_scope_is_not_lower",
+      "note": "The counted q is sealed by the clause's own certificate: a count must read a strictly lower one, never the table under construction.",
+      "program": [{ "head": ["p", "N"], "body": [{ "count": { "pred": "q", "arity": 1, "filter": [], "result": "N" } }] }],
+      "clause": 0,
+      "seals": ["p", "q"],
+      "reads_lower": [],
+      "owns": [],
+      "expect": { "outside": "count_not_lower", "pred": "q", "same_scope": true }
+    },
+    {
+      "name": "a_count_over_a_relation_nothing_seals_is_not_lower",
+      "note": "No certificate seals the counted q.",
+      "program": [{ "head": ["p", "N"], "body": [{ "count": { "pred": "q", "arity": 1, "filter": [], "result": "N" } }] }],
+      "clause": 0,
+      "seals": ["p"],
+      "reads_lower": [],
+      "owns": [],
+      "expect": { "outside": "count_not_lower", "pred": "q", "same_scope": false }
+    },
+    {
+      "name": "a_count_filter_carrying_an_open_compound",
+      "note": "q is read lower, but the filter term f(Y) is an open compound, which the count gate refuses.",
+      "program": [{ "head": ["p", "N"], "body": [["r", "Y"], { "count": { "pred": "q", "arity": 1, "filter": [[0, ["f", "Y"]]], "result": "N" } }] }],
+      "clause": 0,
+      "seals": ["p", "r"],
+      "reads_lower": ["q"],
+      "owns": [],
+      "expect": { "outside": "count_open_compound", "pred": "q" }
+    },
+    {
+      "name": "a_constructor_on_its_own_cycle",
+      "note": "nat(s(X)) :- nat(X) constructs s(X) on nat's own dependency cycle. The fact nat(z) is in scope and inside the fragment.",
+      "program": [{ "head": ["nat", "z"] }, { "head": ["nat", ["s", "X"]], "body": [["nat", "X"]] }],
+      "clause": 1,
+      "seals": ["nat"],
+      "reads_lower": [],
+      "owns": [],
+      "expect": { "outside": "constructor_cycle", "through": "nat" }
+    },
+    {
+      "name": "a_read_nothing_serves",
+      "note": "q is neither sealed, nor theory-owned, nor read from a lower certificate.",
+      "program": [{ "head": ["p", "X"], "body": [["q", "X"]] }],
+      "clause": 0,
+      "seals": ["p"],
+      "reads_lower": [],
+      "owns": [],
+      "expect": { "outside": "unserved", "pred": "q" }
+    },
+    {
+      "name": "a_negation_of_a_relation_this_scope_seals",
+      "note": "q is sealed by the clause's own certificate, so \\+ q would read the table under construction.",
+      "program": [{ "head": ["p", "X"], "body": [["r", "X"], { "neg": ["q", "X"] }] }],
+      "clause": 0,
+      "seals": ["p", "r", "q"],
+      "reads_lower": [],
+      "owns": [],
+      "expect": { "outside": "intra_scope_negation", "pred": "q" }
+    },
+    {
+      "name": "a_count_filter_variable_nothing_binds",
+      "note": "The filter binds position 0 of q to Y, and no positive sealed literal binds Y.",
+      "program": [{ "head": ["p", "N"], "body": [{ "count": { "pred": "q", "arity": 1, "filter": [[0, "Y"]], "result": "N" } }] }],
+      "clause": 0,
+      "seals": ["p"],
+      "reads_lower": ["q"],
+      "owns": [],
+      "expect": { "outside": "unbound_count_filter", "pred": "q", "var": "Y" }
+    },
+    {
+      "name": "a_variable_nothing_binds",
+      "note": "X occurs only under \\+, and a negated literal binds nothing.",
+      "program": [{ "head": ["p", "X"], "body": [{ "neg": ["q", "X"] }] }],
+      "clause": 0,
+      "seals": ["p"],
+      "reads_lower": ["q"],
+      "owns": [],
+      "expect": { "outside": "unbound_variable", "var": "X" }
+    },
+    {
+      "name": "a_theory_literal_binds_nothing",
+      "note": "eq is theory-owned, so it is served, but a theory literal binds no variable: X is bound by nothing.",
+      "program": [{ "head": ["p", "X"], "body": [["r", "Y"], ["eq", "X", "Y"]] }],
+      "clause": 0,
+      "seals": ["p", "r"],
+      "reads_lower": [],
+      "owns": ["eq"],
+      "expect": { "outside": "unbound_variable", "var": "X" }
+    },
+    {
+      "name": "inside_the_fragment",
+      "note": "The control: r is sealed and binds X, and q is read lower under \\+.",
+      "program": [{ "head": ["p", "X"], "body": [["r", "X"], { "neg": ["q", "X"] }] }],
+      "clause": 0,
+      "seals": ["p", "r"],
+      "reads_lower": ["q"],
+      "owns": [],
+      "expect": null
+    },
+    {
+      "name": "a_lower_read_binds",
+      "note": "The control for reads_lower: q is read from a strictly lower certificate, and a positive lower read binds X.",
+      "program": [{ "head": ["p", "X"], "body": [["q", "X"]] }],
+      "clause": 0,
+      "seals": ["p"],
+      "reads_lower": ["q"],
+      "owns": [],
+      "expect": null
+    },
+    {
+      "name": "the_count_gate_before_the_cycle_gate",
+      "note": "Adjacent pair (count, cycle): the filter f(M) is an open compound AND the head constructs s(N) on nat's cycle. The count gate wins.",
+      "program": [{ "head": ["nat", "z"] }, { "head": ["nat", ["s", "N"]], "body": [["nat", "M"], { "count": { "pred": "q", "arity": 1, "filter": [[0, ["f", "M"]]], "result": "N" } }] }],
+      "clause": 1,
+      "seals": ["nat"],
+      "reads_lower": ["q"],
+      "owns": [],
+      "expect": { "outside": "count_open_compound", "pred": "q" }
+    },
+    {
+      "name": "the_cycle_gate_before_the_read_gate",
+      "note": "Adjacent pair (cycle, read): nat(s(X)) constructs on nat's cycle AND reads zz, which nothing serves. The cycle gate wins.",
+      "program": [{ "head": ["nat", "z"] }, { "head": ["nat", ["s", "X"]], "body": [["nat", "X"], ["zz", "X"]] }],
+      "clause": 1,
+      "seals": ["nat"],
+      "reads_lower": [],
+      "owns": [],
+      "expect": { "outside": "constructor_cycle", "through": "nat" }
+    },
+    {
+      "name": "the_read_gate_before_range_restriction",
+      "note": "Adjacent pair (read, range): \\+ q negates a relation this scope seals AND X is bound by nothing. The read gate wins.",
+      "program": [{ "head": ["p", "X"], "body": [{ "neg": ["q", "X"] }] }],
+      "clause": 0,
+      "seals": ["p", "q"],
+      "reads_lower": [],
+      "owns": [],
+      "expect": { "outside": "intra_scope_negation", "pred": "q" }
+    },
+    {
+      "name": "the_cycle_gate_before_range_restriction_3067",
+      "note": "#3067's witness: p(f(X)) :- p(Y) is unsafe (X is bound by nothing) AND constructs on p's cycle. check named the cycle; every seal plan named 'is not range-restricted'. The one order names the cycle.",
+      "program": [{ "head": ["p", ["f", "X"]], "body": [["p", "Y"]] }],
+      "clause": 0,
+      "seals": ["p"],
+      "reads_lower": [],
+      "owns": [],
+      "expect": { "outside": "constructor_cycle", "through": "p" }
+    },
+    {
+      "name": "within_the_count_gate_not_lower_before_open_compound",
+      "note": "One count literal fails both count checks: q is sealed by this scope AND its filter f(Y) is an open compound. Not-lower comes first.",
+      "program": [{ "head": ["p", "N"], "body": [["r", "Y"], { "count": { "pred": "q", "arity": 1, "filter": [[0, ["f", "Y"]]], "result": "N" } }] }],
+      "clause": 0,
+      "seals": ["p", "r", "q"],
+      "reads_lower": [],
+      "owns": [],
+      "expect": { "outside": "count_not_lower", "pred": "q", "same_scope": true }
+    },
+    {
+      "name": "within_the_read_gate_body_order_decides",
+      "note": "The read gate runs literal by literal: zz (unserved) is read before \\+ s (intra-scope), so unserved is named.",
+      "program": [{ "head": ["p", "X"], "body": [["r", "X"], ["zz", "X"], { "neg": ["s", "X"] }] }],
+      "clause": 0,
+      "seals": ["p", "r", "s"],
+      "reads_lower": [],
+      "owns": [],
+      "expect": { "outside": "unserved", "pred": "zz" }
+    },
+    {
+      "name": "within_the_read_gate_body_order_decides_reversed",
+      "note": "The same two literals in the other order: \\+ s comes first, so intra-scope negation is named.",
+      "program": [{ "head": ["p", "X"], "body": [["r", "X"], { "neg": ["s", "X"] }, ["zz", "X"]] }],
+      "clause": 0,
+      "seals": ["p", "r", "s"],
+      "reads_lower": [],
+      "owns": [],
+      "expect": { "outside": "intra_scope_negation", "pred": "s" }
+    },
+    {
+      "name": "within_range_restriction_a_filter_before_a_variable",
+      "note": "The filter variable Y and the head variable Z are both unbound. The count filter is named first.",
+      "program": [{ "head": ["p", "Z"], "body": [{ "count": { "pred": "q", "arity": 1, "filter": [[0, "Y"]], "result": "N" } }] }],
+      "clause": 0,
+      "seals": ["p"],
+      "reads_lower": ["q"],
+      "owns": [],
+      "expect": { "outside": "unbound_count_filter", "pred": "q", "var": "Y" }
+    },
+    {
+      "name": "the_first_unbound_variable_in_name_order",
+      "note": "Y (in the head) and X (under \\+) are both unbound. The one order names X, the first in name order, wherever it occurs. Before #3067, ts named Y (occurrence order) and go named either (a map's iteration order).",
+      "program": [{ "head": ["p", "Y"], "body": [{ "neg": ["q", "X"] }] }],
+      "clause": 0,
+      "seals": ["p"],
+      "reads_lower": ["q"],
+      "owns": [],
+      "expect": { "outside": "unbound_variable", "var": "X" }
+    },
+    {
+      "name": "the_first_unbound_count_filter_variable_in_name_order",
+      "note": "The filter binds q's position 0 to Y and position 1 to X, both unbound. The one order names X, the first in name order. Before #3067, rs and ts named Y (occurrence order).",
+      "program": [{ "head": ["p", "N"], "body": [{ "count": { "pred": "q", "arity": 2, "filter": [[0, "Y"], [1, "X"]], "result": "N" } }] }],
+      "clause": 0,
+      "seals": ["p"],
+      "reads_lower": ["q"],
+      "owns": [],
+      "expect": { "outside": "unbound_count_filter", "pred": "q", "var": "X" }
+    },
+    {
+      "name": "a_lower_read_a_theory_owns_binds_nothing_3067",
+      "note": "seat:caa's ruling on #3067 increment 2, Q1: near, read lower, binds X only if no theory owns it. check's partition gate refuses a certificate that seals a theory's relation, so for check a relation read lower is never owned and this changes nothing. The resolver reads the standard theory while its plan seals every relation but the arithmetic builtins, so it can put a theory's relation (=) in a lower layer, and there too it binds nothing, so X is bound by nothing that must bind.",
+      "program": [{ "head": ["p", "X"], "body": [["c", "Y"], ["near", "X", "Y"]] }],
+      "clause": 0,
+      "seals": ["p"],
+      "reads_lower": ["c", "near"],
+      "owns": ["near"],
+      "expect": { "outside": "unbound_variable", "var": "X" }
+    }
+  ]
+}

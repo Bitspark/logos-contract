@@ -1,0 +1,5789 @@
+{
+  "spi": "logos-checker-spi v1",
+  "profile": "aggregation_v1",
+  "note": "Language-agnostic conformance vectors for ADR 0023 certifiable count / count_distinct (Phase 5, #585, epic #579). A `Premise::Count { pred, filter, project, k, cert }` discharges an aggregate body literal against the SAME sealed, proven-exact ClosedModelCert that ADR 0007 negation uses â€” no new certificate, no new account node. The checker recomputes the count over the cert's RelationTable and accepts only if the proposed `k` matches (the dual-conformance law for count). THE CORE GUARANTEE pinned here is the ADVERSARIAL TAMPER case `tamper_wrong_k_over_valid_cert`: a derivation claiming a wrong `k` over an otherwise-VALID cert MUST be rejected `count_mismatch`. Pinned against the rs oracle (contract/rs/tests/aggregation.rs), replayed byte-identically by go (contract/go/aggregation_vectors_test.go) and ts (contract/ts/test/aggregation_vectors.test.ts). NOTATION (extends negation.json): a premise is a bare int (positive node) OR a count premise {count:{pred:{name,arity}, filter:[{pos,value}...], project:'rows'|{distinct:<attr>}, k:<int>, cert:<int>}}. A clause body literal may be a positive goal {pred,args} OR a count body literal {count_lit:{pred:{name,arity}, filter:[{pos,var}...]|[{pos,atom_str}...], project:'rows'|{distinct:<attr>}, count:{var}}}. The count result int `k`/`count` is the canonical ontos `int` embedding of the integer (encoded by each core's int codec). null() is the nullary compound Tuple[Atom('null')]; count_distinct EXCLUDES null(). CONTEXT BINDING is identical to negation.json: the bound context is DERIVED from the live program (recomputed program_hash) + fixed non-zero pins; each cert auto-binds unless it sets an explicit program_hash (none here). The aggregation_v1 profile: NO theory (NoTheory owns nothing); EDB leaves = the top-level `extensional` set attesting an EDB-of-record snapshot from the top-level `edb` map (Â§3.6); Context = unit. #587 FOLLOW-ON: the same Premise::Count carrier now also folds an integer column via project={sum|min|max:<attr>} (v1 INTEGER-only, SET semantics over the proven-exact rows; the ArithmeticTheory exact +/min/max over BigInt). Empty sum = 0; empty min/max ⇒ REJECT agg_empty_undefined (no infinities/sentinels); a non-int column ⇒ count_attr_out_of_range (ill-typed). An int column value is the canonical ontos `int` encoded {\"int\":N}. score(obj,val) is the int-column relation; folds group by column 0. #2258 L3.3b: a case may name its closed world as `certs`, an ORDERED list of keys into `certs` (index = position), instead of the single `cert`; a cert may carry `supports` (edges with same_stratum/lower_stratum/builtin/neg_lower/count_lower refs) and `partial_scope`. The stacked_count_2258 rows pin a count in a sealed clause over a strictly lower certificate. #2813 FROZEN REJECTIONS (the rows named frozen_*): rejections a future change could flip silently, each pinned tri-core by its EXACT code. (1) Three count-premise paths that REUSE another code instead of a dedicated one (ADR 0023 'What the checker verifies' steps 2 and 4, the negation gate's clone; research 0008 Applied row 17): a counted predicate the cited cert does not seal => neg_atom_not_sealed; a filter value outside the cert's finite domain => neg_atom_ill_typed; a k that is not a canonical int => count_mismatch. (2) sum/min/max over a DECIMAL column => count_attr_out_of_range (ADR 0023's #587 amendment: v1 folds are integer-only; research 0010). NOTATION for these rows: a value may be the canonical ontos decimal embedding {\"decimal\":\"<d.ddd>\"} (#331, the term.json/arithmetic.json notation), and a count premise's k may be any value in the term notation in place of a bare int. FLIPPING ANY ROW OF (2) TO ACCEPT REQUIRES A CHECKER_VERSION BUMP (the kernel's CHECKER_VERSION, rs kernel/rs/src/certify.rs and its go/ts mirrors): widening ProjectSpec::Sum/Min/Max in place changes what the SAME premise bytes are accepted as while every check-profile digest stays unchanged (the digest omits CHECKER_VERSION, #2663), so the pair (check_profile_digest, checker_version) must move (ADR 0035 D1). Research 0010 advises a NEW explicitly typed fold variant rather than widening these bytes at all.",
+  "extensional": [
+    "obs",
+    "r",
+    "depicts",
+    "lineage",
+    "score",
+    "pts",
+    "measure"
+  ],
+  "edb": {
+    "obs": [
+      {
+        "pred": "obs",
+        "args": [
+          {
+            "atom_str": "o1"
+          },
+          {
+            "atom_str": "p1"
+          },
+          {
+            "atom_str": "x"
+          }
+        ]
+      },
+      {
+        "pred": "obs",
+        "args": [
+          {
+            "atom_str": "o1"
+          },
+          {
+            "atom_str": "p2"
+          },
+          {
+            "atom_str": "x"
+          }
+        ]
+      },
+      {
+        "pred": "obs",
+        "args": [
+          {
+            "atom_str": "o1"
+          },
+          {
+            "atom_str": "p3"
+          },
+          {
+            "atom_str": "y"
+          }
+        ]
+      },
+      {
+        "pred": "obs",
+        "args": [
+          {
+            "atom_str": "o1"
+          },
+          {
+            "atom_str": "p4"
+          },
+          {
+            "tuple": [
+              {
+                "atom_str": "null"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "pred": "obs",
+        "args": [
+          {
+            "atom_str": "o2"
+          },
+          {
+            "atom_str": "p1"
+          },
+          {
+            "atom_str": "z"
+          }
+        ]
+      }
+    ],
+    "r": [],
+    "depicts": [
+      {
+        "pred": "depicts",
+        "args": [
+          {
+            "atom_str": "scene"
+          },
+          {
+            "atom_str": "ph1"
+          },
+          {
+            "atom_str": "vase"
+          },
+          {
+            "atom_str": "front"
+          }
+        ]
+      },
+      {
+        "pred": "depicts",
+        "args": [
+          {
+            "atom_str": "scene"
+          },
+          {
+            "atom_str": "ph2"
+          },
+          {
+            "atom_str": "vase"
+          },
+          {
+            "atom_str": "side"
+          }
+        ]
+      },
+      {
+        "pred": "depicts",
+        "args": [
+          {
+            "atom_str": "scene"
+          },
+          {
+            "atom_str": "ph3"
+          },
+          {
+            "atom_str": "vase"
+          },
+          {
+            "atom_str": "top"
+          }
+        ]
+      },
+      {
+        "pred": "depicts",
+        "args": [
+          {
+            "atom_str": "scene"
+          },
+          {
+            "atom_str": "ph4"
+          },
+          {
+            "atom_str": "vase"
+          },
+          {
+            "atom_str": "front"
+          }
+        ]
+      },
+      {
+        "pred": "depicts",
+        "args": [
+          {
+            "atom_str": "scene"
+          },
+          {
+            "atom_str": "ph5"
+          },
+          {
+            "atom_str": "mug"
+          },
+          {
+            "atom_str": "front"
+          }
+        ]
+      }
+    ],
+    "lineage": [
+      {
+        "pred": "lineage",
+        "args": [
+          {
+            "atom_str": "cone1"
+          },
+          {
+            "atom_str": "asset_a"
+          },
+          {
+            "atom_str": "modelM"
+          }
+        ]
+      },
+      {
+        "pred": "lineage",
+        "args": [
+          {
+            "atom_str": "cone1"
+          },
+          {
+            "atom_str": "asset_b"
+          },
+          {
+            "atom_str": "modelM"
+          }
+        ]
+      },
+      {
+        "pred": "lineage",
+        "args": [
+          {
+            "atom_str": "cone1"
+          },
+          {
+            "atom_str": "asset_c"
+          },
+          {
+            "atom_str": "modelN"
+          }
+        ]
+      },
+      {
+        "pred": "lineage",
+        "args": [
+          {
+            "atom_str": "cone1"
+          },
+          {
+            "atom_str": "asset_d"
+          },
+          {
+            "tuple": [
+              {
+                "atom_str": "null"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "score": [
+      {
+        "pred": "score",
+        "args": [
+          {
+            "atom_str": "g1"
+          },
+          {
+            "int": 3
+          }
+        ]
+      },
+      {
+        "pred": "score",
+        "args": [
+          {
+            "atom_str": "g1"
+          },
+          {
+            "int": 7
+          }
+        ]
+      },
+      {
+        "pred": "score",
+        "args": [
+          {
+            "atom_str": "g1"
+          },
+          {
+            "int": 1
+          }
+        ]
+      },
+      {
+        "pred": "score",
+        "args": [
+          {
+            "atom_str": "g2_unused"
+          },
+          {
+            "int": 99
+          }
+        ]
+      }
+    ],
+    "pts": [
+      {
+        "pred": "pts",
+        "args": [
+          {
+            "atom_str": "a"
+          },
+          {
+            "int": 10
+          }
+        ]
+      },
+      {
+        "pred": "pts",
+        "args": [
+          {
+            "atom_str": "a"
+          },
+          {
+            "int": 4
+          }
+        ]
+      }
+    ],
+    "measure": [
+      {
+        "pred": "measure",
+        "args": [
+          {
+            "atom_str": "m1"
+          },
+          {
+            "decimal": "1.0"
+          }
+        ]
+      },
+      {
+        "pred": "measure",
+        "args": [
+          {
+            "atom_str": "m1"
+          },
+          {
+            "decimal": "4.0"
+          }
+        ]
+      },
+      {
+        "pred": "measure",
+        "args": [
+          {
+            "atom_str": "m1"
+          },
+          {
+            "decimal": "1.5"
+          }
+        ]
+      },
+      {
+        "pred": "measure",
+        "args": [
+          {
+            "atom_str": "m1"
+          },
+          {
+            "decimal": "2.5"
+          }
+        ]
+      }
+    ]
+  },
+  "program": {
+    "eligible_count_rule": {
+      "head": {
+        "pred": "eligible_count",
+        "args": [
+          {
+            "var": "O"
+          }
+        ]
+      },
+      "body": [
+        {
+          "count_lit": {
+            "pred": {
+              "name": "obs",
+              "arity": 3
+            },
+            "filter": [
+              {
+                "pos": 0,
+                "var": "O"
+              }
+            ],
+            "project": "rows",
+            "count": {
+              "var": "N"
+            }
+          }
+        }
+      ]
+    },
+    "eligible_distinct_rule": {
+      "head": {
+        "pred": "eligible_distinct",
+        "args": [
+          {
+            "var": "O"
+          }
+        ]
+      },
+      "body": [
+        {
+          "count_lit": {
+            "pred": {
+              "name": "obs",
+              "arity": 3
+            },
+            "filter": [
+              {
+                "pos": 0,
+                "var": "O"
+              }
+            ],
+            "project": {
+              "distinct": 2
+            },
+            "count": {
+              "var": "N"
+            }
+          }
+        }
+      ]
+    },
+    "eligible_bad_attr_rule": {
+      "head": {
+        "pred": "eligible_bad",
+        "args": [
+          {
+            "var": "O"
+          }
+        ]
+      },
+      "body": [
+        {
+          "count_lit": {
+            "pred": {
+              "name": "obs",
+              "arity": 3
+            },
+            "filter": [
+              {
+                "pos": 0,
+                "var": "O"
+              }
+            ],
+            "project": {
+              "distinct": 5
+            },
+            "count": {
+              "var": "N"
+            }
+          }
+        }
+      ]
+    },
+    "eligible_bad_filter_rule": {
+      "head": {
+        "pred": "eligible_bad",
+        "args": [
+          {
+            "var": "O"
+          }
+        ]
+      },
+      "body": [
+        {
+          "count_lit": {
+            "pred": {
+              "name": "obs",
+              "arity": 3
+            },
+            "filter": [
+              {
+                "pos": 7,
+                "var": "O"
+              }
+            ],
+            "project": "rows",
+            "count": {
+              "var": "N"
+            }
+          }
+        }
+      ]
+    },
+    "eligible_bad_arity_rule": {
+      "head": {
+        "pred": "eligible_bad",
+        "args": [
+          {
+            "var": "O"
+          }
+        ]
+      },
+      "body": [
+        {
+          "count_lit": {
+            "pred": {
+              "name": "obs",
+              "arity": 2
+            },
+            "filter": [
+              {
+                "pos": 0,
+                "var": "O"
+              }
+            ],
+            "project": "rows",
+            "count": {
+              "var": "N"
+            }
+          }
+        }
+      ]
+    },
+    "r_self_count_rule": {
+      "head": {
+        "pred": "r",
+        "args": [
+          {
+            "var": "O"
+          }
+        ]
+      },
+      "body": [
+        {
+          "count_lit": {
+            "pred": {
+              "name": "r",
+              "arity": 1
+            },
+            "filter": [],
+            "project": "rows",
+            "count": {
+              "var": "N"
+            }
+          }
+        }
+      ]
+    },
+    "vase_angles_rule": {
+      "head": {
+        "pred": "object_seen_from_distinct_angles",
+        "args": [
+          {
+            "var": "S"
+          },
+          {
+            "var": "O"
+          }
+        ]
+      },
+      "body": [
+        {
+          "count_lit": {
+            "pred": {
+              "name": "depicts",
+              "arity": 4
+            },
+            "filter": [
+              {
+                "pos": 0,
+                "var": "S"
+              },
+              {
+                "pos": 2,
+                "var": "O"
+              }
+            ],
+            "project": {
+              "distinct": 3
+            },
+            "count": {
+              "var": "N"
+            }
+          }
+        }
+      ]
+    },
+    "lineage_models_rule": {
+      "head": {
+        "pred": "lineage_distinct_models",
+        "args": [
+          {
+            "var": "C"
+          }
+        ]
+      },
+      "body": [
+        {
+          "count_lit": {
+            "pred": {
+              "name": "lineage",
+              "arity": 3
+            },
+            "filter": [
+              {
+                "pos": 0,
+                "var": "C"
+              }
+            ],
+            "project": {
+              "distinct": 2
+            },
+            "count": {
+              "var": "N"
+            }
+          }
+        }
+      ]
+    },
+    "score_sum_rule": {
+      "head": {
+        "pred": "score_sum",
+        "args": [
+          {
+            "var": "G"
+          }
+        ]
+      },
+      "body": [
+        {
+          "count_lit": {
+            "pred": {
+              "name": "score",
+              "arity": 2
+            },
+            "filter": [
+              {
+                "pos": 0,
+                "var": "G"
+              }
+            ],
+            "project": {
+              "sum": 1
+            },
+            "count": {
+              "var": "N"
+            }
+          }
+        }
+      ]
+    },
+    "score_min_rule": {
+      "head": {
+        "pred": "score_min",
+        "args": [
+          {
+            "var": "G"
+          }
+        ]
+      },
+      "body": [
+        {
+          "count_lit": {
+            "pred": {
+              "name": "score",
+              "arity": 2
+            },
+            "filter": [
+              {
+                "pos": 0,
+                "var": "G"
+              }
+            ],
+            "project": {
+              "min": 1
+            },
+            "count": {
+              "var": "N"
+            }
+          }
+        }
+      ]
+    },
+    "score_max_rule": {
+      "head": {
+        "pred": "score_max",
+        "args": [
+          {
+            "var": "G"
+          }
+        ]
+      },
+      "body": [
+        {
+          "count_lit": {
+            "pred": {
+              "name": "score",
+              "arity": 2
+            },
+            "filter": [
+              {
+                "pos": 0,
+                "var": "G"
+              }
+            ],
+            "project": {
+              "max": 1
+            },
+            "count": {
+              "var": "N"
+            }
+          }
+        }
+      ]
+    },
+    "score_bad_col_rule": {
+      "head": {
+        "pred": "score_bad",
+        "args": [
+          {
+            "var": "G"
+          }
+        ]
+      },
+      "body": [
+        {
+          "count_lit": {
+            "pred": {
+              "name": "score",
+              "arity": 2
+            },
+            "filter": [
+              {
+                "pos": 0,
+                "var": "G"
+              }
+            ],
+            "project": {
+              "sum": 0
+            },
+            "count": {
+              "var": "N"
+            }
+          }
+        }
+      ]
+    },
+    "pts_fact_1": {
+      "head": {
+        "pred": "pts",
+        "args": [
+          {
+            "atom_str": "a"
+          },
+          {
+            "int": 10
+          }
+        ]
+      },
+      "body": []
+    },
+    "pts_fact_2": {
+      "head": {
+        "pred": "pts",
+        "args": [
+          {
+            "atom_str": "a"
+          },
+          {
+            "int": 4
+          }
+        ]
+      },
+      "body": []
+    },
+    "pts_sum_rule": {
+      "head": {
+        "pred": "pts_sum",
+        "args": [
+          {
+            "var": "T"
+          }
+        ]
+      },
+      "body": [
+        {
+          "count_lit": {
+            "pred": {
+              "name": "pts",
+              "arity": 2
+            },
+            "filter": [
+              {
+                "pos": 0,
+                "var": "T"
+              }
+            ],
+            "project": {
+              "sum": 1
+            },
+            "count": {
+              "var": "N"
+            }
+          }
+        }
+      ]
+    },
+    "deg_rule": {
+      "head": {
+        "pred": "deg",
+        "args": [
+          {
+            "var": "O"
+          },
+          {
+            "var": "N"
+          }
+        ]
+      },
+      "body": [
+        {
+          "pred": "obs",
+          "args": [
+            {
+              "var": "O"
+            },
+            {
+              "var": "P"
+            },
+            {
+              "var": "V"
+            }
+          ]
+        },
+        {
+          "count_lit": {
+            "pred": {
+              "name": "obs",
+              "arity": 3
+            },
+            "filter": [
+              {
+                "pos": 0,
+                "var": "O"
+              }
+            ],
+            "project": "rows",
+            "count": {
+              "var": "N"
+            }
+          }
+        }
+      ]
+    },
+    "n_degs_rule": {
+      "head": {
+        "pred": "n_degs",
+        "args": [
+          {
+            "var": "N"
+          }
+        ]
+      },
+      "body": [
+        {
+          "count_lit": {
+            "pred": {
+              "name": "deg",
+              "arity": 2
+            },
+            "filter": [],
+            "project": "rows",
+            "count": {
+              "var": "N"
+            }
+          }
+        }
+      ]
+    },
+    "total_rule": {
+      "head": {
+        "pred": "total",
+        "args": [
+          {
+            "var": "N"
+          }
+        ]
+      },
+      "body": [
+        {
+          "count_lit": {
+            "pred": {
+              "name": "obs",
+              "arity": 3
+            },
+            "filter": [
+              {
+                "pos": 0,
+                "atom_str": "o1"
+              }
+            ],
+            "project": "rows",
+            "count": {
+              "var": "N"
+            }
+          }
+        }
+      ]
+    },
+    "n_totals_rule": {
+      "head": {
+        "pred": "n_totals",
+        "args": [
+          {
+            "var": "N"
+          }
+        ]
+      },
+      "body": [
+        {
+          "count_lit": {
+            "pred": {
+              "name": "total",
+              "arity": 1
+            },
+            "filter": [],
+            "project": "rows",
+            "count": {
+              "var": "N"
+            }
+          }
+        }
+      ]
+    },
+    "measure_sum_rule": {
+      "head": {
+        "pred": "measure_sum",
+        "args": [
+          {
+            "var": "G"
+          }
+        ]
+      },
+      "body": [
+        {
+          "count_lit": {
+            "pred": {
+              "name": "measure",
+              "arity": 2
+            },
+            "filter": [
+              {
+                "pos": 0,
+                "var": "G"
+              }
+            ],
+            "project": {
+              "sum": 1
+            },
+            "count": {
+              "var": "N"
+            }
+          }
+        }
+      ]
+    },
+    "measure_min_rule": {
+      "head": {
+        "pred": "measure_min",
+        "args": [
+          {
+            "var": "G"
+          }
+        ]
+      },
+      "body": [
+        {
+          "count_lit": {
+            "pred": {
+              "name": "measure",
+              "arity": 2
+            },
+            "filter": [
+              {
+                "pos": 0,
+                "var": "G"
+              }
+            ],
+            "project": {
+              "min": 1
+            },
+            "count": {
+              "var": "N"
+            }
+          }
+        }
+      ]
+    },
+    "measure_max_rule": {
+      "head": {
+        "pred": "measure_max",
+        "args": [
+          {
+            "var": "G"
+          }
+        ]
+      },
+      "body": [
+        {
+          "count_lit": {
+            "pred": {
+              "name": "measure",
+              "arity": 2
+            },
+            "filter": [
+              {
+                "pos": 0,
+                "var": "G"
+              }
+            ],
+            "project": {
+              "max": 1
+            },
+            "count": {
+              "var": "N"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "certs": {
+    "obs_cert": {
+      "scope": {
+        "level": 0,
+        "predicates": [
+          "obs"
+        ]
+      },
+      "domains": [
+        {
+          "type_tag": "u",
+          "values": [
+            {
+              "atom_str": "x"
+            },
+            {
+              "atom_str": "y"
+            },
+            {
+              "atom_str": "z"
+            },
+            {
+              "atom_str": "o1"
+            },
+            {
+              "atom_str": "o2"
+            },
+            {
+              "atom_str": "p1"
+            },
+            {
+              "atom_str": "p2"
+            },
+            {
+              "atom_str": "p3"
+            },
+            {
+              "atom_str": "p4"
+            },
+            {
+              "tuple": [
+                {
+                  "atom_str": "null"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "extensions": [
+        {
+          "pred": "obs",
+          "arity": 3,
+          "rows": [
+            {
+              "pred": "obs",
+              "args": [
+                {
+                  "atom_str": "o1"
+                },
+                {
+                  "atom_str": "p1"
+                },
+                {
+                  "atom_str": "x"
+                }
+              ]
+            },
+            {
+              "pred": "obs",
+              "args": [
+                {
+                  "atom_str": "o1"
+                },
+                {
+                  "atom_str": "p2"
+                },
+                {
+                  "atom_str": "x"
+                }
+              ]
+            },
+            {
+              "pred": "obs",
+              "args": [
+                {
+                  "atom_str": "o1"
+                },
+                {
+                  "atom_str": "p3"
+                },
+                {
+                  "atom_str": "y"
+                }
+              ]
+            },
+            {
+              "pred": "obs",
+              "args": [
+                {
+                  "atom_str": "o1"
+                },
+                {
+                  "atom_str": "p4"
+                },
+                {
+                  "tuple": [
+                    {
+                      "atom_str": "null"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "pred": "obs",
+              "args": [
+                {
+                  "atom_str": "o2"
+                },
+                {
+                  "atom_str": "p1"
+                },
+                {
+                  "atom_str": "z"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "supports": [],
+      "limits_decl": {
+        "cert_facts": 5,
+        "domain_values": 10,
+        "support_edges": 0,
+        "rule_groundings": 1000,
+        "join_steps": 10000,
+        "cert_bytes": 8192
+      }
+    },
+    "obs_cert_head_sealed": {
+      "scope": {
+        "level": 0,
+        "predicates": [
+          "eligible_count",
+          "obs"
+        ]
+      },
+      "domains": [
+        {
+          "type_tag": "u",
+          "values": [
+            {
+              "atom_str": "x"
+            },
+            {
+              "atom_str": "y"
+            },
+            {
+              "atom_str": "z"
+            },
+            {
+              "atom_str": "o1"
+            },
+            {
+              "atom_str": "o2"
+            },
+            {
+              "atom_str": "p1"
+            },
+            {
+              "atom_str": "p2"
+            },
+            {
+              "atom_str": "p3"
+            },
+            {
+              "atom_str": "p4"
+            },
+            {
+              "tuple": [
+                {
+                  "atom_str": "null"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "extensions": [
+        {
+          "pred": "obs",
+          "arity": 3,
+          "rows": [
+            {
+              "pred": "obs",
+              "args": [
+                {
+                  "atom_str": "o1"
+                },
+                {
+                  "atom_str": "p1"
+                },
+                {
+                  "atom_str": "x"
+                }
+              ]
+            },
+            {
+              "pred": "obs",
+              "args": [
+                {
+                  "atom_str": "o1"
+                },
+                {
+                  "atom_str": "p2"
+                },
+                {
+                  "atom_str": "x"
+                }
+              ]
+            },
+            {
+              "pred": "obs",
+              "args": [
+                {
+                  "atom_str": "o1"
+                },
+                {
+                  "atom_str": "p3"
+                },
+                {
+                  "atom_str": "y"
+                }
+              ]
+            },
+            {
+              "pred": "obs",
+              "args": [
+                {
+                  "atom_str": "o1"
+                },
+                {
+                  "atom_str": "p4"
+                },
+                {
+                  "tuple": [
+                    {
+                      "atom_str": "null"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "pred": "obs",
+              "args": [
+                {
+                  "atom_str": "o2"
+                },
+                {
+                  "atom_str": "p1"
+                },
+                {
+                  "atom_str": "z"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "pred": "eligible_count",
+          "arity": 1,
+          "rows": []
+        }
+      ],
+      "supports": [],
+      "limits_decl": {
+        "cert_facts": 5,
+        "domain_values": 10,
+        "support_edges": 0,
+        "rule_groundings": 1000,
+        "join_steps": 10000,
+        "cert_bytes": 8192
+      }
+    },
+    "obs_cert_stale": {
+      "scope": {
+        "level": 0,
+        "predicates": [
+          "obs"
+        ]
+      },
+      "domains": [
+        {
+          "type_tag": "u",
+          "values": [
+            {
+              "atom_str": "x"
+            },
+            {
+              "atom_str": "y"
+            },
+            {
+              "atom_str": "z"
+            },
+            {
+              "atom_str": "o1"
+            },
+            {
+              "atom_str": "o2"
+            },
+            {
+              "atom_str": "p1"
+            },
+            {
+              "atom_str": "p2"
+            },
+            {
+              "atom_str": "p3"
+            },
+            {
+              "atom_str": "p4"
+            },
+            {
+              "tuple": [
+                {
+                  "atom_str": "null"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "extensions": [
+        {
+          "pred": "obs",
+          "arity": 3,
+          "rows": [
+            {
+              "pred": "obs",
+              "args": [
+                {
+                  "atom_str": "o1"
+                },
+                {
+                  "atom_str": "p1"
+                },
+                {
+                  "atom_str": "x"
+                }
+              ]
+            },
+            {
+              "pred": "obs",
+              "args": [
+                {
+                  "atom_str": "o1"
+                },
+                {
+                  "atom_str": "p2"
+                },
+                {
+                  "atom_str": "x"
+                }
+              ]
+            },
+            {
+              "pred": "obs",
+              "args": [
+                {
+                  "atom_str": "o1"
+                },
+                {
+                  "atom_str": "p3"
+                },
+                {
+                  "atom_str": "y"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "supports": [],
+      "limits_decl": {
+        "cert_facts": 3,
+        "domain_values": 10,
+        "support_edges": 0,
+        "rule_groundings": 1000,
+        "join_steps": 10000,
+        "cert_bytes": 8192
+      }
+    },
+    "r_cert": {
+      "scope": {
+        "level": 0,
+        "predicates": [
+          "r"
+        ]
+      },
+      "domains": [
+        {
+          "type_tag": "u",
+          "values": [
+            {
+              "atom_str": "o1"
+            }
+          ]
+        }
+      ],
+      "extensions": [
+        {
+          "pred": "r",
+          "arity": 1,
+          "rows": [
+            {
+              "pred": "r",
+              "args": [
+                {
+                  "atom_str": "o1"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "supports": [],
+      "limits_decl": {
+        "cert_facts": 1,
+        "domain_values": 1,
+        "support_edges": 0,
+        "rule_groundings": 100,
+        "join_steps": 100,
+        "cert_bytes": 512
+      }
+    },
+    "depicts_cert": {
+      "scope": {
+        "level": 0,
+        "predicates": [
+          "depicts"
+        ]
+      },
+      "domains": [
+        {
+          "type_tag": "u",
+          "values": [
+            {
+              "atom_str": "mug"
+            },
+            {
+              "atom_str": "ph1"
+            },
+            {
+              "atom_str": "ph2"
+            },
+            {
+              "atom_str": "ph3"
+            },
+            {
+              "atom_str": "ph4"
+            },
+            {
+              "atom_str": "ph5"
+            },
+            {
+              "atom_str": "top"
+            },
+            {
+              "atom_str": "side"
+            },
+            {
+              "atom_str": "vase"
+            },
+            {
+              "atom_str": "front"
+            },
+            {
+              "atom_str": "scene"
+            }
+          ]
+        }
+      ],
+      "extensions": [
+        {
+          "pred": "depicts",
+          "arity": 4,
+          "rows": [
+            {
+              "pred": "depicts",
+              "args": [
+                {
+                  "atom_str": "scene"
+                },
+                {
+                  "atom_str": "ph1"
+                },
+                {
+                  "atom_str": "vase"
+                },
+                {
+                  "atom_str": "front"
+                }
+              ]
+            },
+            {
+              "pred": "depicts",
+              "args": [
+                {
+                  "atom_str": "scene"
+                },
+                {
+                  "atom_str": "ph2"
+                },
+                {
+                  "atom_str": "vase"
+                },
+                {
+                  "atom_str": "side"
+                }
+              ]
+            },
+            {
+              "pred": "depicts",
+              "args": [
+                {
+                  "atom_str": "scene"
+                },
+                {
+                  "atom_str": "ph3"
+                },
+                {
+                  "atom_str": "vase"
+                },
+                {
+                  "atom_str": "top"
+                }
+              ]
+            },
+            {
+              "pred": "depicts",
+              "args": [
+                {
+                  "atom_str": "scene"
+                },
+                {
+                  "atom_str": "ph4"
+                },
+                {
+                  "atom_str": "vase"
+                },
+                {
+                  "atom_str": "front"
+                }
+              ]
+            },
+            {
+              "pred": "depicts",
+              "args": [
+                {
+                  "atom_str": "scene"
+                },
+                {
+                  "atom_str": "ph5"
+                },
+                {
+                  "atom_str": "mug"
+                },
+                {
+                  "atom_str": "front"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "supports": [],
+      "limits_decl": {
+        "cert_facts": 5,
+        "domain_values": 11,
+        "support_edges": 0,
+        "rule_groundings": 1000,
+        "join_steps": 10000,
+        "cert_bytes": 8192
+      }
+    },
+    "lineage_cert": {
+      "scope": {
+        "level": 0,
+        "predicates": [
+          "lineage"
+        ]
+      },
+      "domains": [
+        {
+          "type_tag": "u",
+          "values": [
+            {
+              "atom_str": "cone1"
+            },
+            {
+              "atom_str": "modelM"
+            },
+            {
+              "atom_str": "modelN"
+            },
+            {
+              "atom_str": "asset_a"
+            },
+            {
+              "atom_str": "asset_b"
+            },
+            {
+              "atom_str": "asset_c"
+            },
+            {
+              "atom_str": "asset_d"
+            },
+            {
+              "tuple": [
+                {
+                  "atom_str": "null"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "extensions": [
+        {
+          "pred": "lineage",
+          "arity": 3,
+          "rows": [
+            {
+              "pred": "lineage",
+              "args": [
+                {
+                  "atom_str": "cone1"
+                },
+                {
+                  "atom_str": "asset_a"
+                },
+                {
+                  "atom_str": "modelM"
+                }
+              ]
+            },
+            {
+              "pred": "lineage",
+              "args": [
+                {
+                  "atom_str": "cone1"
+                },
+                {
+                  "atom_str": "asset_b"
+                },
+                {
+                  "atom_str": "modelM"
+                }
+              ]
+            },
+            {
+              "pred": "lineage",
+              "args": [
+                {
+                  "atom_str": "cone1"
+                },
+                {
+                  "atom_str": "asset_c"
+                },
+                {
+                  "atom_str": "modelN"
+                }
+              ]
+            },
+            {
+              "pred": "lineage",
+              "args": [
+                {
+                  "atom_str": "cone1"
+                },
+                {
+                  "atom_str": "asset_d"
+                },
+                {
+                  "tuple": [
+                    {
+                      "atom_str": "null"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "supports": [],
+      "limits_decl": {
+        "cert_facts": 4,
+        "domain_values": 8,
+        "support_edges": 0,
+        "rule_groundings": 1000,
+        "join_steps": 10000,
+        "cert_bytes": 8192
+      }
+    },
+    "score_cert": {
+      "scope": {
+        "level": 0,
+        "predicates": [
+          "score"
+        ]
+      },
+      "domains": [
+        {
+          "type_tag": "u",
+          "values": [
+            {
+              "atom_str": "g1"
+            },
+            {
+              "atom_str": "empty_grp"
+            },
+            {
+              "atom_str": "g2_unused"
+            },
+            {
+              "int": 1
+            },
+            {
+              "int": 3
+            },
+            {
+              "int": 7
+            },
+            {
+              "int": 99
+            }
+          ]
+        }
+      ],
+      "extensions": [
+        {
+          "pred": "score",
+          "arity": 2,
+          "rows": [
+            {
+              "pred": "score",
+              "args": [
+                {
+                  "atom_str": "g1"
+                },
+                {
+                  "int": 1
+                }
+              ]
+            },
+            {
+              "pred": "score",
+              "args": [
+                {
+                  "atom_str": "g1"
+                },
+                {
+                  "int": 3
+                }
+              ]
+            },
+            {
+              "pred": "score",
+              "args": [
+                {
+                  "atom_str": "g1"
+                },
+                {
+                  "int": 7
+                }
+              ]
+            },
+            {
+              "pred": "score",
+              "args": [
+                {
+                  "atom_str": "g2_unused"
+                },
+                {
+                  "int": 99
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "supports": [],
+      "limits_decl": {
+        "cert_facts": 4,
+        "domain_values": 7,
+        "support_edges": 0,
+        "rule_groundings": 1000,
+        "join_steps": 10000,
+        "cert_bytes": 8192
+      }
+    },
+    "pts_cert": {
+      "scope": {
+        "level": 0,
+        "predicates": [
+          "pts"
+        ]
+      },
+      "domains": [
+        {
+          "type_tag": "u",
+          "values": [
+            {
+              "atom_str": "a"
+            },
+            {
+              "int": 4
+            },
+            {
+              "int": 10
+            }
+          ]
+        }
+      ],
+      "extensions": [
+        {
+          "pred": "pts",
+          "arity": 2,
+          "rows": [
+            {
+              "pred": "pts",
+              "args": [
+                {
+                  "atom_str": "a"
+                },
+                {
+                  "int": 4
+                }
+              ]
+            },
+            {
+              "pred": "pts",
+              "args": [
+                {
+                  "atom_str": "a"
+                },
+                {
+                  "int": 10
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "supports": [],
+      "limits_decl": {
+        "cert_facts": 2,
+        "domain_values": 3,
+        "support_edges": 0,
+        "rule_groundings": 1000,
+        "join_steps": 10000,
+        "cert_bytes": 8192
+      }
+    },
+    "deg_cert": {
+      "note": "#2258 L3.3b: level 1 seals deg, whose clause counts obs, sealed by the level-0 cert. Closure: 5 binder steps over obs + 5 count stages x 5 scanned obs rows = 30 join steps, 5 groundings, both declared exactly.",
+      "scope": {
+        "level": 1,
+        "predicates": [
+          "deg"
+        ]
+      },
+      "domains": [
+        {
+          "type_tag": "u",
+          "values": [
+            {
+              "atom_str": "x"
+            },
+            {
+              "atom_str": "z"
+            },
+            {
+              "atom_str": "o1"
+            },
+            {
+              "atom_str": "o2"
+            },
+            {
+              "atom_str": "p1"
+            },
+            {
+              "int": 1
+            },
+            {
+              "int": 4
+            }
+          ]
+        }
+      ],
+      "extensions": [
+        {
+          "pred": "deg",
+          "arity": 2,
+          "rows": [
+            {
+              "pred": "deg",
+              "args": [
+                {
+                  "atom_str": "o1"
+                },
+                {
+                  "int": 4
+                }
+              ]
+            },
+            {
+              "pred": "deg",
+              "args": [
+                {
+                  "atom_str": "o2"
+                },
+                {
+                  "int": 1
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "supports": [
+        {
+          "fact": {
+            "pred": "deg",
+            "args": [
+              {
+                "atom_str": "o1"
+              },
+              {
+                "int": 4
+              }
+            ]
+          },
+          "clause": "deg_rule",
+          "subst": {
+            "O": {
+              "atom_str": "o1"
+            },
+            "P": {
+              "atom_str": "p1"
+            },
+            "V": {
+              "atom_str": "x"
+            },
+            "N": {
+              "int": 4
+            }
+          },
+          "body_refs": [
+            {
+              "lower_stratum": {
+                "cert": 0,
+                "atom": {
+                  "pred": "obs",
+                  "args": [
+                    {
+                      "atom_str": "o1"
+                    },
+                    {
+                      "atom_str": "p1"
+                    },
+                    {
+                      "atom_str": "x"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "count_lower": {
+                "cert": 0
+              }
+            }
+          ],
+          "rank": 1
+        },
+        {
+          "fact": {
+            "pred": "deg",
+            "args": [
+              {
+                "atom_str": "o2"
+              },
+              {
+                "int": 1
+              }
+            ]
+          },
+          "clause": "deg_rule",
+          "subst": {
+            "O": {
+              "atom_str": "o2"
+            },
+            "P": {
+              "atom_str": "p1"
+            },
+            "V": {
+              "atom_str": "z"
+            },
+            "N": {
+              "int": 1
+            }
+          },
+          "body_refs": [
+            {
+              "lower_stratum": {
+                "cert": 0,
+                "atom": {
+                  "pred": "obs",
+                  "args": [
+                    {
+                      "atom_str": "o2"
+                    },
+                    {
+                      "atom_str": "p1"
+                    },
+                    {
+                      "atom_str": "z"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "count_lower": {
+                "cert": 0
+              }
+            }
+          ],
+          "rank": 1
+        }
+      ],
+      "limits_decl": {
+        "cert_facts": 2,
+        "domain_values": 7,
+        "support_edges": 2,
+        "rule_groundings": 5,
+        "join_steps": 30,
+        "cert_bytes": 8192
+      }
+    },
+    "deg_cert_wrong_result": {
+      "note": "deg_cert with deg(o1, 3): its CountLower support ref claims 3 where obs holds 4 rows for o1.",
+      "scope": {
+        "level": 1,
+        "predicates": [
+          "deg"
+        ]
+      },
+      "domains": [
+        {
+          "type_tag": "u",
+          "values": [
+            {
+              "atom_str": "x"
+            },
+            {
+              "atom_str": "z"
+            },
+            {
+              "atom_str": "o1"
+            },
+            {
+              "atom_str": "o2"
+            },
+            {
+              "atom_str": "p1"
+            },
+            {
+              "int": 1
+            },
+            {
+              "int": 3
+            }
+          ]
+        }
+      ],
+      "extensions": [
+        {
+          "pred": "deg",
+          "arity": 2,
+          "rows": [
+            {
+              "pred": "deg",
+              "args": [
+                {
+                  "atom_str": "o1"
+                },
+                {
+                  "int": 3
+                }
+              ]
+            },
+            {
+              "pred": "deg",
+              "args": [
+                {
+                  "atom_str": "o2"
+                },
+                {
+                  "int": 1
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "supports": [
+        {
+          "fact": {
+            "pred": "deg",
+            "args": [
+              {
+                "atom_str": "o1"
+              },
+              {
+                "int": 3
+              }
+            ]
+          },
+          "clause": "deg_rule",
+          "subst": {
+            "O": {
+              "atom_str": "o1"
+            },
+            "P": {
+              "atom_str": "p1"
+            },
+            "V": {
+              "atom_str": "x"
+            },
+            "N": {
+              "int": 3
+            }
+          },
+          "body_refs": [
+            {
+              "lower_stratum": {
+                "cert": 0,
+                "atom": {
+                  "pred": "obs",
+                  "args": [
+                    {
+                      "atom_str": "o1"
+                    },
+                    {
+                      "atom_str": "p1"
+                    },
+                    {
+                      "atom_str": "x"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "count_lower": {
+                "cert": 0
+              }
+            }
+          ],
+          "rank": 1
+        },
+        {
+          "fact": {
+            "pred": "deg",
+            "args": [
+              {
+                "atom_str": "o2"
+              },
+              {
+                "int": 1
+              }
+            ]
+          },
+          "clause": "deg_rule",
+          "subst": {
+            "O": {
+              "atom_str": "o2"
+            },
+            "P": {
+              "atom_str": "p1"
+            },
+            "V": {
+              "atom_str": "z"
+            },
+            "N": {
+              "int": 1
+            }
+          },
+          "body_refs": [
+            {
+              "lower_stratum": {
+                "cert": 0,
+                "atom": {
+                  "pred": "obs",
+                  "args": [
+                    {
+                      "atom_str": "o2"
+                    },
+                    {
+                      "atom_str": "p1"
+                    },
+                    {
+                      "atom_str": "z"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "count_lower": {
+                "cert": 0
+              }
+            }
+          ],
+          "rank": 1
+        }
+      ],
+      "limits_decl": {
+        "cert_facts": 2,
+        "domain_values": 7,
+        "support_edges": 2,
+        "rule_groundings": 5,
+        "join_steps": 30,
+        "cert_bytes": 8192
+      }
+    },
+    "deg_cert_missing_row": {
+      "note": "deg_cert without deg(o2, 1): every row it holds is supported, but the closure's count stage derives deg(o2, 1) (in the domain) and finds it absent.",
+      "scope": {
+        "level": 1,
+        "predicates": [
+          "deg"
+        ]
+      },
+      "domains": [
+        {
+          "type_tag": "u",
+          "values": [
+            {
+              "atom_str": "x"
+            },
+            {
+              "atom_str": "z"
+            },
+            {
+              "atom_str": "o1"
+            },
+            {
+              "atom_str": "o2"
+            },
+            {
+              "atom_str": "p1"
+            },
+            {
+              "int": 1
+            },
+            {
+              "int": 4
+            }
+          ]
+        }
+      ],
+      "extensions": [
+        {
+          "pred": "deg",
+          "arity": 2,
+          "rows": [
+            {
+              "pred": "deg",
+              "args": [
+                {
+                  "atom_str": "o1"
+                },
+                {
+                  "int": 4
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "supports": [
+        {
+          "fact": {
+            "pred": "deg",
+            "args": [
+              {
+                "atom_str": "o1"
+              },
+              {
+                "int": 4
+              }
+            ]
+          },
+          "clause": "deg_rule",
+          "subst": {
+            "O": {
+              "atom_str": "o1"
+            },
+            "P": {
+              "atom_str": "p1"
+            },
+            "V": {
+              "atom_str": "x"
+            },
+            "N": {
+              "int": 4
+            }
+          },
+          "body_refs": [
+            {
+              "lower_stratum": {
+                "cert": 0,
+                "atom": {
+                  "pred": "obs",
+                  "args": [
+                    {
+                      "atom_str": "o1"
+                    },
+                    {
+                      "atom_str": "p1"
+                    },
+                    {
+                      "atom_str": "x"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "count_lower": {
+                "cert": 0
+              }
+            }
+          ],
+          "rank": 1
+        }
+      ],
+      "limits_decl": {
+        "cert_facts": 1,
+        "domain_values": 7,
+        "support_edges": 1,
+        "rule_groundings": 5,
+        "join_steps": 30,
+        "cert_bytes": 8192
+      }
+    },
+    "deg_cert_self_cite": {
+      "note": "deg_cert whose CountLower refs cite cert 1, its OWN index: a count never reads the table under construction.",
+      "scope": {
+        "level": 1,
+        "predicates": [
+          "deg"
+        ]
+      },
+      "domains": [
+        {
+          "type_tag": "u",
+          "values": [
+            {
+              "atom_str": "x"
+            },
+            {
+              "atom_str": "z"
+            },
+            {
+              "atom_str": "o1"
+            },
+            {
+              "atom_str": "o2"
+            },
+            {
+              "atom_str": "p1"
+            },
+            {
+              "int": 1
+            },
+            {
+              "int": 4
+            }
+          ]
+        }
+      ],
+      "extensions": [
+        {
+          "pred": "deg",
+          "arity": 2,
+          "rows": [
+            {
+              "pred": "deg",
+              "args": [
+                {
+                  "atom_str": "o1"
+                },
+                {
+                  "int": 4
+                }
+              ]
+            },
+            {
+              "pred": "deg",
+              "args": [
+                {
+                  "atom_str": "o2"
+                },
+                {
+                  "int": 1
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "supports": [
+        {
+          "fact": {
+            "pred": "deg",
+            "args": [
+              {
+                "atom_str": "o1"
+              },
+              {
+                "int": 4
+              }
+            ]
+          },
+          "clause": "deg_rule",
+          "subst": {
+            "O": {
+              "atom_str": "o1"
+            },
+            "P": {
+              "atom_str": "p1"
+            },
+            "V": {
+              "atom_str": "x"
+            },
+            "N": {
+              "int": 4
+            }
+          },
+          "body_refs": [
+            {
+              "lower_stratum": {
+                "cert": 0,
+                "atom": {
+                  "pred": "obs",
+                  "args": [
+                    {
+                      "atom_str": "o1"
+                    },
+                    {
+                      "atom_str": "p1"
+                    },
+                    {
+                      "atom_str": "x"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "count_lower": {
+                "cert": 1
+              }
+            }
+          ],
+          "rank": 1
+        },
+        {
+          "fact": {
+            "pred": "deg",
+            "args": [
+              {
+                "atom_str": "o2"
+              },
+              {
+                "int": 1
+              }
+            ]
+          },
+          "clause": "deg_rule",
+          "subst": {
+            "O": {
+              "atom_str": "o2"
+            },
+            "P": {
+              "atom_str": "p1"
+            },
+            "V": {
+              "atom_str": "z"
+            },
+            "N": {
+              "int": 1
+            }
+          },
+          "body_refs": [
+            {
+              "lower_stratum": {
+                "cert": 0,
+                "atom": {
+                  "pred": "obs",
+                  "args": [
+                    {
+                      "atom_str": "o2"
+                    },
+                    {
+                      "atom_str": "p1"
+                    },
+                    {
+                      "atom_str": "z"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "count_lower": {
+                "cert": 1
+              }
+            }
+          ],
+          "rank": 1
+        }
+      ],
+      "limits_decl": {
+        "cert_facts": 2,
+        "domain_values": 7,
+        "support_edges": 2,
+        "rule_groundings": 5,
+        "join_steps": 30,
+        "cert_bytes": 8192
+      }
+    },
+    "obs_cert_partial": {
+      "scope": {
+        "level": 0,
+        "predicates": [
+          "obs"
+        ]
+      },
+      "domains": [
+        {
+          "type_tag": "u",
+          "values": [
+            {
+              "atom_str": "x"
+            },
+            {
+              "atom_str": "y"
+            },
+            {
+              "atom_str": "z"
+            },
+            {
+              "atom_str": "o1"
+            },
+            {
+              "atom_str": "o2"
+            },
+            {
+              "atom_str": "p1"
+            },
+            {
+              "atom_str": "p2"
+            },
+            {
+              "atom_str": "p3"
+            },
+            {
+              "atom_str": "p4"
+            },
+            {
+              "tuple": [
+                {
+                  "atom_str": "null"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "extensions": [
+        {
+          "pred": "obs",
+          "arity": 3,
+          "rows": [
+            {
+              "pred": "obs",
+              "args": [
+                {
+                  "atom_str": "o1"
+                },
+                {
+                  "atom_str": "p1"
+                },
+                {
+                  "atom_str": "x"
+                }
+              ]
+            },
+            {
+              "pred": "obs",
+              "args": [
+                {
+                  "atom_str": "o1"
+                },
+                {
+                  "atom_str": "p2"
+                },
+                {
+                  "atom_str": "x"
+                }
+              ]
+            },
+            {
+              "pred": "obs",
+              "args": [
+                {
+                  "atom_str": "o1"
+                },
+                {
+                  "atom_str": "p3"
+                },
+                {
+                  "atom_str": "y"
+                }
+              ]
+            },
+            {
+              "pred": "obs",
+              "args": [
+                {
+                  "atom_str": "o1"
+                },
+                {
+                  "atom_str": "p4"
+                },
+                {
+                  "tuple": [
+                    {
+                      "atom_str": "null"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "pred": "obs",
+              "args": [
+                {
+                  "atom_str": "o2"
+                },
+                {
+                  "atom_str": "p1"
+                },
+                {
+                  "atom_str": "z"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "supports": [],
+      "limits_decl": {
+        "cert_facts": 5,
+        "domain_values": 10,
+        "support_edges": 0,
+        "rule_groundings": 1000,
+        "join_steps": 10000,
+        "cert_bytes": 8192
+      },
+      "partial_scope": {
+        "level": 0,
+        "predicates": [
+          "obs"
+        ]
+      }
+    },
+    "total_cert": {
+      "note": "#2258 L3.3b: level 1 seals total(N) :- count(obs(o1, _, _), N), a count whose filter is GROUND, so it runs as a LEADING stage: 5 scanned obs rows = 5 join steps, 1 grounding, both declared exactly.",
+      "scope": {
+        "level": 1,
+        "predicates": [
+          "total"
+        ]
+      },
+      "domains": [
+        {
+          "type_tag": "u",
+          "values": [
+            {
+              "int": 4
+            }
+          ]
+        }
+      ],
+      "extensions": [
+        {
+          "pred": "total",
+          "arity": 1,
+          "rows": [
+            {
+              "pred": "total",
+              "args": [
+                {
+                  "int": 4
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "supports": [
+        {
+          "fact": {
+            "pred": "total",
+            "args": [
+              {
+                "int": 4
+              }
+            ]
+          },
+          "clause": "total_rule",
+          "subst": {
+            "N": {
+              "int": 4
+            }
+          },
+          "body_refs": [
+            {
+              "count_lower": {
+                "cert": 0
+              }
+            }
+          ],
+          "rank": 1
+        }
+      ],
+      "limits_decl": {
+        "cert_facts": 1,
+        "domain_values": 1,
+        "support_edges": 1,
+        "rule_groundings": 1,
+        "join_steps": 5,
+        "cert_bytes": 8192
+      }
+    },
+    "deg_cert_join_steps_29": {
+      "note": "deg_cert declaring join_steps 29, one under the 30 its closure counts: with deg_cert (declared 30) ACCEPTED, this pins the count stage's cost at EXACTLY one join step per scanned lower row, in every core.",
+      "scope": {
+        "level": 1,
+        "predicates": [
+          "deg"
+        ]
+      },
+      "domains": [
+        {
+          "type_tag": "u",
+          "values": [
+            {
+              "atom_str": "x"
+            },
+            {
+              "atom_str": "z"
+            },
+            {
+              "atom_str": "o1"
+            },
+            {
+              "atom_str": "o2"
+            },
+            {
+              "atom_str": "p1"
+            },
+            {
+              "int": 1
+            },
+            {
+              "int": 4
+            }
+          ]
+        }
+      ],
+      "extensions": [
+        {
+          "pred": "deg",
+          "arity": 2,
+          "rows": [
+            {
+              "pred": "deg",
+              "args": [
+                {
+                  "atom_str": "o1"
+                },
+                {
+                  "int": 4
+                }
+              ]
+            },
+            {
+              "pred": "deg",
+              "args": [
+                {
+                  "atom_str": "o2"
+                },
+                {
+                  "int": 1
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "supports": [
+        {
+          "fact": {
+            "pred": "deg",
+            "args": [
+              {
+                "atom_str": "o1"
+              },
+              {
+                "int": 4
+              }
+            ]
+          },
+          "clause": "deg_rule",
+          "subst": {
+            "O": {
+              "atom_str": "o1"
+            },
+            "P": {
+              "atom_str": "p1"
+            },
+            "V": {
+              "atom_str": "x"
+            },
+            "N": {
+              "int": 4
+            }
+          },
+          "body_refs": [
+            {
+              "lower_stratum": {
+                "cert": 0,
+                "atom": {
+                  "pred": "obs",
+                  "args": [
+                    {
+                      "atom_str": "o1"
+                    },
+                    {
+                      "atom_str": "p1"
+                    },
+                    {
+                      "atom_str": "x"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "count_lower": {
+                "cert": 0
+              }
+            }
+          ],
+          "rank": 1
+        },
+        {
+          "fact": {
+            "pred": "deg",
+            "args": [
+              {
+                "atom_str": "o2"
+              },
+              {
+                "int": 1
+              }
+            ]
+          },
+          "clause": "deg_rule",
+          "subst": {
+            "O": {
+              "atom_str": "o2"
+            },
+            "P": {
+              "atom_str": "p1"
+            },
+            "V": {
+              "atom_str": "z"
+            },
+            "N": {
+              "int": 1
+            }
+          },
+          "body_refs": [
+            {
+              "lower_stratum": {
+                "cert": 0,
+                "atom": {
+                  "pred": "obs",
+                  "args": [
+                    {
+                      "atom_str": "o2"
+                    },
+                    {
+                      "atom_str": "p1"
+                    },
+                    {
+                      "atom_str": "z"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "count_lower": {
+                "cert": 0
+              }
+            }
+          ],
+          "rank": 1
+        }
+      ],
+      "limits_decl": {
+        "cert_facts": 2,
+        "domain_values": 7,
+        "support_edges": 2,
+        "rule_groundings": 5,
+        "join_steps": 29,
+        "cert_bytes": 8192
+      }
+    },
+    "total_cert_join_steps_4": {
+      "note": "total_cert declaring join_steps 4, one under the 5 its leading count stage scans: pins the leading stage's cost exactly, with total_cert (declared 5) accepted.",
+      "scope": {
+        "level": 1,
+        "predicates": [
+          "total"
+        ]
+      },
+      "domains": [
+        {
+          "type_tag": "u",
+          "values": [
+            {
+              "int": 4
+            }
+          ]
+        }
+      ],
+      "extensions": [
+        {
+          "pred": "total",
+          "arity": 1,
+          "rows": [
+            {
+              "pred": "total",
+              "args": [
+                {
+                  "int": 4
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "supports": [
+        {
+          "fact": {
+            "pred": "total",
+            "args": [
+              {
+                "int": 4
+              }
+            ]
+          },
+          "clause": "total_rule",
+          "subst": {
+            "N": {
+              "int": 4
+            }
+          },
+          "body_refs": [
+            {
+              "count_lower": {
+                "cert": 0
+              }
+            }
+          ],
+          "rank": 1
+        }
+      ],
+      "limits_decl": {
+        "cert_facts": 1,
+        "domain_values": 1,
+        "support_edges": 1,
+        "rule_groundings": 1,
+        "join_steps": 4,
+        "cert_bytes": 8192
+      }
+    },
+    "measure_cert": {
+      "scope": {
+        "level": 0,
+        "predicates": [
+          "measure"
+        ]
+      },
+      "domains": [
+        {
+          "type_tag": "u",
+          "values": [
+            {
+              "atom_str": "m1"
+            },
+            {
+              "decimal": "1.0"
+            },
+            {
+              "decimal": "4.0"
+            },
+            {
+              "decimal": "1.5"
+            },
+            {
+              "decimal": "2.5"
+            }
+          ]
+        }
+      ],
+      "extensions": [
+        {
+          "pred": "measure",
+          "arity": 2,
+          "rows": [
+            {
+              "pred": "measure",
+              "args": [
+                {
+                  "atom_str": "m1"
+                },
+                {
+                  "decimal": "1.0"
+                }
+              ]
+            },
+            {
+              "pred": "measure",
+              "args": [
+                {
+                  "atom_str": "m1"
+                },
+                {
+                  "decimal": "4.0"
+                }
+              ]
+            },
+            {
+              "pred": "measure",
+              "args": [
+                {
+                  "atom_str": "m1"
+                },
+                {
+                  "decimal": "1.5"
+                }
+              ]
+            },
+            {
+              "pred": "measure",
+              "args": [
+                {
+                  "atom_str": "m1"
+                },
+                {
+                  "decimal": "2.5"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "supports": [],
+      "limits_decl": {
+        "cert_facts": 4,
+        "domain_values": 5,
+        "support_edges": 0,
+        "rule_groundings": 1000,
+        "join_steps": 10000,
+        "cert_bytes": 8192
+      }
+    }
+  },
+  "cases": [
+    {
+      "name": "accept_count_rows_matching_filter",
+      "note": "4 obs rows match O=o1 â‡’ eligible_count(o1) accepts (the gate recomputes 4 == claimed 4).",
+      "claim": {
+        "pred": "eligible_count",
+        "args": [
+          {
+            "atom_str": "o1"
+          }
+        ]
+      },
+      "cert": "obs_cert",
+      "derivation": {
+        "nodes": [
+          {
+            "kind": "rule",
+            "conclusion": {
+              "pred": "eligible_count",
+              "args": [
+                {
+                  "atom_str": "o1"
+                }
+              ]
+            },
+            "clause": "eligible_count_rule",
+            "subst": {
+              "O": {
+                "atom_str": "o1"
+              },
+              "N": {
+                "int": 4
+              }
+            },
+            "premises": [
+              {
+                "count": {
+                  "pred": {
+                    "name": "obs",
+                    "arity": 3
+                  },
+                  "filter": [
+                    {
+                      "pos": 0,
+                      "value": {
+                        "atom_str": "o1"
+                      }
+                    }
+                  ],
+                  "project": "rows",
+                  "k": 4,
+                  "cert": 0
+                }
+              }
+            ]
+          }
+        ],
+        "root": 0
+      },
+      "outcome": "accept"
+    },
+    {
+      "name": "term_too_deep_count_premise_filter",
+      "note": "issue #253 (CERT-DEEP arm, count premise / section d) -- the term-nesting-depth cap also bounds a certifiable COUNT premise's ground filter values + claimed k (data the cert path traverses). Here the count premise's filter value is tuple(box,o1) of structural depth 2; the cited clause's count body literal + the obs_cert stay shallow, so the gate passes (a)/(b)/(c) and REJECTS term_too_deep on the count-premise filter value under max_term_depth=1, before the gate recomputes the cardinality. Pins the count-premise depth arm -- the one the abbreviated TS comment omitted. All three cores replay this; the aggregation harnesses gained a per-case limits override for it.",
+      "claim": {
+        "pred": "eligible_count",
+        "args": [
+          {
+            "atom_str": "o1"
+          }
+        ]
+      },
+      "cert": "obs_cert",
+      "limits": {
+        "max_term_depth": 1
+      },
+      "derivation": {
+        "nodes": [
+          {
+            "kind": "rule",
+            "conclusion": {
+              "pred": "eligible_count",
+              "args": [
+                {
+                  "atom_str": "o1"
+                }
+              ]
+            },
+            "clause": "eligible_count_rule",
+            "subst": {
+              "O": {
+                "atom_str": "o1"
+              },
+              "N": {
+                "int": 4
+              }
+            },
+            "premises": [
+              {
+                "count": {
+                  "pred": {
+                    "name": "obs",
+                    "arity": 3
+                  },
+                  "filter": [
+                    {
+                      "pos": 0,
+                      "value": {
+                        "tuple": [
+                          {
+                            "atom_str": "box"
+                          },
+                          {
+                            "atom_str": "o1"
+                          }
+                        ]
+                      }
+                    }
+                  ],
+                  "project": "rows",
+                  "k": 4,
+                  "cert": 0
+                }
+              }
+            ]
+          }
+        ],
+        "root": 0
+      },
+      "outcome": {
+        "reject": "term_too_deep"
+      }
+    },
+    {
+      "name": "accept_count_empty_zero",
+      "note": "Empty count â‡’ 0. The filter value O=p1 is in the cert's finite domain (well-typed) but never appears at obs position 0, so no obs row matches and the gate recomputes 0; claim k=0 accepts. (The filter value MUST be in the sealed domain, else neg_atom_ill_typed fires first â€” empty count means zero MATCHES, not an out-of-domain probe.)",
+      "claim": {
+        "pred": "eligible_count",
+        "args": [
+          {
+            "atom_str": "p1"
+          }
+        ]
+      },
+      "cert": "obs_cert",
+      "derivation": {
+        "nodes": [
+          {
+            "kind": "rule",
+            "conclusion": {
+              "pred": "eligible_count",
+              "args": [
+                {
+                  "atom_str": "p1"
+                }
+              ]
+            },
+            "clause": "eligible_count_rule",
+            "subst": {
+              "O": {
+                "atom_str": "p1"
+              },
+              "N": {
+                "int": 0
+              }
+            },
+            "premises": [
+              {
+                "count": {
+                  "pred": {
+                    "name": "obs",
+                    "arity": 3
+                  },
+                  "filter": [
+                    {
+                      "pos": 0,
+                      "value": {
+                        "atom_str": "p1"
+                      }
+                    }
+                  ],
+                  "project": "rows",
+                  "k": 0,
+                  "cert": 0
+                }
+              }
+            ]
+          }
+        ],
+        "root": 0
+      },
+      "outcome": "accept"
+    },
+    {
+      "name": "accept_count_distinct_excludes_null",
+      "note": "distinct non-null V over O=o1 = {x, y} â‡’ 2. The null() projection of obs(o1,p4,null()) is EXCLUDED (ADR 0023 Phase 0). Claim k=2 accepts.",
+      "claim": {
+        "pred": "eligible_distinct",
+        "args": [
+          {
+            "atom_str": "o1"
+          }
+        ]
+      },
+      "cert": "obs_cert",
+      "derivation": {
+        "nodes": [
+          {
+            "kind": "rule",
+            "conclusion": {
+              "pred": "eligible_distinct",
+              "args": [
+                {
+                  "atom_str": "o1"
+                }
+              ]
+            },
+            "clause": "eligible_distinct_rule",
+            "subst": {
+              "O": {
+                "atom_str": "o1"
+              },
+              "N": {
+                "int": 2
+              }
+            },
+            "premises": [
+              {
+                "count": {
+                  "pred": {
+                    "name": "obs",
+                    "arity": 3
+                  },
+                  "filter": [
+                    {
+                      "pos": 0,
+                      "value": {
+                        "atom_str": "o1"
+                      }
+                    }
+                  ],
+                  "project": {
+                    "distinct": 2
+                  },
+                  "k": 2,
+                  "cert": 0
+                }
+              }
+            ]
+          }
+        ],
+        "root": 0
+      },
+      "outcome": "accept"
+    },
+    {
+      "name": "accept_count_filter_applied_o2",
+      "note": "The filter applied to o2 selects exactly 1 obs row; claiming k=1 accepts (the positive companion to the filter-applied tamper).",
+      "claim": {
+        "pred": "eligible_count",
+        "args": [
+          {
+            "atom_str": "o2"
+          }
+        ]
+      },
+      "cert": "obs_cert",
+      "derivation": {
+        "nodes": [
+          {
+            "kind": "rule",
+            "conclusion": {
+              "pred": "eligible_count",
+              "args": [
+                {
+                  "atom_str": "o2"
+                }
+              ]
+            },
+            "clause": "eligible_count_rule",
+            "subst": {
+              "O": {
+                "atom_str": "o2"
+              },
+              "N": {
+                "int": 1
+              }
+            },
+            "premises": [
+              {
+                "count": {
+                  "pred": {
+                    "name": "obs",
+                    "arity": 3
+                  },
+                  "filter": [
+                    {
+                      "pos": 0,
+                      "value": {
+                        "atom_str": "o2"
+                      }
+                    }
+                  ],
+                  "project": "rows",
+                  "k": 1,
+                  "cert": 0
+                }
+              }
+            ]
+          }
+        ],
+        "root": 0
+      },
+      "outcome": "accept"
+    },
+    {
+      "name": "tamper_wrong_k_over_valid_cert",
+      "note": "THE CORE DUAL-CONFORMANCE GUARANTEE. The cert is VALID and the filter is correct (O=o1 â‡’ 4 rows), but the derivation TAMPERS the proposed count to k=3. The gate independently recomputes 4 != 3 â‡’ count_mismatch. A lie about the cardinality cannot override the checker's own recomputation over the proven-exact relation.",
+      "claim": {
+        "pred": "eligible_count",
+        "args": [
+          {
+            "atom_str": "o1"
+          }
+        ]
+      },
+      "cert": "obs_cert",
+      "derivation": {
+        "nodes": [
+          {
+            "kind": "rule",
+            "conclusion": {
+              "pred": "eligible_count",
+              "args": [
+                {
+                  "atom_str": "o1"
+                }
+              ]
+            },
+            "clause": "eligible_count_rule",
+            "subst": {
+              "O": {
+                "atom_str": "o1"
+              },
+              "N": {
+                "int": 3
+              }
+            },
+            "premises": [
+              {
+                "count": {
+                  "pred": {
+                    "name": "obs",
+                    "arity": 3
+                  },
+                  "filter": [
+                    {
+                      "pos": 0,
+                      "value": {
+                        "atom_str": "o1"
+                      }
+                    }
+                  ],
+                  "project": "rows",
+                  "k": 3,
+                  "cert": 0
+                }
+              }
+            ]
+          }
+        ],
+        "root": 0
+      },
+      "outcome": {
+        "reject": "count_mismatch"
+      }
+    },
+    {
+      "name": "tamper_wrong_k_distinct_over_valid_cert",
+      "note": "Tamper, count_distinct flavour. distinct non-null V over O=o1 = {x, y} = 2, but the derivation claims k=3 (the tamperer forgot null() is excluded / double-counted x). The gate recomputes 2 != 3 â‡’ count_mismatch.",
+      "claim": {
+        "pred": "eligible_distinct",
+        "args": [
+          {
+            "atom_str": "o1"
+          }
+        ]
+      },
+      "cert": "obs_cert",
+      "derivation": {
+        "nodes": [
+          {
+            "kind": "rule",
+            "conclusion": {
+              "pred": "eligible_distinct",
+              "args": [
+                {
+                  "atom_str": "o1"
+                }
+              ]
+            },
+            "clause": "eligible_distinct_rule",
+            "subst": {
+              "O": {
+                "atom_str": "o1"
+              },
+              "N": {
+                "int": 3
+              }
+            },
+            "premises": [
+              {
+                "count": {
+                  "pred": {
+                    "name": "obs",
+                    "arity": 3
+                  },
+                  "filter": [
+                    {
+                      "pos": 0,
+                      "value": {
+                        "atom_str": "o1"
+                      }
+                    }
+                  ],
+                  "project": {
+                    "distinct": 2
+                  },
+                  "k": 3,
+                  "cert": 0
+                }
+              }
+            ]
+          }
+        ],
+        "root": 0
+      },
+      "outcome": {
+        "reject": "count_mismatch"
+      }
+    },
+    {
+      "name": "tamper_filter_applied_wrong_k",
+      "note": "The filter selects O=o2 (1 obs row), but the derivation claims k=4 (the o1 count). Proves the filter is genuinely applied during recomputation: 1 != 4 â‡’ count_mismatch.",
+      "claim": {
+        "pred": "eligible_count",
+        "args": [
+          {
+            "atom_str": "o2"
+          }
+        ]
+      },
+      "cert": "obs_cert",
+      "derivation": {
+        "nodes": [
+          {
+            "kind": "rule",
+            "conclusion": {
+              "pred": "eligible_count",
+              "args": [
+                {
+                  "atom_str": "o2"
+                }
+              ]
+            },
+            "clause": "eligible_count_rule",
+            "subst": {
+              "O": {
+                "atom_str": "o2"
+              },
+              "N": {
+                "int": 4
+              }
+            },
+            "premises": [
+              {
+                "count": {
+                  "pred": {
+                    "name": "obs",
+                    "arity": 3
+                  },
+                  "filter": [
+                    {
+                      "pos": 0,
+                      "value": {
+                        "atom_str": "o2"
+                      }
+                    }
+                  ],
+                  "project": "rows",
+                  "k": 4,
+                  "cert": 0
+                }
+              }
+            ]
+          }
+        ],
+        "root": 0
+      },
+      "outcome": {
+        "reject": "count_mismatch"
+      }
+    },
+    {
+      "name": "count_stratum_not_lower",
+      "note": "The head predicate eligible_count is SEALED alongside obs, the counted relation, by the SAME certificate. Since #2258 L3.3b a sealed clause may count only over a strictly LOWER certificate's relation (the NegLower rule); counting the table under construction stays cert_scope_incomplete (the scope gate), subsuming the per-premise count_stratum_not_lower.",
+      "claim": {
+        "pred": "eligible_count",
+        "args": [
+          {
+            "atom_str": "o1"
+          }
+        ]
+      },
+      "cert": "obs_cert_head_sealed",
+      "derivation": {
+        "nodes": [
+          {
+            "kind": "rule",
+            "conclusion": {
+              "pred": "eligible_count",
+              "args": [
+                {
+                  "atom_str": "o1"
+                }
+              ]
+            },
+            "clause": "eligible_count_rule",
+            "subst": {
+              "O": {
+                "atom_str": "o1"
+              },
+              "N": {
+                "int": 4
+              }
+            },
+            "premises": [
+              {
+                "count": {
+                  "pred": {
+                    "name": "obs",
+                    "arity": 3
+                  },
+                  "filter": [
+                    {
+                      "pos": 0,
+                      "value": {
+                        "atom_str": "o1"
+                      }
+                    }
+                  ],
+                  "project": "rows",
+                  "k": 4,
+                  "cert": 0
+                }
+              }
+            ]
+          }
+        ],
+        "root": 0
+      },
+      "outcome": {
+        "reject": "cert_scope_incomplete"
+      }
+    },
+    {
+      "name": "count_stratum_not_lower_head_sealed",
+      "note": "Per-premise variant. r is a pure EDB leaf; the citing rule concludes r(o1) while counting r, which the same certificate seals. Since #2258 L3.3b a sealed count must read a strictly lower certificate, so the scope gate still refuses (cert_scope_incomplete); the per-premise count_stratum_not_lower is the backstop.",
+      "claim": {
+        "pred": "r",
+        "args": [
+          {
+            "atom_str": "o1"
+          }
+        ]
+      },
+      "cert": "r_cert",
+      "derivation": {
+        "nodes": [
+          {
+            "kind": "rule",
+            "conclusion": {
+              "pred": "r",
+              "args": [
+                {
+                  "atom_str": "o1"
+                }
+              ]
+            },
+            "clause": "r_self_count_rule",
+            "subst": {
+              "O": {
+                "atom_str": "o1"
+              },
+              "N": {
+                "int": 1
+              }
+            },
+            "premises": [
+              {
+                "count": {
+                  "pred": {
+                    "name": "r",
+                    "arity": 1
+                  },
+                  "filter": [],
+                  "project": "rows",
+                  "k": 1,
+                  "cert": 0
+                }
+              }
+            ]
+          }
+        ],
+        "root": 0
+      },
+      "outcome": {
+        "reject": "cert_scope_incomplete"
+      }
+    },
+    {
+      "name": "count_attr_out_of_range_distinct",
+      "note": "A count_distinct projection attr (5) >= the predicate arity (obs is arity 3) â‡’ count_attr_out_of_range.",
+      "claim": {
+        "pred": "eligible_bad",
+        "args": [
+          {
+            "atom_str": "o1"
+          }
+        ]
+      },
+      "cert": "obs_cert",
+      "derivation": {
+        "nodes": [
+          {
+            "kind": "rule",
+            "conclusion": {
+              "pred": "eligible_bad",
+              "args": [
+                {
+                  "atom_str": "o1"
+                }
+              ]
+            },
+            "clause": "eligible_bad_attr_rule",
+            "subst": {
+              "O": {
+                "atom_str": "o1"
+              },
+              "N": {
+                "int": 2
+              }
+            },
+            "premises": [
+              {
+                "count": {
+                  "pred": {
+                    "name": "obs",
+                    "arity": 3
+                  },
+                  "filter": [
+                    {
+                      "pos": 0,
+                      "value": {
+                        "atom_str": "o1"
+                      }
+                    }
+                  ],
+                  "project": {
+                    "distinct": 5
+                  },
+                  "k": 2,
+                  "cert": 0
+                }
+              }
+            ]
+          }
+        ],
+        "root": 0
+      },
+      "outcome": {
+        "reject": "count_attr_out_of_range"
+      }
+    },
+    {
+      "name": "count_filter_position_out_of_range",
+      "note": "A FILTER position (7) >= the predicate arity (obs is arity 3) â‡’ count_attr_out_of_range (the filter/project positions are interpreted against the same arity).",
+      "claim": {
+        "pred": "eligible_bad",
+        "args": [
+          {
+            "atom_str": "o1"
+          }
+        ]
+      },
+      "cert": "obs_cert",
+      "derivation": {
+        "nodes": [
+          {
+            "kind": "rule",
+            "conclusion": {
+              "pred": "eligible_bad",
+              "args": [
+                {
+                  "atom_str": "o1"
+                }
+              ]
+            },
+            "clause": "eligible_bad_filter_rule",
+            "subst": {
+              "O": {
+                "atom_str": "o1"
+              },
+              "N": {
+                "int": 0
+              }
+            },
+            "premises": [
+              {
+                "count": {
+                  "pred": {
+                    "name": "obs",
+                    "arity": 3
+                  },
+                  "filter": [
+                    {
+                      "pos": 7,
+                      "value": {
+                        "atom_str": "o1"
+                      }
+                    }
+                  ],
+                  "project": "rows",
+                  "k": 0,
+                  "cert": 0
+                }
+              }
+            ]
+          }
+        ],
+        "root": 0
+      },
+      "outcome": {
+        "reject": "count_attr_out_of_range"
+      }
+    },
+    {
+      "name": "count_wrong_arity",
+      "note": "#581 arity sharpening. The PredicateRef names obs with arity 2, but the sealed obs table has arity 3. A wrong arity must be rejected (count_attr_out_of_range), never silently counted against a different-arity table.",
+      "claim": {
+        "pred": "eligible_bad",
+        "args": [
+          {
+            "atom_str": "o1"
+          }
+        ]
+      },
+      "cert": "obs_cert",
+      "derivation": {
+        "nodes": [
+          {
+            "kind": "rule",
+            "conclusion": {
+              "pred": "eligible_bad",
+              "args": [
+                {
+                  "atom_str": "o1"
+                }
+              ]
+            },
+            "clause": "eligible_bad_arity_rule",
+            "subst": {
+              "O": {
+                "atom_str": "o1"
+              },
+              "N": {
+                "int": 4
+              }
+            },
+            "premises": [
+              {
+                "count": {
+                  "pred": {
+                    "name": "obs",
+                    "arity": 2
+                  },
+                  "filter": [
+                    {
+                      "pos": 0,
+                      "value": {
+                        "atom_str": "o1"
+                      }
+                    }
+                  ],
+                  "project": "rows",
+                  "k": 4,
+                  "cert": 0
+                }
+              }
+            ]
+          }
+        ],
+        "root": 0
+      },
+      "outcome": {
+        "reject": "count_attr_out_of_range"
+      }
+    },
+    {
+      "name": "count_cert_out_of_range",
+      "note": "The count premise cites cert 0 but closed_world is empty (no cert supplied) â‡’ cert_out_of_range. The cert path's range gate applies to a count premise too.",
+      "claim": {
+        "pred": "eligible_count",
+        "args": [
+          {
+            "atom_str": "o1"
+          }
+        ]
+      },
+      "cert": null,
+      "derivation": {
+        "nodes": [
+          {
+            "kind": "rule",
+            "conclusion": {
+              "pred": "eligible_count",
+              "args": [
+                {
+                  "atom_str": "o1"
+                }
+              ]
+            },
+            "clause": "eligible_count_rule",
+            "subst": {
+              "O": {
+                "atom_str": "o1"
+              },
+              "N": {
+                "int": 4
+              }
+            },
+            "premises": [
+              {
+                "count": {
+                  "pred": {
+                    "name": "obs",
+                    "arity": 3
+                  },
+                  "filter": [
+                    {
+                      "pos": 0,
+                      "value": {
+                        "atom_str": "o1"
+                      }
+                    }
+                  ],
+                  "project": "rows",
+                  "k": 4,
+                  "cert": 0
+                }
+              }
+            ]
+          }
+        ],
+        "root": 0
+      },
+      "outcome": {
+        "reject": "cert_out_of_range"
+      }
+    },
+    {
+      "name": "count_stale_edb_cert_edb_mismatch",
+      "note": "Stale-EDB reject (reuses the negation Â§3.6 EDB-binding gate). The sealed obs table OMITS live EDB rows obs(o1,p4,null()) and obs(o2,p1,z), so the EDB gate (cert_edb_mismatch) fires BEFORE the count is recomputed â€” invalid-cert propagation: a count over a stale cert never reaches step 5.",
+      "claim": {
+        "pred": "eligible_count",
+        "args": [
+          {
+            "atom_str": "o1"
+          }
+        ]
+      },
+      "cert": "obs_cert_stale",
+      "derivation": {
+        "nodes": [
+          {
+            "kind": "rule",
+            "conclusion": {
+              "pred": "eligible_count",
+              "args": [
+                {
+                  "atom_str": "o1"
+                }
+              ]
+            },
+            "clause": "eligible_count_rule",
+            "subst": {
+              "O": {
+                "atom_str": "o1"
+              },
+              "N": {
+                "int": 4
+              }
+            },
+            "premises": [
+              {
+                "count": {
+                  "pred": {
+                    "name": "obs",
+                    "arity": 3
+                  },
+                  "filter": [
+                    {
+                      "pos": 0,
+                      "value": {
+                        "atom_str": "o1"
+                      }
+                    }
+                  ],
+                  "project": "rows",
+                  "k": 4,
+                  "cert": 0
+                }
+              }
+            ]
+          }
+        ],
+        "root": 0
+      },
+      "outcome": {
+        "reject": "cert_edb_mismatch"
+      }
+    },
+    {
+      "name": "prism_distinct_angles_accept",
+      "note": "PRISM REAL-DOMAIN VECTOR (representative stand-in). The '>=k distinct perspectives' gate, EXACT-lane count_distinct flavour: how many DISTINCT angles is object `vase` depicted from in `scene`? Rows for (scene,vase): front/side/top/front â‡’ distinct angles {front, side, top} = 3 (front deduped). Claim k=3 accepts. Prism has offered to contribute their actual conformance vectors; this is a representative stand-in until then.",
+      "claim": {
+        "pred": "object_seen_from_distinct_angles",
+        "args": [
+          {
+            "atom_str": "scene"
+          },
+          {
+            "atom_str": "vase"
+          }
+        ]
+      },
+      "cert": "depicts_cert",
+      "derivation": {
+        "nodes": [
+          {
+            "kind": "rule",
+            "conclusion": {
+              "pred": "object_seen_from_distinct_angles",
+              "args": [
+                {
+                  "atom_str": "scene"
+                },
+                {
+                  "atom_str": "vase"
+                }
+              ]
+            },
+            "clause": "vase_angles_rule",
+            "subst": {
+              "S": {
+                "atom_str": "scene"
+              },
+              "O": {
+                "atom_str": "vase"
+              },
+              "N": {
+                "int": 3
+              }
+            },
+            "premises": [
+              {
+                "count": {
+                  "pred": {
+                    "name": "depicts",
+                    "arity": 4
+                  },
+                  "filter": [
+                    {
+                      "pos": 0,
+                      "value": {
+                        "atom_str": "scene"
+                      }
+                    },
+                    {
+                      "pos": 2,
+                      "value": {
+                        "atom_str": "vase"
+                      }
+                    }
+                  ],
+                  "project": {
+                    "distinct": 3
+                  },
+                  "k": 3,
+                  "cert": 0
+                }
+              }
+            ]
+          }
+        ],
+        "root": 0
+      },
+      "outcome": "accept"
+    },
+    {
+      "name": "prism_distinct_angles_tamper",
+      "note": "PRISM REAL-DOMAIN VECTOR â€” the adversarial guard for the consumer gate. The same scene/vase distinct-angle count is genuinely 3 (front deduped), but the derivation claims k=4 (the tamperer counted the duplicate `front` row). The gate recomputes 3 != 4 â‡’ count_mismatch. This is exactly the unsoundness the certifiable lane removes from a trusted-leaf count: a duplicated row cannot inflate the distinct cardinality.",
+      "claim": {
+        "pred": "object_seen_from_distinct_angles",
+        "args": [
+          {
+            "atom_str": "scene"
+          },
+          {
+            "atom_str": "vase"
+          }
+        ]
+      },
+      "cert": "depicts_cert",
+      "derivation": {
+        "nodes": [
+          {
+            "kind": "rule",
+            "conclusion": {
+              "pred": "object_seen_from_distinct_angles",
+              "args": [
+                {
+                  "atom_str": "scene"
+                },
+                {
+                  "atom_str": "vase"
+                }
+              ]
+            },
+            "clause": "vase_angles_rule",
+            "subst": {
+              "S": {
+                "atom_str": "scene"
+              },
+              "O": {
+                "atom_str": "vase"
+              },
+              "N": {
+                "int": 4
+              }
+            },
+            "premises": [
+              {
+                "count": {
+                  "pred": {
+                    "name": "depicts",
+                    "arity": 4
+                  },
+                  "filter": [
+                    {
+                      "pos": 0,
+                      "value": {
+                        "atom_str": "scene"
+                      }
+                    },
+                    {
+                      "pos": 2,
+                      "value": {
+                        "atom_str": "vase"
+                      }
+                    }
+                  ],
+                  "project": {
+                    "distinct": 3
+                  },
+                  "k": 4,
+                  "cert": 0
+                }
+              }
+            ]
+          }
+        ],
+        "root": 0
+      },
+      "outcome": {
+        "reject": "count_mismatch"
+      }
+    },
+    {
+      "name": "prism_lineage_distinct_models_accept",
+      "note": "PRISM REAL-DOMAIN VECTOR (representative stand-in). The lineage-aggregate shape: how many DISTINCT models appear across the lineage cone `cone1`? Rows: modelM/modelM/modelN/null() â‡’ distinct non-null models {modelM, modelN} = 2 (modelM deduped, null() excluded). Claim k=2 accepts. The lineage aggregate Prism materializes as a trusted leaf today, now derived + certified.",
+      "claim": {
+        "pred": "lineage_distinct_models",
+        "args": [
+          {
+            "atom_str": "cone1"
+          }
+        ]
+      },
+      "cert": "lineage_cert",
+      "derivation": {
+        "nodes": [
+          {
+            "kind": "rule",
+            "conclusion": {
+              "pred": "lineage_distinct_models",
+              "args": [
+                {
+                  "atom_str": "cone1"
+                }
+              ]
+            },
+            "clause": "lineage_models_rule",
+            "subst": {
+              "C": {
+                "atom_str": "cone1"
+              },
+              "N": {
+                "int": 2
+              }
+            },
+            "premises": [
+              {
+                "count": {
+                  "pred": {
+                    "name": "lineage",
+                    "arity": 3
+                  },
+                  "filter": [
+                    {
+                      "pos": 0,
+                      "value": {
+                        "atom_str": "cone1"
+                      }
+                    }
+                  ],
+                  "project": {
+                    "distinct": 2
+                  },
+                  "k": 2,
+                  "cert": 0
+                }
+              }
+            ]
+          }
+        ],
+        "root": 0
+      },
+      "outcome": "accept"
+    },
+    {
+      "name": "accept_sum_integer_column",
+      "note": "#587 integer SUM over the sealed score column 1 for g1: 3 + 7 + 1 = 11 (set semantics over the proven-exact rows). The ArithmeticTheory exact + operator over BigInt. Claim k=11 accepts.",
+      "claim": {
+        "pred": "score_sum",
+        "args": [
+          {
+            "atom_str": "g1"
+          }
+        ]
+      },
+      "cert": "score_cert",
+      "derivation": {
+        "nodes": [
+          {
+            "kind": "rule",
+            "conclusion": {
+              "pred": "score_sum",
+              "args": [
+                {
+                  "atom_str": "g1"
+                }
+              ]
+            },
+            "clause": "score_sum_rule",
+            "subst": {
+              "G": {
+                "atom_str": "g1"
+              },
+              "N": {
+                "int": 11
+              }
+            },
+            "premises": [
+              {
+                "count": {
+                  "pred": {
+                    "name": "score",
+                    "arity": 2
+                  },
+                  "filter": [
+                    {
+                      "pos": 0,
+                      "value": {
+                        "atom_str": "g1"
+                      }
+                    }
+                  ],
+                  "project": {
+                    "sum": 1
+                  },
+                  "k": 11,
+                  "cert": 0
+                }
+              }
+            ]
+          }
+        ],
+        "root": 0
+      },
+      "outcome": "accept"
+    },
+    {
+      "name": "accept_min_integer_column",
+      "note": "#587 integer MIN over g1: min{3,7,1} = 1. Claim k=1 accepts.",
+      "claim": {
+        "pred": "score_min",
+        "args": [
+          {
+            "atom_str": "g1"
+          }
+        ]
+      },
+      "cert": "score_cert",
+      "derivation": {
+        "nodes": [
+          {
+            "kind": "rule",
+            "conclusion": {
+              "pred": "score_min",
+              "args": [
+                {
+                  "atom_str": "g1"
+                }
+              ]
+            },
+            "clause": "score_min_rule",
+            "subst": {
+              "G": {
+                "atom_str": "g1"
+              },
+              "N": {
+                "int": 1
+              }
+            },
+            "premises": [
+              {
+                "count": {
+                  "pred": {
+                    "name": "score",
+                    "arity": 2
+                  },
+                  "filter": [
+                    {
+                      "pos": 0,
+                      "value": {
+                        "atom_str": "g1"
+                      }
+                    }
+                  ],
+                  "project": {
+                    "min": 1
+                  },
+                  "k": 1,
+                  "cert": 0
+                }
+              }
+            ]
+          }
+        ],
+        "root": 0
+      },
+      "outcome": "accept"
+    },
+    {
+      "name": "accept_max_integer_column",
+      "note": "#587 integer MAX over g1: max{3,7,1} = 7. Claim k=7 accepts.",
+      "claim": {
+        "pred": "score_max",
+        "args": [
+          {
+            "atom_str": "g1"
+          }
+        ]
+      },
+      "cert": "score_cert",
+      "derivation": {
+        "nodes": [
+          {
+            "kind": "rule",
+            "conclusion": {
+              "pred": "score_max",
+              "args": [
+                {
+                  "atom_str": "g1"
+                }
+              ]
+            },
+            "clause": "score_max_rule",
+            "subst": {
+              "G": {
+                "atom_str": "g1"
+              },
+              "N": {
+                "int": 7
+              }
+            },
+            "premises": [
+              {
+                "count": {
+                  "pred": {
+                    "name": "score",
+                    "arity": 2
+                  },
+                  "filter": [
+                    {
+                      "pos": 0,
+                      "value": {
+                        "atom_str": "g1"
+                      }
+                    }
+                  ],
+                  "project": {
+                    "max": 1
+                  },
+                  "k": 7,
+                  "cert": 0
+                }
+              }
+            ]
+          }
+        ],
+        "root": 0
+      },
+      "outcome": "accept"
+    },
+    {
+      "name": "accept_empty_sum_is_zero",
+      "note": "#587 EMPTY SUM = 0. empty_grp is in the cert's finite domain (well-typed filter) but no score row has it at position 0, so the fold is over no rows and the gate recomputes 0; claim k=0 accepts. (Empty sum is 0, never agg_empty_undefined — that code is min/max-only.)",
+      "claim": {
+        "pred": "score_sum",
+        "args": [
+          {
+            "atom_str": "empty_grp"
+          }
+        ]
+      },
+      "cert": "score_cert",
+      "derivation": {
+        "nodes": [
+          {
+            "kind": "rule",
+            "conclusion": {
+              "pred": "score_sum",
+              "args": [
+                {
+                  "atom_str": "empty_grp"
+                }
+              ]
+            },
+            "clause": "score_sum_rule",
+            "subst": {
+              "G": {
+                "atom_str": "empty_grp"
+              },
+              "N": {
+                "int": 0
+              }
+            },
+            "premises": [
+              {
+                "count": {
+                  "pred": {
+                    "name": "score",
+                    "arity": 2
+                  },
+                  "filter": [
+                    {
+                      "pos": 0,
+                      "value": {
+                        "atom_str": "empty_grp"
+                      }
+                    }
+                  ],
+                  "project": {
+                    "sum": 1
+                  },
+                  "k": 0,
+                  "cert": 0
+                }
+              }
+            ]
+          }
+        ],
+        "root": 0
+      },
+      "outcome": "accept"
+    },
+    {
+      "name": "reject_empty_min_agg_empty_undefined",
+      "note": "#587 EMPTY MIN ⇒ REJECT agg_empty_undefined. min of an empty set is undefined; v1 mints no infinity/sentinel. empty_grp matches no score row, so min over zero rows is undefined and the gate rejects regardless of the claimed k.",
+      "claim": {
+        "pred": "score_min",
+        "args": [
+          {
+            "atom_str": "empty_grp"
+          }
+        ]
+      },
+      "cert": "score_cert",
+      "derivation": {
+        "nodes": [
+          {
+            "kind": "rule",
+            "conclusion": {
+              "pred": "score_min",
+              "args": [
+                {
+                  "atom_str": "empty_grp"
+                }
+              ]
+            },
+            "clause": "score_min_rule",
+            "subst": {
+              "G": {
+                "atom_str": "empty_grp"
+              },
+              "N": {
+                "int": 0
+              }
+            },
+            "premises": [
+              {
+                "count": {
+                  "pred": {
+                    "name": "score",
+                    "arity": 2
+                  },
+                  "filter": [
+                    {
+                      "pos": 0,
+                      "value": {
+                        "atom_str": "empty_grp"
+                      }
+                    }
+                  ],
+                  "project": {
+                    "min": 1
+                  },
+                  "k": 0,
+                  "cert": 0
+                }
+              }
+            ]
+          }
+        ],
+        "root": 0
+      },
+      "outcome": {
+        "reject": "agg_empty_undefined"
+      }
+    },
+    {
+      "name": "reject_empty_max_agg_empty_undefined",
+      "note": "#587 EMPTY MAX ⇒ REJECT agg_empty_undefined (symmetric to empty min).",
+      "claim": {
+        "pred": "score_max",
+        "args": [
+          {
+            "atom_str": "empty_grp"
+          }
+        ]
+      },
+      "cert": "score_cert",
+      "derivation": {
+        "nodes": [
+          {
+            "kind": "rule",
+            "conclusion": {
+              "pred": "score_max",
+              "args": [
+                {
+                  "atom_str": "empty_grp"
+                }
+              ]
+            },
+            "clause": "score_max_rule",
+            "subst": {
+              "G": {
+                "atom_str": "empty_grp"
+              },
+              "N": {
+                "int": 0
+              }
+            },
+            "premises": [
+              {
+                "count": {
+                  "pred": {
+                    "name": "score",
+                    "arity": 2
+                  },
+                  "filter": [
+                    {
+                      "pos": 0,
+                      "value": {
+                        "atom_str": "empty_grp"
+                      }
+                    }
+                  ],
+                  "project": {
+                    "max": 1
+                  },
+                  "k": 0,
+                  "cert": 0
+                }
+              }
+            ]
+          }
+        ],
+        "root": 0
+      },
+      "outcome": {
+        "reject": "agg_empty_undefined"
+      }
+    },
+    {
+      "name": "tamper_sum_wrong_result_over_valid_cert",
+      "note": "#587 ADVERSARIAL TAMPER (the dual-conformance guarantee for sum): a derivation claiming a WRONG sum (k=99) over an otherwise-VALID cert MUST be rejected count_mismatch. The real sum over g1 is 11.",
+      "claim": {
+        "pred": "score_sum",
+        "args": [
+          {
+            "atom_str": "g1"
+          }
+        ]
+      },
+      "cert": "score_cert",
+      "derivation": {
+        "nodes": [
+          {
+            "kind": "rule",
+            "conclusion": {
+              "pred": "score_sum",
+              "args": [
+                {
+                  "atom_str": "g1"
+                }
+              ]
+            },
+            "clause": "score_sum_rule",
+            "subst": {
+              "G": {
+                "atom_str": "g1"
+              },
+              "N": {
+                "int": 99
+              }
+            },
+            "premises": [
+              {
+                "count": {
+                  "pred": {
+                    "name": "score",
+                    "arity": 2
+                  },
+                  "filter": [
+                    {
+                      "pos": 0,
+                      "value": {
+                        "atom_str": "g1"
+                      }
+                    }
+                  ],
+                  "project": {
+                    "sum": 1
+                  },
+                  "k": 99,
+                  "cert": 0
+                }
+              }
+            ]
+          }
+        ],
+        "root": 0
+      },
+      "outcome": {
+        "reject": "count_mismatch"
+      }
+    },
+    {
+      "name": "tamper_max_wrong_result_over_valid_cert",
+      "note": "#587 ADVERSARIAL TAMPER for max: claim k=8 when the real max over g1 is 7 ⇒ count_mismatch.",
+      "claim": {
+        "pred": "score_max",
+        "args": [
+          {
+            "atom_str": "g1"
+          }
+        ]
+      },
+      "cert": "score_cert",
+      "derivation": {
+        "nodes": [
+          {
+            "kind": "rule",
+            "conclusion": {
+              "pred": "score_max",
+              "args": [
+                {
+                  "atom_str": "g1"
+                }
+              ]
+            },
+            "clause": "score_max_rule",
+            "subst": {
+              "G": {
+                "atom_str": "g1"
+              },
+              "N": {
+                "int": 8
+              }
+            },
+            "premises": [
+              {
+                "count": {
+                  "pred": {
+                    "name": "score",
+                    "arity": 2
+                  },
+                  "filter": [
+                    {
+                      "pos": 0,
+                      "value": {
+                        "atom_str": "g1"
+                      }
+                    }
+                  ],
+                  "project": {
+                    "max": 1
+                  },
+                  "k": 8,
+                  "cert": 0
+                }
+              }
+            ]
+          }
+        ],
+        "root": 0
+      },
+      "outcome": {
+        "reject": "count_mismatch"
+      }
+    },
+    {
+      "name": "reject_sum_non_int_column_ill_typed",
+      "note": "#587 NON-INT COLUMN ⇒ REJECT count_attr_out_of_range (ill-typed). Folding column 0 (the group ATOM, not an int) is not a sealed numeric column; v1 sum/min/max are integer-only. Folds g1's column-0 atoms which are not ints.",
+      "claim": {
+        "pred": "score_bad",
+        "args": [
+          {
+            "atom_str": "g1"
+          }
+        ]
+      },
+      "cert": "score_cert",
+      "derivation": {
+        "nodes": [
+          {
+            "kind": "rule",
+            "conclusion": {
+              "pred": "score_bad",
+              "args": [
+                {
+                  "atom_str": "g1"
+                }
+              ]
+            },
+            "clause": "score_bad_col_rule",
+            "subst": {
+              "G": {
+                "atom_str": "g1"
+              },
+              "N": {
+                "int": 0
+              }
+            },
+            "premises": [
+              {
+                "count": {
+                  "pred": {
+                    "name": "score",
+                    "arity": 2
+                  },
+                  "filter": [
+                    {
+                      "pos": 0,
+                      "value": {
+                        "atom_str": "g1"
+                      }
+                    }
+                  ],
+                  "project": {
+                    "sum": 0
+                  },
+                  "k": 0,
+                  "cert": 0
+                }
+              }
+            ]
+          }
+        ],
+        "root": 0
+      },
+      "outcome": {
+        "reject": "count_attr_out_of_range"
+      }
+    },
+    {
+      "name": "accept_sum_over_int_relation_defined_by_fact_clauses",
+      "note": "#587 FUNCTION-FREE INT CARVE-OUT (tri-core pin). pts(tag,val) is a sealed int relation DEFINED BY FACT-CLAUSES, so the §3.2 scope-downward-closure scans int-valued fact-clause heads — a canonical ground int is a FLAT numeric domain value (not a sub-term-bearing compound), so the function-free gate ACCEPTS it (it would reject a genuine variable-bearing/nested tuple). The sum over a={10,4} = 14 then certifies.",
+      "claim": {
+        "pred": "pts_sum",
+        "args": [
+          {
+            "atom_str": "a"
+          }
+        ]
+      },
+      "cert": "pts_cert",
+      "derivation": {
+        "nodes": [
+          {
+            "kind": "rule",
+            "conclusion": {
+              "pred": "pts_sum",
+              "args": [
+                {
+                  "atom_str": "a"
+                }
+              ]
+            },
+            "clause": "pts_sum_rule",
+            "subst": {
+              "T": {
+                "atom_str": "a"
+              },
+              "N": {
+                "int": 14
+              }
+            },
+            "premises": [
+              {
+                "count": {
+                  "pred": {
+                    "name": "pts",
+                    "arity": 2
+                  },
+                  "filter": [
+                    {
+                      "pos": 0,
+                      "value": {
+                        "atom_str": "a"
+                      }
+                    }
+                  ],
+                  "project": {
+                    "sum": 1
+                  },
+                  "k": 14,
+                  "cert": 0
+                }
+              }
+            ]
+          }
+        ],
+        "root": 0
+      },
+      "outcome": "accept"
+    },
+    {
+      "name": "stacked_count_2258_accept",
+      "note": "#2258 L3.3b: deg_cert (level 1) seals a clause that COUNTS obs, sealed by obs_cert (level 0). The count is admitted over the unique, exact, Valid lower seal; closure runs it as a count stage and CountLower support recomputes it. n_degs(2) counts deg.",
+      "claim": {
+        "pred": "n_degs",
+        "args": [
+          {
+            "int": 2
+          }
+        ]
+      },
+      "certs": [
+        "obs_cert",
+        "deg_cert"
+      ],
+      "derivation": {
+        "nodes": [
+          {
+            "kind": "rule",
+            "conclusion": {
+              "pred": "n_degs",
+              "args": [
+                {
+                  "int": 2
+                }
+              ]
+            },
+            "clause": "n_degs_rule",
+            "subst": {
+              "N": {
+                "int": 2
+              }
+            },
+            "premises": [
+              {
+                "count": {
+                  "pred": {
+                    "name": "deg",
+                    "arity": 2
+                  },
+                  "filter": [],
+                  "project": "rows",
+                  "k": 2,
+                  "cert": 1
+                }
+              }
+            ]
+          }
+        ],
+        "root": 0
+      },
+      "outcome": "accept"
+    },
+    {
+      "name": "stacked_count_2258_leading_stage_accept",
+      "note": "#2258 L3.3b: total_cert's count has a ground filter, so closure runs it as a LEADING stage (before any binder). n_totals(1) counts total.",
+      "claim": {
+        "pred": "n_totals",
+        "args": [
+          {
+            "int": 1
+          }
+        ]
+      },
+      "certs": [
+        "obs_cert",
+        "total_cert"
+      ],
+      "derivation": {
+        "nodes": [
+          {
+            "kind": "rule",
+            "conclusion": {
+              "pred": "n_totals",
+              "args": [
+                {
+                  "int": 1
+                }
+              ]
+            },
+            "clause": "n_totals_rule",
+            "subst": {
+              "N": {
+                "int": 1
+              }
+            },
+            "premises": [
+              {
+                "count": {
+                  "pred": {
+                    "name": "total",
+                    "arity": 1
+                  },
+                  "filter": [],
+                  "project": "rows",
+                  "k": 1,
+                  "cert": 1
+                }
+              }
+            ]
+          }
+        ],
+        "root": 0
+      },
+      "outcome": "accept"
+    },
+    {
+      "name": "stacked_count_2258_support_wrong_result_rejects",
+      "note": "#2258 L3.3b: deg(o1, 3)'s CountLower ref recomputes 4 over obs_cert's table, so the support gate refuses deg_cert_wrong_result.",
+      "claim": {
+        "pred": "n_degs",
+        "args": [
+          {
+            "int": 2
+          }
+        ]
+      },
+      "certs": [
+        "obs_cert",
+        "deg_cert_wrong_result"
+      ],
+      "derivation": {
+        "nodes": [
+          {
+            "kind": "rule",
+            "conclusion": {
+              "pred": "n_degs",
+              "args": [
+                {
+                  "int": 2
+                }
+              ]
+            },
+            "clause": "n_degs_rule",
+            "subst": {
+              "N": {
+                "int": 2
+              }
+            },
+            "premises": [
+              {
+                "count": {
+                  "pred": {
+                    "name": "deg",
+                    "arity": 2
+                  },
+                  "filter": [],
+                  "project": "rows",
+                  "k": 2,
+                  "cert": 1
+                }
+              }
+            ]
+          }
+        ],
+        "root": 0
+      },
+      "outcome": {
+        "reject": "cert_unsupported"
+      }
+    },
+    {
+      "name": "stacked_count_2258_closure_missing_row_rejects",
+      "note": "#2258 L3.3b: the closure's count stage derives deg(o2, 1), which deg_cert_missing_row lacks.",
+      "claim": {
+        "pred": "n_degs",
+        "args": [
+          {
+            "int": 1
+          }
+        ]
+      },
+      "certs": [
+        "obs_cert",
+        "deg_cert_missing_row"
+      ],
+      "derivation": {
+        "nodes": [
+          {
+            "kind": "rule",
+            "conclusion": {
+              "pred": "n_degs",
+              "args": [
+                {
+                  "int": 1
+                }
+              ]
+            },
+            "clause": "n_degs_rule",
+            "subst": {
+              "N": {
+                "int": 1
+              }
+            },
+            "premises": [
+              {
+                "count": {
+                  "pred": {
+                    "name": "deg",
+                    "arity": 2
+                  },
+                  "filter": [],
+                  "project": "rows",
+                  "k": 1,
+                  "cert": 1
+                }
+              }
+            ]
+          }
+        ],
+        "root": 0
+      },
+      "outcome": {
+        "reject": "cert_not_closed"
+      }
+    },
+    {
+      "name": "stacked_count_2258_count_cites_own_cert_rejects",
+      "note": "#2258 L3.3b: a CountLower ref citing the certificate's OWN index is refused.",
+      "claim": {
+        "pred": "n_degs",
+        "args": [
+          {
+            "int": 2
+          }
+        ]
+      },
+      "certs": [
+        "obs_cert",
+        "deg_cert_self_cite"
+      ],
+      "derivation": {
+        "nodes": [
+          {
+            "kind": "rule",
+            "conclusion": {
+              "pred": "n_degs",
+              "args": [
+                {
+                  "int": 2
+                }
+              ]
+            },
+            "clause": "n_degs_rule",
+            "subst": {
+              "N": {
+                "int": 2
+              }
+            },
+            "premises": [
+              {
+                "count": {
+                  "pred": {
+                    "name": "deg",
+                    "arity": 2
+                  },
+                  "filter": [],
+                  "project": "rows",
+                  "k": 2,
+                  "cert": 1
+                }
+              }
+            ]
+          }
+        ],
+        "root": 0
+      },
+      "outcome": {
+        "reject": "cert_unsupported"
+      }
+    },
+    {
+      "name": "stacked_count_2258_ambiguous_lower_seal_rejects",
+      "note": "#2258 L3.3b: two level-0 certificates seal obs, so the count's lower seal is not unique and deg_cert cannot read it.",
+      "claim": {
+        "pred": "n_degs",
+        "args": [
+          {
+            "int": 2
+          }
+        ]
+      },
+      "certs": [
+        "obs_cert",
+        "obs_cert",
+        "deg_cert"
+      ],
+      "derivation": {
+        "nodes": [
+          {
+            "kind": "rule",
+            "conclusion": {
+              "pred": "n_degs",
+              "args": [
+                {
+                  "int": 2
+                }
+              ]
+            },
+            "clause": "n_degs_rule",
+            "subst": {
+              "N": {
+                "int": 2
+              }
+            },
+            "premises": [
+              {
+                "count": {
+                  "pred": {
+                    "name": "deg",
+                    "arity": 2
+                  },
+                  "filter": [],
+                  "project": "rows",
+                  "k": 2,
+                  "cert": 2
+                }
+              }
+            ]
+          }
+        ],
+        "root": 0
+      },
+      "outcome": {
+        "reject": "cert_scope_incomplete"
+      }
+    },
+    {
+      "name": "stacked_count_2258_partial_lower_seal_rejects",
+      "note": "#2258 L3.3b: obs_cert_partial seals obs PARTIAL (a lower bound, ADR 0030 D2), so a sealed clause may not count it.",
+      "claim": {
+        "pred": "n_degs",
+        "args": [
+          {
+            "int": 2
+          }
+        ]
+      },
+      "certs": [
+        "obs_cert_partial",
+        "deg_cert"
+      ],
+      "derivation": {
+        "nodes": [
+          {
+            "kind": "rule",
+            "conclusion": {
+              "pred": "n_degs",
+              "args": [
+                {
+                  "int": 2
+                }
+              ]
+            },
+            "clause": "n_degs_rule",
+            "subst": {
+              "N": {
+                "int": 2
+              }
+            },
+            "premises": [
+              {
+                "count": {
+                  "pred": {
+                    "name": "deg",
+                    "arity": 2
+                  },
+                  "filter": [],
+                  "project": "rows",
+                  "k": 2,
+                  "cert": 1
+                }
+              }
+            ]
+          }
+        ],
+        "root": 0
+      },
+      "outcome": {
+        "reject": "cert_scope_incomplete"
+      }
+    },
+    {
+      "name": "stacked_count_2258_join_steps_pinned_exactly_rejects",
+      "note": "#2258 L3.3b: the same stacked world with deg_cert under-declaring join_steps by one (29 < 30 counted) is refused cert_decl_mismatch. With stacked_count_2258_accept (30) this pins the count stage's cost tri-core, in both directions.",
+      "claim": {
+        "pred": "n_degs",
+        "args": [
+          {
+            "int": 2
+          }
+        ]
+      },
+      "certs": [
+        "obs_cert",
+        "deg_cert_join_steps_29"
+      ],
+      "derivation": {
+        "nodes": [
+          {
+            "kind": "rule",
+            "conclusion": {
+              "pred": "n_degs",
+              "args": [
+                {
+                  "int": 2
+                }
+              ]
+            },
+            "clause": "n_degs_rule",
+            "subst": {
+              "N": {
+                "int": 2
+              }
+            },
+            "premises": [
+              {
+                "count": {
+                  "pred": {
+                    "name": "deg",
+                    "arity": 2
+                  },
+                  "filter": [],
+                  "project": "rows",
+                  "k": 2,
+                  "cert": 1
+                }
+              }
+            ]
+          }
+        ],
+        "root": 0
+      },
+      "outcome": {
+        "reject": "cert_decl_mismatch"
+      }
+    },
+    {
+      "name": "stacked_count_2258_leading_join_steps_pinned_exactly_rejects",
+      "note": "#2258 L3.3b: total_cert under-declaring join_steps by one (4 < 5 scanned) is refused cert_decl_mismatch, pinning the leading count stage's cost exactly.",
+      "claim": {
+        "pred": "n_totals",
+        "args": [
+          {
+            "int": 1
+          }
+        ]
+      },
+      "certs": [
+        "obs_cert",
+        "total_cert_join_steps_4"
+      ],
+      "derivation": {
+        "nodes": [
+          {
+            "kind": "rule",
+            "conclusion": {
+              "pred": "n_totals",
+              "args": [
+                {
+                  "int": 1
+                }
+              ]
+            },
+            "clause": "n_totals_rule",
+            "subst": {
+              "N": {
+                "int": 1
+              }
+            },
+            "premises": [
+              {
+                "count": {
+                  "pred": {
+                    "name": "total",
+                    "arity": 1
+                  },
+                  "filter": [],
+                  "project": "rows",
+                  "k": 1,
+                  "cert": 1
+                }
+              }
+            ]
+          }
+        ],
+        "root": 0
+      },
+      "outcome": {
+        "reject": "cert_decl_mismatch"
+      }
+    },
+    {
+      "name": "frozen_count_pred_not_sealed_reuses_neg_atom_not_sealed",
+      "note": "#2813 FROZEN (research 0008 row 17). A count premise over score/2 cites obs_cert, which seals only obs (ADR 0023 step 2: the counted relation must be sealed by the cited cert). The code is the negation gate's REUSED neg_atom_not_sealed, not a dedicated count code. Everything else is true: k=11 is g1's score sum (3+7+1), what score_cert would recompute, so the unsealed cite is the only defect.",
+      "claim": {
+        "pred": "score_sum",
+        "args": [
+          {
+            "atom_str": "g1"
+          }
+        ]
+      },
+      "cert": "obs_cert",
+      "derivation": {
+        "nodes": [
+          {
+            "kind": "rule",
+            "conclusion": {
+              "pred": "score_sum",
+              "args": [
+                {
+                  "atom_str": "g1"
+                }
+              ]
+            },
+            "clause": "score_sum_rule",
+            "subst": {
+              "G": {
+                "atom_str": "g1"
+              },
+              "N": {
+                "int": 11
+              }
+            },
+            "premises": [
+              {
+                "count": {
+                  "pred": {
+                    "name": "score",
+                    "arity": 2
+                  },
+                  "filter": [
+                    {
+                      "pos": 0,
+                      "value": {
+                        "atom_str": "g1"
+                      }
+                    }
+                  ],
+                  "project": {
+                    "sum": 1
+                  },
+                  "k": 11,
+                  "cert": 0
+                }
+              }
+            ]
+          }
+        ],
+        "root": 0
+      },
+      "outcome": {
+        "reject": "neg_atom_not_sealed"
+      }
+    },
+    {
+      "name": "frozen_count_filter_value_outside_domain_reuses_neg_atom_ill_typed",
+      "note": "#2813 FROZEN (research 0008 row 17). The count filter binds obs column 0 to o9, which is NOT in obs_cert's finite domain (ADR 0023 step 4: every bound filter value is in the cert's finite domain). The code is the negation gate's REUSED neg_atom_ill_typed. k=0 is what a count that skipped the domain check would recompute (no obs row has o9), so only the domain rule rejects.",
+      "claim": {
+        "pred": "eligible_count",
+        "args": [
+          {
+            "atom_str": "o9"
+          }
+        ]
+      },
+      "cert": "obs_cert",
+      "derivation": {
+        "nodes": [
+          {
+            "kind": "rule",
+            "conclusion": {
+              "pred": "eligible_count",
+              "args": [
+                {
+                  "atom_str": "o9"
+                }
+              ]
+            },
+            "clause": "eligible_count_rule",
+            "subst": {
+              "O": {
+                "atom_str": "o9"
+              },
+              "N": {
+                "int": 0
+              }
+            },
+            "premises": [
+              {
+                "count": {
+                  "pred": {
+                    "name": "obs",
+                    "arity": 3
+                  },
+                  "filter": [
+                    {
+                      "pos": 0,
+                      "value": {
+                        "atom_str": "o9"
+                      }
+                    }
+                  ],
+                  "project": "rows",
+                  "k": 0,
+                  "cert": 0
+                }
+              }
+            ]
+          }
+        ],
+        "root": 0
+      },
+      "outcome": {
+        "reject": "neg_atom_ill_typed"
+      }
+    },
+    {
+      "name": "frozen_count_k_not_canonical_int_reuses_count_mismatch",
+      "note": "#2813 FROZEN (research 0008 row 17). O=o1 matches 4 obs rows, and the premise claims k = the DECIMAL 4.0, i.e. decimal(int 4, int 0): VALUE-equal to the recomputed 4 but not the canonical int embedding (ontos-data 5.9: an int and a decimal of one number are distinct values). k is an int-encoded ground value and the count must equal it (ADR 0023 step 5), so the code is count_mismatch, not a dedicated one. A checker that compared k by numeric value would accept.",
+      "claim": {
+        "pred": "eligible_count",
+        "args": [
+          {
+            "atom_str": "o1"
+          }
+        ]
+      },
+      "cert": "obs_cert",
+      "derivation": {
+        "nodes": [
+          {
+            "kind": "rule",
+            "conclusion": {
+              "pred": "eligible_count",
+              "args": [
+                {
+                  "atom_str": "o1"
+                }
+              ]
+            },
+            "clause": "eligible_count_rule",
+            "subst": {
+              "O": {
+                "atom_str": "o1"
+              },
+              "N": {
+                "decimal": "4.0"
+              }
+            },
+            "premises": [
+              {
+                "count": {
+                  "pred": {
+                    "name": "obs",
+                    "arity": 3
+                  },
+                  "filter": [
+                    {
+                      "pos": 0,
+                      "value": {
+                        "atom_str": "o1"
+                      }
+                    }
+                  ],
+                  "project": "rows",
+                  "k": {
+                    "decimal": "4.0"
+                  },
+                  "cert": 0
+                }
+              }
+            ]
+          }
+        ],
+        "root": 0
+      },
+      "outcome": {
+        "reject": "count_mismatch"
+      }
+    },
+    {
+      "name": "frozen_sum_decimal_column_rejected",
+      "note": "#2813 FROZEN (research 0010). SUM over measure's column 1, whose sealed values are DECIMALS: v1 sum/min/max are integer-only, a non-int column is count_attr_out_of_range (ADR 0023's #587 amendment). The claimed k=9 is the integer VALUE of the widened fold (1.0+4.0+1.5+2.5 = 9.0), so a fold widened to decimals and compared by value would ACCEPT. Flipping this row requires a CHECKER_VERSION bump (see the file note): the premise bytes and every profile digest are unchanged by an in-place widening.",
+      "claim": {
+        "pred": "measure_sum",
+        "args": [
+          {
+            "atom_str": "m1"
+          }
+        ]
+      },
+      "cert": "measure_cert",
+      "derivation": {
+        "nodes": [
+          {
+            "kind": "rule",
+            "conclusion": {
+              "pred": "measure_sum",
+              "args": [
+                {
+                  "atom_str": "m1"
+                }
+              ]
+            },
+            "clause": "measure_sum_rule",
+            "subst": {
+              "G": {
+                "atom_str": "m1"
+              },
+              "N": {
+                "int": 9
+              }
+            },
+            "premises": [
+              {
+                "count": {
+                  "pred": {
+                    "name": "measure",
+                    "arity": 2
+                  },
+                  "filter": [
+                    {
+                      "pos": 0,
+                      "value": {
+                        "atom_str": "m1"
+                      }
+                    }
+                  ],
+                  "project": {
+                    "sum": 1
+                  },
+                  "k": 9,
+                  "cert": 0
+                }
+              }
+            ]
+          }
+        ],
+        "root": 0
+      },
+      "outcome": {
+        "reject": "count_attr_out_of_range"
+      }
+    },
+    {
+      "name": "frozen_min_decimal_column_rejected",
+      "note": "#2813 FROZEN (research 0010). MIN over measure's column 1, whose sealed values are DECIMALS: v1 sum/min/max are integer-only, a non-int column is count_attr_out_of_range (ADR 0023's #587 amendment). The claimed k=1 is the integer VALUE of the widened fold (min = 1.0), so a fold widened to decimals and compared by value would ACCEPT. Flipping this row requires a CHECKER_VERSION bump (see the file note): the premise bytes and every profile digest are unchanged by an in-place widening.",
+      "claim": {
+        "pred": "measure_min",
+        "args": [
+          {
+            "atom_str": "m1"
+          }
+        ]
+      },
+      "cert": "measure_cert",
+      "derivation": {
+        "nodes": [
+          {
+            "kind": "rule",
+            "conclusion": {
+              "pred": "measure_min",
+              "args": [
+                {
+                  "atom_str": "m1"
+                }
+              ]
+            },
+            "clause": "measure_min_rule",
+            "subst": {
+              "G": {
+                "atom_str": "m1"
+              },
+              "N": {
+                "int": 1
+              }
+            },
+            "premises": [
+              {
+                "count": {
+                  "pred": {
+                    "name": "measure",
+                    "arity": 2
+                  },
+                  "filter": [
+                    {
+                      "pos": 0,
+                      "value": {
+                        "atom_str": "m1"
+                      }
+                    }
+                  ],
+                  "project": {
+                    "min": 1
+                  },
+                  "k": 1,
+                  "cert": 0
+                }
+              }
+            ]
+          }
+        ],
+        "root": 0
+      },
+      "outcome": {
+        "reject": "count_attr_out_of_range"
+      }
+    },
+    {
+      "name": "frozen_max_decimal_column_rejected",
+      "note": "#2813 FROZEN (research 0010). MAX over measure's column 1, whose sealed values are DECIMALS: v1 sum/min/max are integer-only, a non-int column is count_attr_out_of_range (ADR 0023's #587 amendment). The claimed k=4 is the integer VALUE of the widened fold (max = 4.0), so a fold widened to decimals and compared by value would ACCEPT. Flipping this row requires a CHECKER_VERSION bump (see the file note): the premise bytes and every profile digest are unchanged by an in-place widening.",
+      "claim": {
+        "pred": "measure_max",
+        "args": [
+          {
+            "atom_str": "m1"
+          }
+        ]
+      },
+      "cert": "measure_cert",
+      "derivation": {
+        "nodes": [
+          {
+            "kind": "rule",
+            "conclusion": {
+              "pred": "measure_max",
+              "args": [
+                {
+                  "atom_str": "m1"
+                }
+              ]
+            },
+            "clause": "measure_max_rule",
+            "subst": {
+              "G": {
+                "atom_str": "m1"
+              },
+              "N": {
+                "int": 4
+              }
+            },
+            "premises": [
+              {
+                "count": {
+                  "pred": {
+                    "name": "measure",
+                    "arity": 2
+                  },
+                  "filter": [
+                    {
+                      "pos": 0,
+                      "value": {
+                        "atom_str": "m1"
+                      }
+                    }
+                  ],
+                  "project": {
+                    "max": 1
+                  },
+                  "k": 4,
+                  "cert": 0
+                }
+              }
+            ]
+          }
+        ],
+        "root": 0
+      },
+      "outcome": {
+        "reject": "count_attr_out_of_range"
+      }
+    }
+  ]
+}

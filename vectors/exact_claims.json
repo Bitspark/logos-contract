@@ -1,0 +1,1053 @@
+{
+  "spi": "logos-checker-spi v1",
+  "profile": "negation_v1",
+  "note": "#3022 (research 0028 rows A2, 1 and 2; seat:caa's ruling of 2026-09-26): every certified literal claim is EXACT. check compares the root against the claim, a Rule's instantiated head against its conclusion, and a positive premise against the grounded body literal structurally, whatever term identity the caller's profile names; a list's display spelling is presentation, carried beside the exact fact and never certified in place of it. Each refused case below is ACCEPTED by a label-tolerant checker (the reify_lists identity's account equality, #277) and is false in the exact model; A2 and row 2 are false in the list quotient as well. Each is paired with its control, the derivation a structurally unifying engine emits, which is accepted either way. A count's k is not witnessed here: a count's value is an integer, so no list spelling can reach that site. Hand-authored from the spec (logos-contract.md 'What the default certifies') and research 0028's measured rows; no case was captured from a run. Driven through every core's conformance CLI as the negation family (conformance/harness.mjs, cli: negation), so the notation, the negation_v1 profile and the context binding are negation.json's: body literal = bare goal | {neg:<goal>}; premise = bare int | {neg:{atom, cert, nonmember}}; a derivation may carry closed_world certificates, auto-bound to the derived context. `[a]` is the cons spelling .(a, []), and list(a) the flat one, Tuple[Atom(list), a].",
+  "extensional": [
+    "a2_p",
+    "root_t",
+    "row1_p",
+    "row2_p",
+    "row2_q"
+  ],
+  "edb": {
+    "a2_p": [
+      {
+        "pred": "a2_p",
+        "args": [
+          {
+            "tuple": [
+              {
+                "atom_str": "."
+              },
+              {
+                "atom_str": "b"
+              },
+              {
+                "atom_str": "[]"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "root_t": [
+      {
+        "pred": "root_t",
+        "args": [
+          {
+            "tuple": [
+              {
+                "atom_str": "."
+              },
+              {
+                "atom_str": "a"
+              },
+              {
+                "atom_str": "[]"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "row1_p": [
+      {
+        "pred": "row1_p",
+        "args": [
+          {
+            "tuple": [
+              {
+                "atom_str": "."
+              },
+              {
+                "atom_str": "a"
+              },
+              {
+                "atom_str": "[]"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "pred": "row1_p",
+        "args": [
+          {
+            "tuple": [
+              {
+                "atom_str": "list"
+              },
+              {
+                "atom_str": "a"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "row2_p": [
+      {
+        "pred": "row2_p",
+        "args": [
+          {
+            "tuple": [
+              {
+                "atom_str": "."
+              },
+              {
+                "atom_str": "a"
+              },
+              {
+                "atom_str": "[]"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "row2_q": [
+      {
+        "pred": "row2_q",
+        "args": [
+          {
+            "tuple": [
+              {
+                "atom_str": "list"
+              },
+              {
+                "atom_str": "a"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "program": {
+    "a2_rule": {
+      "head": {
+        "pred": "a2_r",
+        "args": [
+          {
+            "tuple": [
+              {
+                "atom_str": "."
+              },
+              {
+                "atom_str": "a"
+              },
+              {
+                "var": "X"
+              }
+            ]
+          }
+        ]
+      },
+      "body": [
+        {
+          "pred": "a2_p",
+          "args": [
+            {
+              "var": "X"
+            }
+          ]
+        }
+      ]
+    },
+    "row1_rule": {
+      "head": {
+        "pred": "row1_s",
+        "args": [
+          {
+            "var": "X"
+          }
+        ]
+      },
+      "body": [
+        {
+          "pred": "row1_p",
+          "args": [
+            {
+              "var": "X"
+            }
+          ]
+        }
+      ]
+    },
+    "row2_rule": {
+      "head": {
+        "pred": "row2_r",
+        "args": [
+          {
+            "var": "X"
+          }
+        ]
+      },
+      "body": [
+        {
+          "pred": "row2_p",
+          "args": [
+            {
+              "var": "X"
+            }
+          ]
+        },
+        {
+          "neg": {
+            "pred": "row2_q",
+            "args": [
+              {
+                "var": "X"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "cases": [
+    {
+      "name": "a2_cons_tail_label_tolerant_premise_is_refused",
+      "note": "Research 0028 A2, the reproduction of #3022. p([b]). r([a|X]) :- p(X). The derivation binds X = list(b), cites the leaf p([b]) for the body literal p(list(b)), and concludes r([a|list(b)]). That claim is false in the exact model, whose one r fact is r([a,b]), and false in the list quotient too: the list normal form never rewrites a cons TAIL, so r([a|list(b)]) is not identified with r([a,b]). The premise p([b]) is not structurally the grounded body literal p(list(b)), so the derivation is refused at premise 0. A label-tolerant checker (#277's account equality at a Rule- or Leaf-cited positive premise) accepts it.",
+      "claim": {
+        "pred": "a2_r",
+        "args": [
+          {
+            "tuple": [
+              {
+                "atom_str": "."
+              },
+              {
+                "atom_str": "a"
+              },
+              {
+                "tuple": [
+                  {
+                    "atom_str": "list"
+                  },
+                  {
+                    "atom_str": "b"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "derivation": {
+        "nodes": [
+          {
+            "kind": "leaf",
+            "conclusion": {
+              "pred": "a2_p",
+              "args": [
+                {
+                  "tuple": [
+                    {
+                      "atom_str": "."
+                    },
+                    {
+                      "atom_str": "b"
+                    },
+                    {
+                      "atom_str": "[]"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "kind": "rule",
+            "conclusion": {
+              "pred": "a2_r",
+              "args": [
+                {
+                  "tuple": [
+                    {
+                      "atom_str": "."
+                    },
+                    {
+                      "atom_str": "a"
+                    },
+                    {
+                      "tuple": [
+                        {
+                          "atom_str": "list"
+                        },
+                        {
+                          "atom_str": "b"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            "clause": "a2_rule",
+            "subst": {
+              "X": {
+                "tuple": [
+                  {
+                    "atom_str": "list"
+                  },
+                  {
+                    "atom_str": "b"
+                  }
+                ]
+              }
+            },
+            "premises": [
+              0
+            ]
+          }
+        ],
+        "root": 1
+      },
+      "outcome": {
+        "reject": "instantiation_mismatch"
+      }
+    },
+    {
+      "name": "a2_cons_tail_exact_derivation_accepts",
+      "note": "A2's control: the same program, the derivation an engine unifying structurally emits. X = [b], the leaf p([b]) is exactly the grounded body literal, and the conclusion r([a,b]) is exactly the instantiated head. Accepted before and after #3022.",
+      "claim": {
+        "pred": "a2_r",
+        "args": [
+          {
+            "tuple": [
+              {
+                "atom_str": "."
+              },
+              {
+                "atom_str": "a"
+              },
+              {
+                "tuple": [
+                  {
+                    "atom_str": "."
+                  },
+                  {
+                    "atom_str": "b"
+                  },
+                  {
+                    "atom_str": "[]"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "derivation": {
+        "nodes": [
+          {
+            "kind": "leaf",
+            "conclusion": {
+              "pred": "a2_p",
+              "args": [
+                {
+                  "tuple": [
+                    {
+                      "atom_str": "."
+                    },
+                    {
+                      "atom_str": "b"
+                    },
+                    {
+                      "atom_str": "[]"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "kind": "rule",
+            "conclusion": {
+              "pred": "a2_r",
+              "args": [
+                {
+                  "tuple": [
+                    {
+                      "atom_str": "."
+                    },
+                    {
+                      "atom_str": "a"
+                    },
+                    {
+                      "tuple": [
+                        {
+                          "atom_str": "."
+                        },
+                        {
+                          "atom_str": "b"
+                        },
+                        {
+                          "atom_str": "[]"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            "clause": "a2_rule",
+            "subst": {
+              "X": {
+                "tuple": [
+                  {
+                    "atom_str": "."
+                  },
+                  {
+                    "atom_str": "b"
+                  },
+                  {
+                    "atom_str": "[]"
+                  }
+                ]
+              }
+            },
+            "premises": [
+              0
+            ]
+          }
+        ],
+        "root": 1
+      },
+      "outcome": "accept"
+    },
+    {
+      "name": "row1_premise_citing_the_other_spelling_is_refused",
+      "note": "Research 0028 row 1, at the checker's comparison sites. The table row1_p holds two rows, p([a]) and p(list(a)): two rows under structural equality, which the table, a count and every other layer keep apart. The derivation binds X = list(a) and cites the leaf p([a]) for the body literal p(list(a)), so the checker's own equality calls the two rows equal. Refused at premise 0: a premise must be exactly the grounded body literal. The claim s(list(a)) is true here, but this derivation proves it from the other row.",
+      "claim": {
+        "pred": "row1_s",
+        "args": [
+          {
+            "tuple": [
+              {
+                "atom_str": "list"
+              },
+              {
+                "atom_str": "a"
+              }
+            ]
+          }
+        ]
+      },
+      "derivation": {
+        "nodes": [
+          {
+            "kind": "leaf",
+            "conclusion": {
+              "pred": "row1_p",
+              "args": [
+                {
+                  "tuple": [
+                    {
+                      "atom_str": "."
+                    },
+                    {
+                      "atom_str": "a"
+                    },
+                    {
+                      "atom_str": "[]"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "kind": "rule",
+            "conclusion": {
+              "pred": "row1_s",
+              "args": [
+                {
+                  "tuple": [
+                    {
+                      "atom_str": "list"
+                    },
+                    {
+                      "atom_str": "a"
+                    }
+                  ]
+                }
+              ]
+            },
+            "clause": "row1_rule",
+            "subst": {
+              "X": {
+                "tuple": [
+                  {
+                    "atom_str": "list"
+                  },
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              }
+            },
+            "premises": [
+              0
+            ]
+          }
+        ],
+        "root": 1
+      },
+      "outcome": {
+        "reject": "instantiation_mismatch"
+      }
+    },
+    {
+      "name": "row1_premise_citing_its_own_row_accepts",
+      "note": "Row 1's control: the same claim s(list(a)), proved from its own row p(list(a)). Accepted before and after #3022.",
+      "claim": {
+        "pred": "row1_s",
+        "args": [
+          {
+            "tuple": [
+              {
+                "atom_str": "list"
+              },
+              {
+                "atom_str": "a"
+              }
+            ]
+          }
+        ]
+      },
+      "derivation": {
+        "nodes": [
+          {
+            "kind": "leaf",
+            "conclusion": {
+              "pred": "row1_p",
+              "args": [
+                {
+                  "tuple": [
+                    {
+                      "atom_str": "list"
+                    },
+                    {
+                      "atom_str": "a"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "kind": "rule",
+            "conclusion": {
+              "pred": "row1_s",
+              "args": [
+                {
+                  "tuple": [
+                    {
+                      "atom_str": "list"
+                    },
+                    {
+                      "atom_str": "a"
+                    }
+                  ]
+                }
+              ]
+            },
+            "clause": "row1_rule",
+            "subst": {
+              "X": {
+                "tuple": [
+                  {
+                    "atom_str": "list"
+                  },
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              }
+            },
+            "premises": [
+              0
+            ]
+          }
+        ],
+        "root": 1
+      },
+      "outcome": "accept"
+    },
+    {
+      "name": "row2_relabeled_conclusion_over_a_negation_is_refused",
+      "note": "Research 0028 row 2. r(X) :- p(X), \\+ q(X), with p([a]) and the sealed q = {q(list(a))}. The derivation binds X = [a], discharges \\+ q([a]) (absent: the sealed table holds only q(list(a))), and writes the conclusion r(list(a)), a relabeling of the instantiated head r([a]). r(list(a)) is false in the exact model, which holds r([a]), and false in the list quotient, where q([a]) holds and the negation fails. Refused at the head: the conclusion must be exactly the instantiated head. A label-tolerant head comparison accepts it.",
+      "claim": {
+        "pred": "row2_r",
+        "args": [
+          {
+            "tuple": [
+              {
+                "atom_str": "list"
+              },
+              {
+                "atom_str": "a"
+              }
+            ]
+          }
+        ]
+      },
+      "derivation": {
+        "nodes": [
+          {
+            "kind": "leaf",
+            "conclusion": {
+              "pred": "row2_p",
+              "args": [
+                {
+                  "tuple": [
+                    {
+                      "atom_str": "."
+                    },
+                    {
+                      "atom_str": "a"
+                    },
+                    {
+                      "atom_str": "[]"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "kind": "rule",
+            "conclusion": {
+              "pred": "row2_r",
+              "args": [
+                {
+                  "tuple": [
+                    {
+                      "atom_str": "list"
+                    },
+                    {
+                      "atom_str": "a"
+                    }
+                  ]
+                }
+              ]
+            },
+            "clause": "row2_rule",
+            "subst": {
+              "X": {
+                "tuple": [
+                  {
+                    "atom_str": "."
+                  },
+                  {
+                    "atom_str": "a"
+                  },
+                  {
+                    "atom_str": "[]"
+                  }
+                ]
+              }
+            },
+            "premises": [
+              0,
+              {
+                "neg": {
+                  "atom": {
+                    "pred": "row2_q",
+                    "args": [
+                      {
+                        "tuple": [
+                          {
+                            "atom_str": "."
+                          },
+                          {
+                            "atom_str": "a"
+                          },
+                          {
+                            "atom_str": "[]"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "cert": 0,
+                  "nonmember": "direct_lookup"
+                }
+              }
+            ]
+          }
+        ],
+        "root": 1,
+        "closed_world": [
+          {
+            "scope": {
+              "level": 1,
+              "predicates": [
+                "row2_q"
+              ]
+            },
+            "domains": [
+              {
+                "type_tag": "cons",
+                "values": [
+                  {
+                    "tuple": [
+                      {
+                        "atom_str": "."
+                      },
+                      {
+                        "atom_str": "a"
+                      },
+                      {
+                        "atom_str": "[]"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type_tag": "flat",
+                "values": [
+                  {
+                    "tuple": [
+                      {
+                        "atom_str": "list"
+                      },
+                      {
+                        "atom_str": "a"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ],
+            "extensions": [
+              {
+                "pred": "row2_q",
+                "arity": 1,
+                "rows": [
+                  {
+                    "pred": "row2_q",
+                    "args": [
+                      {
+                        "tuple": [
+                          {
+                            "atom_str": "list"
+                          },
+                          {
+                            "atom_str": "a"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ],
+            "supports": [],
+            "limits_decl": {
+              "cert_facts": 1,
+              "domain_values": 2,
+              "support_edges": 0,
+              "rule_groundings": 1000,
+              "join_steps": 10000,
+              "cert_bytes": 4096
+            }
+          }
+        ]
+      },
+      "outcome": {
+        "reject": "instantiation_mismatch"
+      }
+    },
+    {
+      "name": "row2_exact_conclusion_over_a_negation_accepts",
+      "note": "Row 2's control: the same instance, concluding exactly its instantiated head r([a]). True in the exact model. Accepted before and after #3022.",
+      "claim": {
+        "pred": "row2_r",
+        "args": [
+          {
+            "tuple": [
+              {
+                "atom_str": "."
+              },
+              {
+                "atom_str": "a"
+              },
+              {
+                "atom_str": "[]"
+              }
+            ]
+          }
+        ]
+      },
+      "derivation": {
+        "nodes": [
+          {
+            "kind": "leaf",
+            "conclusion": {
+              "pred": "row2_p",
+              "args": [
+                {
+                  "tuple": [
+                    {
+                      "atom_str": "."
+                    },
+                    {
+                      "atom_str": "a"
+                    },
+                    {
+                      "atom_str": "[]"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "kind": "rule",
+            "conclusion": {
+              "pred": "row2_r",
+              "args": [
+                {
+                  "tuple": [
+                    {
+                      "atom_str": "."
+                    },
+                    {
+                      "atom_str": "a"
+                    },
+                    {
+                      "atom_str": "[]"
+                    }
+                  ]
+                }
+              ]
+            },
+            "clause": "row2_rule",
+            "subst": {
+              "X": {
+                "tuple": [
+                  {
+                    "atom_str": "."
+                  },
+                  {
+                    "atom_str": "a"
+                  },
+                  {
+                    "atom_str": "[]"
+                  }
+                ]
+              }
+            },
+            "premises": [
+              0,
+              {
+                "neg": {
+                  "atom": {
+                    "pred": "row2_q",
+                    "args": [
+                      {
+                        "tuple": [
+                          {
+                            "atom_str": "."
+                          },
+                          {
+                            "atom_str": "a"
+                          },
+                          {
+                            "atom_str": "[]"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "cert": 0,
+                  "nonmember": "direct_lookup"
+                }
+              }
+            ]
+          }
+        ],
+        "root": 1,
+        "closed_world": [
+          {
+            "scope": {
+              "level": 1,
+              "predicates": [
+                "row2_q"
+              ]
+            },
+            "domains": [
+              {
+                "type_tag": "cons",
+                "values": [
+                  {
+                    "tuple": [
+                      {
+                        "atom_str": "."
+                      },
+                      {
+                        "atom_str": "a"
+                      },
+                      {
+                        "atom_str": "[]"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type_tag": "flat",
+                "values": [
+                  {
+                    "tuple": [
+                      {
+                        "atom_str": "list"
+                      },
+                      {
+                        "atom_str": "a"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ],
+            "extensions": [
+              {
+                "pred": "row2_q",
+                "arity": 1,
+                "rows": [
+                  {
+                    "pred": "row2_q",
+                    "args": [
+                      {
+                        "tuple": [
+                          {
+                            "atom_str": "list"
+                          },
+                          {
+                            "atom_str": "a"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ],
+            "supports": [],
+            "limits_decl": {
+              "cert_facts": 1,
+              "domain_values": 2,
+              "support_edges": 0,
+              "rule_groundings": 1000,
+              "join_steps": 10000,
+              "cert_bytes": 4096
+            }
+          }
+        ]
+      },
+      "outcome": "accept"
+    },
+    {
+      "name": "root_claim_in_the_other_spelling_is_refused",
+      "note": "The root site. The derivation proves the leaf t([a]); the claim is t(list(a)), which is not in the exact model (the EDB holds only t([a])). The certified claim is exactly what the root concludes, so this is refused. A label-tolerant root comparison accepts it.",
+      "claim": {
+        "pred": "root_t",
+        "args": [
+          {
+            "tuple": [
+              {
+                "atom_str": "list"
+              },
+              {
+                "atom_str": "a"
+              }
+            ]
+          }
+        ]
+      },
+      "derivation": {
+        "nodes": [
+          {
+            "kind": "leaf",
+            "conclusion": {
+              "pred": "root_t",
+              "args": [
+                {
+                  "tuple": [
+                    {
+                      "atom_str": "."
+                    },
+                    {
+                      "atom_str": "a"
+                    },
+                    {
+                      "atom_str": "[]"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ],
+        "root": 0
+      },
+      "outcome": {
+        "reject": "root_conclusion_mismatch"
+      }
+    },
+    {
+      "name": "root_claim_in_its_own_spelling_accepts",
+      "note": "The root site's control: the claim t([a]) is what the root concludes. Accepted before and after #3022.",
+      "claim": {
+        "pred": "root_t",
+        "args": [
+          {
+            "tuple": [
+              {
+                "atom_str": "."
+              },
+              {
+                "atom_str": "a"
+              },
+              {
+                "atom_str": "[]"
+              }
+            ]
+          }
+        ]
+      },
+      "derivation": {
+        "nodes": [
+          {
+            "kind": "leaf",
+            "conclusion": {
+              "pred": "root_t",
+              "args": [
+                {
+                  "tuple": [
+                    {
+                      "atom_str": "."
+                    },
+                    {
+                      "atom_str": "a"
+                    },
+                    {
+                      "atom_str": "[]"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ],
+        "root": 0
+      },
+      "outcome": "accept"
+    }
+  ]
+}

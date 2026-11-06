@@ -1,0 +1,670 @@
+{
+  "vector": "exact_answer_set",
+  "schema_version": 1,
+  "note": "#3022 (research 0028 rows 1, 3, 4, 5 and 6; seat:caa's ruling of 2026-09-26): the completeness gate's G4 is exact. The emitted answers must be exactly the sealed rows that are instances of the goal, where an instance is one binding of the goal's variables that makes the goal STRUCTURALLY equal to the row (a repeated variable binds one value), and two answers are one answer exactly when they are structurally equal. So G4 agrees with the sealed table, a count over it, negation and every engine store, which all compare structurally. Each case gives the goal, the sealed rows of the goal's predicate (the last certificate's table; G2 and G3 are not exercised here, so no certificate is carried), the emitted answers' claims, and the verdict: accept, or the gate's G4 reject tag completeness_set_mismatch together with `mismatch`, the contract's structured result: {extra: literal} or {missing: literal}. #3023 (research 0028 A16, seat:caa's ruling): G4 is the contract's check_answer_set (rs) / CheckAnswerSet (go) / checkAnswerSet (ts), and its precedence is normative: the first extra in claim order, otherwise the first missing row in ground_key order. Hand-authored from design 0008 section 1.4.4 and research 0028's measured rows; no case was captured from a run. Every replayer (contract/rs/tests/exact_answer_set_vectors.rs, contract/go/exact_answer_set_vectors_test.go, contract/ts/test/exact_answer_set_vectors.test.ts) applies every case, counts them against this list, and runs its own core's contract G4. Terms use check.json's notation; `[a]` is the cons spelling .(a, []), and list(a) the flat one.",
+  "cases": [
+    {
+      "name": "control_the_sealed_set_emitted_accepts",
+      "note": "goal g(X), sealed {g([a])}, emitted {g([a])}: the emitted answers are exactly the sealed rows matching the goal. Accepted before and after #3022.",
+      "goal": {
+        "pred": "g",
+        "args": [
+          {
+            "var": "X"
+          }
+        ]
+      },
+      "sealed": [
+        {
+          "pred": "g",
+          "args": [
+            {
+              "tuple": [
+                {
+                  "atom_str": "."
+                },
+                {
+                  "atom_str": "a"
+                },
+                {
+                  "atom_str": "[]"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "emitted": [
+        {
+          "pred": "g",
+          "args": [
+            {
+              "tuple": [
+                {
+                  "atom_str": "."
+                },
+                {
+                  "atom_str": "a"
+                },
+                {
+                  "atom_str": "[]"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "outcome": "accept"
+    },
+    {
+      "name": "row1_one_spelling_emitted_of_two_sealed_rows_is_refused",
+      "note": "Research 0028 row 1. The sealed table holds two rows, p([a]) and p(list(a)); a count over it certifies 2. Emitting only p([a]) leaves the sealed row p(list(a)) unemitted, so the set is refused. A gate that keys rows by their list normal form gives the two rows one key, and accepts one answer beside a certified count of two.",
+      "goal": {
+        "pred": "p",
+        "args": [
+          {
+            "var": "X"
+          }
+        ]
+      },
+      "sealed": [
+        {
+          "pred": "p",
+          "args": [
+            {
+              "tuple": [
+                {
+                  "atom_str": "."
+                },
+                {
+                  "atom_str": "a"
+                },
+                {
+                  "atom_str": "[]"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "pred": "p",
+          "args": [
+            {
+              "tuple": [
+                {
+                  "atom_str": "list"
+                },
+                {
+                  "atom_str": "a"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "emitted": [
+        {
+          "pred": "p",
+          "args": [
+            {
+              "tuple": [
+                {
+                  "atom_str": "."
+                },
+                {
+                  "atom_str": "a"
+                },
+                {
+                  "atom_str": "[]"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "outcome": {
+        "reject": "completeness_set_mismatch",
+        "mismatch": {
+          "missing": {
+            "pred": "p",
+            "args": [
+              {
+                "tuple": [
+                  {
+                    "atom_str": "list"
+                  },
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "row1_both_sealed_rows_emitted_accepts",
+      "note": "Row 1's control: both sealed rows emitted. Accepted before and after #3022.",
+      "goal": {
+        "pred": "p",
+        "args": [
+          {
+            "var": "X"
+          }
+        ]
+      },
+      "sealed": [
+        {
+          "pred": "p",
+          "args": [
+            {
+              "tuple": [
+                {
+                  "atom_str": "."
+                },
+                {
+                  "atom_str": "a"
+                },
+                {
+                  "atom_str": "[]"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "pred": "p",
+          "args": [
+            {
+              "tuple": [
+                {
+                  "atom_str": "list"
+                },
+                {
+                  "atom_str": "a"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "emitted": [
+        {
+          "pred": "p",
+          "args": [
+            {
+              "tuple": [
+                {
+                  "atom_str": "."
+                },
+                {
+                  "atom_str": "a"
+                },
+                {
+                  "atom_str": "[]"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "pred": "p",
+          "args": [
+            {
+              "tuple": [
+                {
+                  "atom_str": "list"
+                },
+                {
+                  "atom_str": "a"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "outcome": "accept"
+    },
+    {
+      "name": "row3_a_flat_ground_goal_has_no_cons_instance_accepts_the_empty_set",
+      "note": "Research 0028 row 3. goal r(list(a)), sealed row r([a]). The row is not an instance of the goal, so the complete answer set is empty, which is what an engine unifying structurally emits. A gate matching under the list normal form counts the row as an instance and refuses this honest run.",
+      "goal": {
+        "pred": "r",
+        "args": [
+          {
+            "tuple": [
+              {
+                "atom_str": "list"
+              },
+              {
+                "atom_str": "a"
+              }
+            ]
+          }
+        ]
+      },
+      "sealed": [
+        {
+          "pred": "r",
+          "args": [
+            {
+              "tuple": [
+                {
+                  "atom_str": "."
+                },
+                {
+                  "atom_str": "a"
+                },
+                {
+                  "atom_str": "[]"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "emitted": [],
+      "outcome": "accept"
+    },
+    {
+      "name": "row3_the_cons_row_emitted_for_a_flat_ground_goal_is_refused",
+      "note": "Row 3's other side: emitting r([a]) for the goal r(list(a)) emits an answer that is not an instance of the goal. Refused; a gate matching under the list normal form accepts it.",
+      "goal": {
+        "pred": "r",
+        "args": [
+          {
+            "tuple": [
+              {
+                "atom_str": "list"
+              },
+              {
+                "atom_str": "a"
+              }
+            ]
+          }
+        ]
+      },
+      "sealed": [
+        {
+          "pred": "r",
+          "args": [
+            {
+              "tuple": [
+                {
+                  "atom_str": "."
+                },
+                {
+                  "atom_str": "a"
+                },
+                {
+                  "atom_str": "[]"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "emitted": [
+        {
+          "pred": "r",
+          "args": [
+            {
+              "tuple": [
+                {
+                  "atom_str": "."
+                },
+                {
+                  "atom_str": "a"
+                },
+                {
+                  "atom_str": "[]"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "outcome": {
+        "reject": "completeness_set_mismatch",
+        "mismatch": {
+          "extra": {
+            "pred": "r",
+            "args": [
+              {
+                "tuple": [
+                  {
+                    "atom_str": "."
+                  },
+                  {
+                    "atom_str": "a"
+                  },
+                  {
+                    "atom_str": "[]"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "row4_an_open_cons_pattern_matches_its_cons_row_accepts",
+      "note": "Research 0028 row 4. goal r([X]), an open cons pattern, sealed row r([a]). The row is an instance (X = a), and an engine unifying structurally emits it. A gate that rewrites the row to r(list(a)) while the open pattern stays cons finds no instance, and refuses this honest run.",
+      "goal": {
+        "pred": "r",
+        "args": [
+          {
+            "tuple": [
+              {
+                "atom_str": "."
+              },
+              {
+                "var": "X"
+              },
+              {
+                "atom_str": "[]"
+              }
+            ]
+          }
+        ]
+      },
+      "sealed": [
+        {
+          "pred": "r",
+          "args": [
+            {
+              "tuple": [
+                {
+                  "atom_str": "."
+                },
+                {
+                  "atom_str": "a"
+                },
+                {
+                  "atom_str": "[]"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "emitted": [
+        {
+          "pred": "r",
+          "args": [
+            {
+              "tuple": [
+                {
+                  "atom_str": "."
+                },
+                {
+                  "atom_str": "a"
+                },
+                {
+                  "atom_str": "[]"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "outcome": "accept"
+    },
+    {
+      "name": "row5_an_open_flat_pattern_has_no_cons_instance_accepts_the_empty_set",
+      "note": "Research 0028 row 5. goal r(list(X)), an open flat pattern, sealed row r([a]). The row is not an instance, so the complete answer set is empty. A gate that rewrites the row to r(list(a)) finds an instance, and refuses this honest run.",
+      "goal": {
+        "pred": "r",
+        "args": [
+          {
+            "tuple": [
+              {
+                "atom_str": "list"
+              },
+              {
+                "var": "X"
+              }
+            ]
+          }
+        ]
+      },
+      "sealed": [
+        {
+          "pred": "r",
+          "args": [
+            {
+              "tuple": [
+                {
+                  "atom_str": "."
+                },
+                {
+                  "atom_str": "a"
+                },
+                {
+                  "atom_str": "[]"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "emitted": [],
+      "outcome": "accept"
+    },
+    {
+      "name": "row6_a_repeated_variable_does_not_join_two_spellings_accepts_the_empty_set",
+      "note": "Research 0028 row 6. goal p(X, X), sealed row p([a], list(a)). The two arguments are different values, so the row is not an instance, and the complete answer set is empty. A gate comparing under the list normal form binds X once for both, and refuses this honest run.",
+      "goal": {
+        "pred": "p",
+        "args": [
+          {
+            "var": "X"
+          },
+          {
+            "var": "X"
+          }
+        ]
+      },
+      "sealed": [
+        {
+          "pred": "p",
+          "args": [
+            {
+              "tuple": [
+                {
+                  "atom_str": "."
+                },
+                {
+                  "atom_str": "a"
+                },
+                {
+                  "atom_str": "[]"
+                }
+              ]
+            },
+            {
+              "tuple": [
+                {
+                  "atom_str": "list"
+                },
+                {
+                  "atom_str": "a"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "emitted": [],
+      "outcome": "accept"
+    },
+    {
+      "name": "precedence_an_extra_is_reported_before_a_missing_row",
+      "note": "#3023 (seat:caa's ruling): the precedence is normative. goal q(X), sealed {q(a), q(b)}, emitted {q(a), q(c)}. Both an extra (q(c)) and a missing row (q(b)) exist; G4 reports the extra first.",
+      "goal": {
+        "pred": "q",
+        "args": [
+          {
+            "var": "X"
+          }
+        ]
+      },
+      "sealed": [
+        {
+          "pred": "q",
+          "args": [
+            {
+              "atom_str": "a"
+            }
+          ]
+        },
+        {
+          "pred": "q",
+          "args": [
+            {
+              "atom_str": "b"
+            }
+          ]
+        }
+      ],
+      "emitted": [
+        {
+          "pred": "q",
+          "args": [
+            {
+              "atom_str": "a"
+            }
+          ]
+        },
+        {
+          "pred": "q",
+          "args": [
+            {
+              "atom_str": "c"
+            }
+          ]
+        }
+      ],
+      "outcome": {
+        "reject": "completeness_set_mismatch",
+        "mismatch": {
+          "extra": {
+            "pred": "q",
+            "args": [
+              {
+                "atom_str": "c"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "precedence_the_first_extra_is_in_claim_order",
+      "note": "#3023: among extras, the first in claim ORDER, not key order. goal q(X), sealed {q(a)}, emitted {q(a), q(z), q(y)}: q(z) is claimed before q(y), though q(y) sorts first by its key.",
+      "goal": {
+        "pred": "q",
+        "args": [
+          {
+            "var": "X"
+          }
+        ]
+      },
+      "sealed": [
+        {
+          "pred": "q",
+          "args": [
+            {
+              "atom_str": "a"
+            }
+          ]
+        }
+      ],
+      "emitted": [
+        {
+          "pred": "q",
+          "args": [
+            {
+              "atom_str": "a"
+            }
+          ]
+        },
+        {
+          "pred": "q",
+          "args": [
+            {
+              "atom_str": "z"
+            }
+          ]
+        },
+        {
+          "pred": "q",
+          "args": [
+            {
+              "atom_str": "y"
+            }
+          ]
+        }
+      ],
+      "outcome": {
+        "reject": "completeness_set_mismatch",
+        "mismatch": {
+          "extra": {
+            "pred": "q",
+            "args": [
+              {
+                "atom_str": "z"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "precedence_the_first_missing_row_is_in_key_order",
+      "note": "#3023: among missing rows, the first in ground_key order, not the sealed table's listing order. goal q(X), sealed listed as {q(b), q(a)}, emitted {}: q(a) sorts first by its key (atom byte 0x61 before 0x62).",
+      "goal": {
+        "pred": "q",
+        "args": [
+          {
+            "var": "X"
+          }
+        ]
+      },
+      "sealed": [
+        {
+          "pred": "q",
+          "args": [
+            {
+              "atom_str": "b"
+            }
+          ]
+        },
+        {
+          "pred": "q",
+          "args": [
+            {
+              "atom_str": "a"
+            }
+          ]
+        }
+      ],
+      "emitted": [],
+      "outcome": {
+        "reject": "completeness_set_mismatch",
+        "mismatch": {
+          "missing": {
+            "pred": "q",
+            "args": [
+              {
+                "atom_str": "a"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

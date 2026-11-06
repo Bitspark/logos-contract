@@ -1,0 +1,698 @@
+{
+  "seam": "logos TermTheory decision vector v1 (UNFROZEN v1)",
+  "note": "Language-AGNOSTIC tri-core THEORY-DECISION agreement vectors for the term-algebra TermTheory (logos-core/term-theory@1.1.0, ADR 0016 Shelf A0). Each entry is a GROUND term atom (predicate + args) together with the PINNED Theory.decide outcome. The decision oracle is the search-side builtins (builtin_atom/atomic/compound/is_list/number + builtin_order_lt/gt/le/ge + ==/\\== in core/rs/src/builtins.rs, sharing the contract's compare_values standard order); contract/{rs,go,ts} TermTheory.decide MUST reproduce every outcome byte-for-byte (the §7 dual-conformance law). Args are encoded as: {\"atom\": \"<utf8>\"} = a bare Atom of those UTF-8 bytes; {\"int\": N} = the frozen ontos-data int embedding Tuple(Atom(\"int\"), Atom(payload)); {\"decimal\": \"<d.dddd>\"} = the frozen ontos-data decimal embedding Tuple(Atom(\"decimal\"), int(mantissa), int(exponent)) of that decimal literal (#331); {\"tuple\": [..]} = a raw compound Tuple of the encoded children. A proper list [a,b] is the cons chain Tuple(Atom(\".\"), a, Tuple(Atom(\".\"), b, Atom(\"[]\"))); the empty list is Atom(\"[]\"). The standard order is the GROUND restriction Atom < Tuple (a number is the int/decimal embedding -> a Tuple, so it ranks with compounds, NOT before atoms), ties by atom bytes / tuple arity-then-elementwise. number/1 recognizes the int OR decimal embedding, NOT a number-shaped atom. Outcome is \"holds\" or {\"fails\": \"<code>\"} where the code is one of the pinned host-band sub-codes term_does_not_hold | term_bad_arity | term_unknown_predicate. owns: atom, atomic, compound, is_list, number, ==, \\==, @<, @>, @=<, @>=, =.. -- and, since 1.1.0 (#1611, seat:caa's ruling), the unification relations = and \\= over GROUND terms (syntactic unification of two ground terms IS structural equality, so `t = u` holds iff compare_values(t, u) is Equal and `t \\= u` iff it is not) and the control constants true (holds), fail and false (never hold), all three arity 0. Those five are served by the rs engine's Stage-A registry but dispatched only behind theory.owns, and the checker's Builtin arm accepts a node only if a bound theory owns its predicate -- so without an owner `X = a` in a body was a SILENT empty answer that no core could certify. The version bump is the identity moving with the owned set; every profile digest folding it moves too.",
+  "identity": {
+    "id": "logos-core/term-theory",
+    "version": "1.1.0",
+    "config_digest_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "owns": {
+    "owned": ["atom", "atomic", "compound", "is_list", "number", "==", "\\==", "@<", "@>", "@=<", "@>=", "=..", "=", "\\=", "true", "fail", "false"],
+    "not_owned": ["is", "<", ">", ">=", "=<", "=:=", "=\\=", "contains", "starts_with", "ends_with", "var", "nonvar", "functor", "copy_term", "\\+", "!", "call"]
+  },
+  "decisions": [
+    {
+      "name": "atom_bare_atom_holds",
+      "note": "a bare Atom is an atom",
+      "pred": "atom",
+      "args": [{ "atom": "hello" }],
+      "outcome": "holds"
+    },
+    {
+      "name": "atom_number_spelling_atom_holds",
+      "note": "a number-SHAPED bare atom is still an Atom (atom/1 is syntactic; only number/1 is the embedding test)",
+      "pred": "atom",
+      "args": [{ "atom": "42" }],
+      "outcome": "holds"
+    },
+    {
+      "name": "atom_compound_fails",
+      "note": "a compound Tuple is not an atom",
+      "pred": "atom",
+      "args": [{ "tuple": [{ "atom": "f" }, { "atom": "x" }] }],
+      "outcome": { "fails": "term_does_not_hold" }
+    },
+    {
+      "name": "atom_int_embedding_fails",
+      "note": "the int embedding is a Tuple, so atom/1 fails (it is a number, not an atom)",
+      "pred": "atom",
+      "args": [{ "int": 42 }],
+      "outcome": { "fails": "term_does_not_hold" }
+    },
+    {
+      "name": "atom_empty_list_holds",
+      "note": "the nil [] is the bare Atom \"[]\"",
+      "pred": "atom",
+      "args": [{ "atom": "[]" }],
+      "outcome": "holds"
+    },
+    {
+      "name": "atom_arity2_bad_arity",
+      "note": "atom/2 is not a recognizer",
+      "pred": "atom",
+      "args": [{ "atom": "a" }, { "atom": "b" }],
+      "outcome": { "fails": "term_bad_arity" }
+    },
+    {
+      "name": "atomic_bare_atom_holds",
+      "note": "atomic coincides with atom in the ground term world",
+      "pred": "atomic",
+      "args": [{ "atom": "hello" }],
+      "outcome": "holds"
+    },
+    {
+      "name": "atomic_int_embedding_fails",
+      "note": "the int embedding is a Tuple -> not atomic in this model (a number is a compound shape)",
+      "pred": "atomic",
+      "args": [{ "int": 7 }],
+      "outcome": { "fails": "term_does_not_hold" }
+    },
+    {
+      "name": "atomic_compound_fails",
+      "note": "a compound is not atomic",
+      "pred": "atomic",
+      "args": [{ "tuple": [{ "atom": "f" }, { "atom": "x" }] }],
+      "outcome": { "fails": "term_does_not_hold" }
+    },
+    {
+      "name": "atomic_arity0_bad_arity",
+      "note": "atomic/0 is not a recognizer",
+      "pred": "atomic",
+      "args": [],
+      "outcome": { "fails": "term_bad_arity" }
+    },
+    {
+      "name": "compound_tuple_holds",
+      "note": "a labeled compound Tuple is compound",
+      "pred": "compound",
+      "args": [{ "tuple": [{ "atom": "f" }, { "atom": "x" }] }],
+      "outcome": "holds"
+    },
+    {
+      "name": "compound_int_embedding_holds",
+      "note": "the int embedding is structurally a Tuple, so compound/1 HOLDS on it",
+      "pred": "compound",
+      "args": [{ "int": 99 }],
+      "outcome": "holds"
+    },
+    {
+      "name": "compound_cons_cell_holds",
+      "note": "a cons cell [a|b] is a 3-tuple -> compound",
+      "pred": "compound",
+      "args": [{ "tuple": [{ "atom": "." }, { "atom": "a" }, { "atom": "b" }] }],
+      "outcome": "holds"
+    },
+    {
+      "name": "compound_bare_atom_fails",
+      "note": "a bare atom is not compound",
+      "pred": "compound",
+      "args": [{ "atom": "a" }],
+      "outcome": { "fails": "term_does_not_hold" }
+    },
+    {
+      "name": "compound_empty_list_fails",
+      "note": "[] is a bare atom, not compound",
+      "pred": "compound",
+      "args": [{ "atom": "[]" }],
+      "outcome": { "fails": "term_does_not_hold" }
+    },
+    {
+      "name": "compound_arity3_bad_arity",
+      "note": "compound/3 is not a recognizer",
+      "pred": "compound",
+      "args": [{ "atom": "a" }, { "atom": "b" }, { "atom": "c" }],
+      "outcome": { "fails": "term_bad_arity" }
+    },
+    {
+      "name": "is_list_empty_holds",
+      "note": "[] is a proper list",
+      "pred": "is_list",
+      "args": [{ "atom": "[]" }],
+      "outcome": "holds"
+    },
+    {
+      "name": "is_list_two_elements_holds",
+      "note": "[a, b] = .(a, .(b, [])) is a proper list",
+      "pred": "is_list",
+      "args": [
+        {
+          "tuple": [
+            { "atom": "." },
+            { "atom": "a" },
+            { "tuple": [{ "atom": "." }, { "atom": "b" }, { "atom": "[]" }] }
+          ]
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "is_list_one_element_holds",
+      "note": "[a] = .(a, []) is a proper list",
+      "pred": "is_list",
+      "args": [{ "tuple": [{ "atom": "." }, { "atom": "a" }, { "atom": "[]" }] }],
+      "outcome": "holds"
+    },
+    {
+      "name": "is_list_improper_tail_fails",
+      "note": "[a|b] = .(a, b) ends in a non-[] atom -> improper, not a proper list",
+      "pred": "is_list",
+      "args": [{ "tuple": [{ "atom": "." }, { "atom": "a" }, { "atom": "b" }] }],
+      "outcome": { "fails": "term_does_not_hold" }
+    },
+    {
+      "name": "is_list_bare_atom_fails",
+      "note": "a bare atom (other than []) is not a list",
+      "pred": "is_list",
+      "args": [{ "atom": "a" }],
+      "outcome": { "fails": "term_does_not_hold" }
+    },
+    {
+      "name": "is_list_non_cons_tuple_fails",
+      "note": "f(x) is a tuple but not a cons cell -> not a list",
+      "pred": "is_list",
+      "args": [{ "tuple": [{ "atom": "f" }, { "atom": "x" }] }],
+      "outcome": { "fails": "term_does_not_hold" }
+    },
+    {
+      "name": "is_list_list_of_ints_holds",
+      "note": "[1, 2] of int embeddings is still a proper list (elements may be any ground term)",
+      "pred": "is_list",
+      "args": [
+        {
+          "tuple": [
+            { "atom": "." },
+            { "int": 1 },
+            { "tuple": [{ "atom": "." }, { "int": 2 }, { "atom": "[]" }] }
+          ]
+        }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "is_list_arity2_bad_arity",
+      "note": "is_list/2 is not a recognizer",
+      "pred": "is_list",
+      "args": [{ "atom": "[]" }, { "atom": "[]" }],
+      "outcome": { "fails": "term_bad_arity" }
+    },
+    {
+      "name": "number_int_zero_holds",
+      "note": "the int embedding of 0 is a number",
+      "pred": "number",
+      "args": [{ "int": 0 }],
+      "outcome": "holds"
+    },
+    {
+      "name": "number_int_positive_holds",
+      "note": "the int embedding of 42 is a number",
+      "pred": "number",
+      "args": [{ "int": 42 }],
+      "outcome": "holds"
+    },
+    {
+      "name": "number_int_negative_holds",
+      "note": "the int embedding of -5 is a number",
+      "pred": "number",
+      "args": [{ "int": -5 }],
+      "outcome": "holds"
+    },
+    {
+      "name": "number_decimal_embedding_holds",
+      "note": "#331 the decimal embedding of 3.14 is a number (number/1 recognizes int AND decimal embeddings)",
+      "pred": "number",
+      "args": [{ "decimal": "3.14" }],
+      "outcome": "holds"
+    },
+    {
+      "name": "number_bare_atom_fails",
+      "note": "a number-SHAPED bare atom is NOT a number (only the genuine int embedding is)",
+      "pred": "number",
+      "args": [{ "atom": "42" }],
+      "outcome": { "fails": "term_does_not_hold" }
+    },
+    {
+      "name": "number_decimal_atom_fails",
+      "note": "a decimal-shaped atom is not the int embedding -> not a number",
+      "pred": "number",
+      "args": [{ "atom": "3.14" }],
+      "outcome": { "fails": "term_does_not_hold" }
+    },
+    {
+      "name": "number_compound_fails",
+      "note": "a non-int compound is not a number",
+      "pred": "number",
+      "args": [{ "tuple": [{ "atom": "f" }, { "atom": "a" }] }],
+      "outcome": { "fails": "term_does_not_hold" }
+    },
+    {
+      "name": "number_non_int_label_tuple_fails",
+      "note": "a Tuple(Atom(\"float\"), ...) is not the int embedding",
+      "pred": "number",
+      "args": [{ "tuple": [{ "atom": "float" }, { "atom": "a" }] }],
+      "outcome": { "fails": "term_does_not_hold" }
+    },
+    {
+      "name": "number_arity0_bad_arity",
+      "note": "number/0 is not a recognizer",
+      "pred": "number",
+      "args": [],
+      "outcome": { "fails": "term_bad_arity" }
+    },
+    {
+      "name": "eq_identical_atoms_holds",
+      "note": "a == a",
+      "pred": "==",
+      "args": [{ "atom": "a" }, { "atom": "a" }],
+      "outcome": "holds"
+    },
+    {
+      "name": "eq_different_atoms_fails",
+      "note": "a == b fails",
+      "pred": "==",
+      "args": [{ "atom": "a" }, { "atom": "b" }],
+      "outcome": { "fails": "term_does_not_hold" }
+    },
+    {
+      "name": "eq_identical_compounds_holds",
+      "note": "f(a) == f(a)",
+      "pred": "==",
+      "args": [
+        { "tuple": [{ "atom": "f" }, { "atom": "a" }] },
+        { "tuple": [{ "atom": "f" }, { "atom": "a" }] }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "eq_identical_ints_holds",
+      "note": "the int embedding is canonical, so 7 == 7 structurally",
+      "pred": "==",
+      "args": [{ "int": 7 }, { "int": 7 }],
+      "outcome": "holds"
+    },
+    {
+      "name": "eq_atom_vs_compound_fails",
+      "note": "a == f(a) fails (different kinds)",
+      "pred": "==",
+      "args": [{ "atom": "a" }, { "tuple": [{ "atom": "f" }, { "atom": "a" }] }],
+      "outcome": { "fails": "term_does_not_hold" }
+    },
+    {
+      "name": "eq_arity1_bad_arity",
+      "note": "==/1 is not the comparison",
+      "pred": "==",
+      "args": [{ "atom": "a" }],
+      "outcome": { "fails": "term_bad_arity" }
+    },
+    {
+      "name": "neq_different_atoms_holds",
+      "note": "a \\== b",
+      "pred": "\\==",
+      "args": [{ "atom": "a" }, { "atom": "b" }],
+      "outcome": "holds"
+    },
+    {
+      "name": "neq_identical_atoms_fails",
+      "note": "a \\== a fails",
+      "pred": "\\==",
+      "args": [{ "atom": "a" }, { "atom": "a" }],
+      "outcome": { "fails": "term_does_not_hold" }
+    },
+    {
+      "name": "neq_atom_vs_compound_holds",
+      "note": "a \\== f(a) holds (different terms)",
+      "pred": "\\==",
+      "args": [{ "atom": "a" }, { "tuple": [{ "atom": "f" }, { "atom": "a" }] }],
+      "outcome": "holds"
+    },
+    {
+      "name": "neq_arity3_bad_arity",
+      "note": "\\==/3 is not the comparison",
+      "pred": "\\==",
+      "args": [{ "atom": "a" }, { "atom": "b" }, { "atom": "c" }],
+      "outcome": { "fails": "term_bad_arity" }
+    },
+    {
+      "name": "lt_atoms_by_bytes_holds",
+      "note": "a @< b (atom bytes order)",
+      "pred": "@<",
+      "args": [{ "atom": "a" }, { "atom": "b" }],
+      "outcome": "holds"
+    },
+    {
+      "name": "lt_atoms_reverse_fails",
+      "note": "b @< a fails",
+      "pred": "@<",
+      "args": [{ "atom": "b" }, { "atom": "a" }],
+      "outcome": { "fails": "term_does_not_hold" }
+    },
+    {
+      "name": "lt_atom_prefix_shorter_first_holds",
+      "note": "shorter atom that is a prefix sorts first: ab @< abc",
+      "pred": "@<",
+      "args": [{ "atom": "ab" }, { "atom": "abc" }],
+      "outcome": "holds"
+    },
+    {
+      "name": "lt_equal_atoms_fails",
+      "note": "a @< a fails (strict)",
+      "pred": "@<",
+      "args": [{ "atom": "a" }, { "atom": "a" }],
+      "outcome": { "fails": "term_does_not_hold" }
+    },
+    {
+      "name": "lt_atom_before_compound_holds",
+      "note": "cross-rank: Atom @< Tuple",
+      "pred": "@<",
+      "args": [{ "atom": "z" }, { "tuple": [{ "atom": "f" }, { "atom": "a" }] }],
+      "outcome": "holds"
+    },
+    {
+      "name": "lt_atom_before_int_holds",
+      "note": "cross-rank: an Atom @< a number (the int embedding is a Tuple, so it sorts AFTER any atom)",
+      "pred": "@<",
+      "args": [{ "atom": "zzz" }, { "int": 0 }],
+      "outcome": "holds"
+    },
+    {
+      "name": "lt_compound_after_atom_fails",
+      "note": "f(a) @< z fails (Tuple is not before an Atom)",
+      "pred": "@<",
+      "args": [{ "tuple": [{ "atom": "f" }, { "atom": "a" }] }, { "atom": "z" }],
+      "outcome": { "fails": "term_does_not_hold" }
+    },
+    {
+      "name": "lt_tuples_by_arity_holds",
+      "note": "lower arity sorts first: f(z) @< f(a, a)",
+      "pred": "@<",
+      "args": [
+        { "tuple": [{ "atom": "f" }, { "atom": "z" }] },
+        { "tuple": [{ "atom": "f" }, { "atom": "a" }, { "atom": "a" }] }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "lt_tuples_same_arity_by_functor_holds",
+      "note": "same arity -> element-wise; functor head compared first: f(a) @< g(a)",
+      "pred": "@<",
+      "args": [
+        { "tuple": [{ "atom": "f" }, { "atom": "a" }] },
+        { "tuple": [{ "atom": "g" }, { "atom": "a" }] }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "lt_tuples_same_functor_by_arg_holds",
+      "note": "same functor/arity -> compare args: f(a) @< f(b)",
+      "pred": "@<",
+      "args": [
+        { "tuple": [{ "atom": "f" }, { "atom": "a" }] },
+        { "tuple": [{ "atom": "f" }, { "atom": "b" }] }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "lt_arity1_bad_arity",
+      "note": "@</1 is not the comparison",
+      "pred": "@<",
+      "args": [{ "atom": "a" }],
+      "outcome": { "fails": "term_bad_arity" }
+    },
+    {
+      "name": "gt_atoms_holds",
+      "note": "b @> a",
+      "pred": "@>",
+      "args": [{ "atom": "b" }, { "atom": "a" }],
+      "outcome": "holds"
+    },
+    {
+      "name": "gt_atoms_reverse_fails",
+      "note": "a @> b fails",
+      "pred": "@>",
+      "args": [{ "atom": "a" }, { "atom": "b" }],
+      "outcome": { "fails": "term_does_not_hold" }
+    },
+    {
+      "name": "gt_compound_after_atom_holds",
+      "note": "f(a) @> z (Tuple after Atom)",
+      "pred": "@>",
+      "args": [{ "tuple": [{ "atom": "f" }, { "atom": "a" }] }, { "atom": "z" }],
+      "outcome": "holds"
+    },
+    {
+      "name": "gt_equal_fails",
+      "note": "a @> a fails (strict)",
+      "pred": "@>",
+      "args": [{ "atom": "a" }, { "atom": "a" }],
+      "outcome": { "fails": "term_does_not_hold" }
+    },
+    {
+      "name": "gt_arity2_holds_bad_arity_check",
+      "note": "@>/3 is not the comparison",
+      "pred": "@>",
+      "args": [{ "atom": "a" }, { "atom": "b" }, { "atom": "c" }],
+      "outcome": { "fails": "term_bad_arity" }
+    },
+    {
+      "name": "le_less_holds",
+      "note": "a @=< b (strictly less)",
+      "pred": "@=<",
+      "args": [{ "atom": "a" }, { "atom": "b" }],
+      "outcome": "holds"
+    },
+    {
+      "name": "le_equal_holds",
+      "note": "a @=< a (reflexive)",
+      "pred": "@=<",
+      "args": [{ "atom": "a" }, { "atom": "a" }],
+      "outcome": "holds"
+    },
+    {
+      "name": "le_greater_fails",
+      "note": "b @=< a fails",
+      "pred": "@=<",
+      "args": [{ "atom": "b" }, { "atom": "a" }],
+      "outcome": { "fails": "term_does_not_hold" }
+    },
+    {
+      "name": "le_equal_compounds_holds",
+      "note": "f(a) @=< f(a) (reflexive on compounds)",
+      "pred": "@=<",
+      "args": [
+        { "tuple": [{ "atom": "f" }, { "atom": "a" }] },
+        { "tuple": [{ "atom": "f" }, { "atom": "a" }] }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "le_arity1_bad_arity",
+      "note": "@=</1 is not the comparison",
+      "pred": "@=<",
+      "args": [{ "atom": "a" }],
+      "outcome": { "fails": "term_bad_arity" }
+    },
+    {
+      "name": "ge_greater_holds",
+      "note": "b @>= a",
+      "pred": "@>=",
+      "args": [{ "atom": "b" }, { "atom": "a" }],
+      "outcome": "holds"
+    },
+    {
+      "name": "ge_equal_holds",
+      "note": "a @>= a (reflexive)",
+      "pred": "@>=",
+      "args": [{ "atom": "a" }, { "atom": "a" }],
+      "outcome": "holds"
+    },
+    {
+      "name": "ge_less_fails",
+      "note": "a @>= b fails",
+      "pred": "@>=",
+      "args": [{ "atom": "a" }, { "atom": "b" }],
+      "outcome": { "fails": "term_does_not_hold" }
+    },
+    {
+      "name": "ge_int_after_atom_holds",
+      "note": "a number @>= an atom (Tuple-ranked number is after any atom)",
+      "pred": "@>=",
+      "args": [{ "int": 0 }, { "atom": "zzz" }],
+      "outcome": "holds"
+    },
+    {
+      "name": "ge_arity0_bad_arity",
+      "note": "@>=/0 is not the comparison",
+      "pred": "@>=",
+      "args": [],
+      "outcome": { "fails": "term_bad_arity" }
+    },
+    {
+      "name": "univ_compound_holds",
+      "note": "=.. decomposes a labeled compound Tuple[Atom(f),a,b] into the cons-list [f,a,b]",
+      "pred": "=..",
+      "args": [
+        { "tuple": [{ "atom": "f" }, { "atom": "a" }, { "atom": "b" }] },
+        { "tuple": [{ "atom": "." }, { "atom": "f" }, { "tuple": [{ "atom": "." }, { "atom": "a" }, { "tuple": [{ "atom": "." }, { "atom": "b" }, { "atom": "[]" }] }] }] }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "univ_atom_singleton_holds",
+      "note": "=.. relates a bare Atom(x) to the arity-0 singleton list [x]",
+      "pred": "=..",
+      "args": [
+        { "atom": "x" },
+        { "tuple": [{ "atom": "." }, { "atom": "x" }, { "atom": "[]" }] }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "univ_wrong_functor_mismatch",
+      "note": "the proposed list names the wrong functor (g, not f) — the univ relation does not hold",
+      "pred": "=..",
+      "args": [
+        { "tuple": [{ "atom": "f" }, { "atom": "a" }, { "atom": "b" }] },
+        { "tuple": [{ "atom": "." }, { "atom": "g" }, { "tuple": [{ "atom": "." }, { "atom": "a" }, { "tuple": [{ "atom": "." }, { "atom": "b" }, { "atom": "[]" }] }] }] }
+      ],
+      "outcome": { "fails": "univ_mismatch" }
+    },
+    {
+      "name": "univ_wrong_arity_mismatch",
+      "note": "the proposed list drops an argument (arity 2, not 3) — the univ relation does not hold",
+      "pred": "=..",
+      "args": [
+        { "tuple": [{ "atom": "f" }, { "atom": "a" }, { "atom": "b" }] },
+        { "tuple": [{ "atom": "." }, { "atom": "f" }, { "tuple": [{ "atom": "." }, { "atom": "a" }, { "atom": "[]" }] }] }
+      ],
+      "outcome": { "fails": "univ_mismatch" }
+    },
+    {
+      "name": "univ_non_atom_head_not_callable",
+      "note": "a tuple whose head is itself a Tuple is not a labeled compound — outside the univ image",
+      "pred": "=..",
+      "args": [
+        { "tuple": [{ "tuple": [{ "atom": "g" }] }, { "atom": "a" }] },
+        { "atom": "[]" }
+      ],
+      "outcome": { "fails": "univ_not_callable" }
+    },
+    {
+      "name": "univ_arity1_bad_arity",
+      "note": "=../1 is not the relation (univ is arity 2)",
+      "pred": "=..",
+      "args": [{ "atom": "x" }],
+      "outcome": { "fails": "term_bad_arity" }
+    },
+    {
+      "name": "unify_same_atom_holds",
+      "note": "#1611 -- a = a: two identical ground atoms unify (structural equality)",
+      "pred": "=",
+      "args": [{ "atom": "a" }, { "atom": "a" }],
+      "outcome": "holds"
+    },
+    {
+      "name": "unify_different_atoms_fails",
+      "note": "#1611 -- a = b: two different ground atoms do not unify; the named code is the term theory's does-not-hold",
+      "pred": "=",
+      "args": [{ "atom": "a" }, { "atom": "b" }],
+      "outcome": { "fails": "term_does_not_hold" }
+    },
+    {
+      "name": "unify_same_compound_holds",
+      "note": "#1611 -- f(a) = f(a): structurally equal compounds unify",
+      "pred": "=",
+      "args": [{ "tuple": [{ "atom": "f" }, { "atom": "a" }] }, { "tuple": [{ "atom": "f" }, { "atom": "a" }] }],
+      "outcome": "holds"
+    },
+    {
+      "name": "unify_different_compounds_fails",
+      "note": "#1611 -- f(a) = f(b): same functor, different argument",
+      "pred": "=",
+      "args": [{ "tuple": [{ "atom": "f" }, { "atom": "a" }] }, { "tuple": [{ "atom": "f" }, { "atom": "b" }] }],
+      "outcome": { "fails": "term_does_not_hold" }
+    },
+    {
+      "name": "unify_atom_against_compound_fails",
+      "note": "#1611 -- a = f(a): an atom never unifies with a compound (different ranks in the standard order)",
+      "pred": "=",
+      "args": [{ "atom": "a" }, { "tuple": [{ "atom": "f" }, { "atom": "a" }] }],
+      "outcome": { "fails": "term_does_not_hold" }
+    },
+    {
+      "name": "unify_int_embedding_holds",
+      "note": "#1611 -- 42 = 42 over the frozen int embedding: equal embeddings are equal tuples",
+      "pred": "=",
+      "args": [{ "int": 42 }, { "int": 42 }],
+      "outcome": "holds"
+    },
+    {
+      "name": "unify_arity1_bad_arity",
+      "note": "#1611 -- =/1 is not the relation (unification is arity 2)",
+      "pred": "=",
+      "args": [{ "atom": "a" }],
+      "outcome": { "fails": "term_bad_arity" }
+    },
+    {
+      "name": "not_unify_different_atoms_holds",
+      "note": "#1611 -- a \\= b: different ground atoms do not unify, so the negation holds",
+      "pred": "\\=",
+      "args": [{ "atom": "a" }, { "atom": "b" }],
+      "outcome": "holds"
+    },
+    {
+      "name": "not_unify_same_atom_fails",
+      "note": "#1611 -- a \\= a: identical atoms unify, so the negation fails",
+      "pred": "\\=",
+      "args": [{ "atom": "a" }, { "atom": "a" }],
+      "outcome": { "fails": "term_does_not_hold" }
+    },
+    {
+      "name": "not_unify_same_compound_fails",
+      "note": "#1611 -- f(a) \\= f(a): structurally equal compounds unify, so the negation fails",
+      "pred": "\\=",
+      "args": [{ "tuple": [{ "atom": "f" }, { "atom": "a" }] }, { "tuple": [{ "atom": "f" }, { "atom": "a" }] }],
+      "outcome": { "fails": "term_does_not_hold" }
+    },
+    {
+      "name": "not_unify_arity3_bad_arity",
+      "note": "#1611 -- \\=/3 is not the relation",
+      "pred": "\\=",
+      "args": [{ "atom": "a" }, { "atom": "b" }, { "atom": "c" }],
+      "outcome": { "fails": "term_bad_arity" }
+    },
+    {
+      "name": "true_holds",
+      "note": "#1611 -- true/0 holds",
+      "pred": "true",
+      "args": [],
+      "outcome": "holds"
+    },
+    {
+      "name": "true_arity1_bad_arity",
+      "note": "#1611 -- true/1 is not the constant",
+      "pred": "true",
+      "args": [{ "atom": "a" }],
+      "outcome": { "fails": "term_bad_arity" }
+    },
+    {
+      "name": "fail_fails",
+      "note": "#1611 -- fail/0 never holds",
+      "pred": "fail",
+      "args": [],
+      "outcome": { "fails": "term_does_not_hold" }
+    },
+    {
+      "name": "false_fails",
+      "note": "#1611 -- false/0 never holds (the ISO synonym of fail)",
+      "pred": "false",
+      "args": [],
+      "outcome": { "fails": "term_does_not_hold" }
+    },
+    {
+      "name": "false_arity1_bad_arity",
+      "note": "#1611 -- false/1 is not the constant",
+      "pred": "false",
+      "args": [{ "atom": "a" }],
+      "outcome": { "fails": "term_bad_arity" }
+    }
+  ]
+}

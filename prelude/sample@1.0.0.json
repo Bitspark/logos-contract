@@ -1,0 +1,22 @@
+{
+  "name": "sample",
+  "version": "1.0.0",
+  "program_digest": "cb22fbb4f7fcaf55de33742c2ad0328cc9f964bbb97b62ab508fced396fbb5a7",
+  "note": "ADR 0016 Shelf-B sample bundle exercising the prelude loader end-to-end. Two trivial Horn clauses defining the unary naturals as a compound term algebra: nat(z) and nat(s(X)) :- nat(X). These are ordinary account `Rule` nodes the EXISTING check() verifies (zero new trusted code). `program_digest` = lowercase-hex SHA-256(PROGRAM_PREFIX 'logos/account/program/v1\\n' || concat of len-prefixed SORTED ontos-codec(quote(clause-as-term)) bytes), recomputed and verified by load_prelude. Each clause `id` = ClauseId::canonical (lowercase-hex SHA-256(CLAUSE_PREFIX || ontos-codec(quote(clause-as-term)))). Term notation as in vectors/account.json: term = {atom:<hex>}|{atom_str:<utf8>}|{tuple:[...]}|{var:<id>}; goal = {pred:<utf8>, args:[term...]}; negated body literal = {neg:<goal>}. The append/length list bundle is tracked separately (issue #240).",
+  "clauses": [
+    {
+      "id": "8c245a7a0ea73dab49ff899cc27254953f7cb321e15a803bf832c174ab2d757c",
+      "clause": {
+        "head": { "pred": "nat", "args": [{ "tuple": [{ "atom_str": "z" }] }] },
+        "body": []
+      }
+    },
+    {
+      "id": "d02e98ca7fe546344c88c2bc5afdfea44779e90195c9432de6858d5055d46e84",
+      "clause": {
+        "head": { "pred": "nat", "args": [{ "tuple": [{ "atom_str": "s" }, { "var": "X" }] }] },
+        "body": [{ "pred": "nat", "args": [{ "var": "X" }] }]
+      }
+    }
+  ]
+}

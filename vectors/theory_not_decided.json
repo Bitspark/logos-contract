@@ -1,0 +1,2136 @@
+{
+  "spi": "logos-checker-spi v1",
+  "profile": "negation_v1",
+  "note": "#3126 (seat:caa's rulings of 2026-09-27 on #3126; research 0031 rows 3 and 5): a theory that STOPPED before it decided a ground literal is NOT DECIDED, never false, and check refuses it by name (builtin_not_decided) in every position: a Builtin node, a support edge's builtin, and a closure rule instance whose body is not decided and whose head is absent. The stop is the decimal alignment work cap: two in-domain decimals whose exponents differ by more than MAX_DECIMAL_SCALE_SHIFT (65,536). Each refused case is paired with a control that is decided. Hand-authored from the spec (logos-contract.md 5, decide_ground) and the ruling; no case was captured from a run. Driven through every core's conformance CLI as the negation family (conformance/harness.mjs, cli: negation), so the notation, the negation_v1 profile and the context binding are negation.json's; the negation_v1 profile's theory carries the standard arithmetic theory beside lt since #3126. An int is Tuple[Atom(int), Atom(sign byte + big-endian magnitude)] (atom = hex bytes), a decimal is decimal(int(m), int(e)) = m x 10^e, and an operator compound is Tuple[Atom(op), ...].",
+  "extensional": [],
+  "edb": {},
+  "program": {
+    "q_cap": {
+      "head": {
+        "pred": "q_cap",
+        "args": []
+      },
+      "body": [
+        {
+          "pred": ">",
+          "args": [
+            {
+              "tuple": [
+                {
+                  "atom_str": "+"
+                },
+                {
+                  "tuple": [
+                    {
+                      "atom_str": "decimal"
+                    },
+                    {
+                      "tuple": [
+                        {
+                          "atom_str": "int"
+                        },
+                        {
+                          "atom": "0001"
+                        }
+                      ]
+                    },
+                    {
+                      "tuple": [
+                        {
+                          "atom_str": "int"
+                        },
+                        {
+                          "atom": "00ea60"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "tuple": [
+                    {
+                      "atom_str": "decimal"
+                    },
+                    {
+                      "tuple": [
+                        {
+                          "atom_str": "int"
+                        },
+                        {
+                          "atom": "0001"
+                        }
+                      ]
+                    },
+                    {
+                      "tuple": [
+                        {
+                          "atom_str": "int"
+                        },
+                        {
+                          "atom": "01ea60"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "tuple": [
+                {
+                  "atom_str": "int"
+                },
+                {
+                  "atom": "0001"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "r_cap": {
+      "head": {
+        "pred": "r_cap",
+        "args": []
+      },
+      "body": [
+        {
+          "neg": {
+            "pred": "q_cap",
+            "args": []
+          }
+        }
+      ]
+    },
+    "q_holds": {
+      "head": {
+        "pred": "q_holds",
+        "args": []
+      },
+      "body": [
+        {
+          "pred": ">",
+          "args": [
+            {
+              "tuple": [
+                {
+                  "atom_str": "+"
+                },
+                {
+                  "tuple": [
+                    {
+                      "atom_str": "decimal"
+                    },
+                    {
+                      "tuple": [
+                        {
+                          "atom_str": "int"
+                        },
+                        {
+                          "atom": "0001"
+                        }
+                      ]
+                    },
+                    {
+                      "tuple": [
+                        {
+                          "atom_str": "int"
+                        },
+                        {
+                          "atom": "0006"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "tuple": [
+                    {
+                      "atom_str": "decimal"
+                    },
+                    {
+                      "tuple": [
+                        {
+                          "atom_str": "int"
+                        },
+                        {
+                          "atom": "0001"
+                        }
+                      ]
+                    },
+                    {
+                      "tuple": [
+                        {
+                          "atom_str": "int"
+                        },
+                        {
+                          "atom": "0106"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "tuple": [
+                {
+                  "atom_str": "int"
+                },
+                {
+                  "atom": "0001"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "r_holds": {
+      "head": {
+        "pred": "r_holds",
+        "args": []
+      },
+      "body": [
+        {
+          "neg": {
+            "pred": "q_holds",
+            "args": []
+          }
+        }
+      ]
+    },
+    "q_fails": {
+      "head": {
+        "pred": "q_fails",
+        "args": []
+      },
+      "body": [
+        {
+          "pred": "<",
+          "args": [
+            {
+              "tuple": [
+                {
+                  "atom_str": "+"
+                },
+                {
+                  "tuple": [
+                    {
+                      "atom_str": "decimal"
+                    },
+                    {
+                      "tuple": [
+                        {
+                          "atom_str": "int"
+                        },
+                        {
+                          "atom": "0001"
+                        }
+                      ]
+                    },
+                    {
+                      "tuple": [
+                        {
+                          "atom_str": "int"
+                        },
+                        {
+                          "atom": "0006"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "tuple": [
+                    {
+                      "atom_str": "decimal"
+                    },
+                    {
+                      "tuple": [
+                        {
+                          "atom_str": "int"
+                        },
+                        {
+                          "atom": "0001"
+                        }
+                      ]
+                    },
+                    {
+                      "tuple": [
+                        {
+                          "atom_str": "int"
+                        },
+                        {
+                          "atom": "0106"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "tuple": [
+                {
+                  "atom_str": "int"
+                },
+                {
+                  "atom": "0001"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "r_fails": {
+      "head": {
+        "pred": "r_fails",
+        "args": []
+      },
+      "body": [
+        {
+          "neg": {
+            "pred": "q_fails",
+            "args": []
+          }
+        }
+      ]
+    },
+    "q_cap_then_false": {
+      "head": {
+        "pred": "q_cap_then_false",
+        "args": []
+      },
+      "body": [
+        {
+          "pred": ">",
+          "args": [
+            {
+              "tuple": [
+                {
+                  "atom_str": "+"
+                },
+                {
+                  "tuple": [
+                    {
+                      "atom_str": "decimal"
+                    },
+                    {
+                      "tuple": [
+                        {
+                          "atom_str": "int"
+                        },
+                        {
+                          "atom": "0001"
+                        }
+                      ]
+                    },
+                    {
+                      "tuple": [
+                        {
+                          "atom_str": "int"
+                        },
+                        {
+                          "atom": "00ea60"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "tuple": [
+                    {
+                      "atom_str": "decimal"
+                    },
+                    {
+                      "tuple": [
+                        {
+                          "atom_str": "int"
+                        },
+                        {
+                          "atom": "0001"
+                        }
+                      ]
+                    },
+                    {
+                      "tuple": [
+                        {
+                          "atom_str": "int"
+                        },
+                        {
+                          "atom": "01ea60"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "tuple": [
+                {
+                  "atom_str": "int"
+                },
+                {
+                  "atom": "0001"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "pred": "<",
+          "args": [
+            {
+              "tuple": [
+                {
+                  "atom_str": "int"
+                },
+                {
+                  "atom": "0001"
+                }
+              ]
+            },
+            {
+              "tuple": [
+                {
+                  "atom_str": "int"
+                },
+                {
+                  "atom": "00"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "r_cap_then_false": {
+      "head": {
+        "pred": "r_cap_then_false",
+        "args": []
+      },
+      "body": [
+        {
+          "neg": {
+            "pred": "q_cap_then_false",
+            "args": []
+          }
+        }
+      ]
+    },
+    "q_false_then_cap": {
+      "head": {
+        "pred": "q_false_then_cap",
+        "args": []
+      },
+      "body": [
+        {
+          "pred": "<",
+          "args": [
+            {
+              "tuple": [
+                {
+                  "atom_str": "int"
+                },
+                {
+                  "atom": "0001"
+                }
+              ]
+            },
+            {
+              "tuple": [
+                {
+                  "atom_str": "int"
+                },
+                {
+                  "atom": "00"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "pred": ">",
+          "args": [
+            {
+              "tuple": [
+                {
+                  "atom_str": "+"
+                },
+                {
+                  "tuple": [
+                    {
+                      "atom_str": "decimal"
+                    },
+                    {
+                      "tuple": [
+                        {
+                          "atom_str": "int"
+                        },
+                        {
+                          "atom": "0001"
+                        }
+                      ]
+                    },
+                    {
+                      "tuple": [
+                        {
+                          "atom_str": "int"
+                        },
+                        {
+                          "atom": "00ea60"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "tuple": [
+                    {
+                      "atom_str": "decimal"
+                    },
+                    {
+                      "tuple": [
+                        {
+                          "atom_str": "int"
+                        },
+                        {
+                          "atom": "0001"
+                        }
+                      ]
+                    },
+                    {
+                      "tuple": [
+                        {
+                          "atom_str": "int"
+                        },
+                        {
+                          "atom": "01ea60"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "tuple": [
+                {
+                  "atom_str": "int"
+                },
+                {
+                  "atom": "0001"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "r_false_then_cap": {
+      "head": {
+        "pred": "r_false_then_cap",
+        "args": []
+      },
+      "body": [
+        {
+          "neg": {
+            "pred": "q_false_then_cap",
+            "args": []
+          }
+        }
+      ]
+    },
+    "q_neg_cap": {
+      "head": {
+        "pred": "q_neg_cap",
+        "args": []
+      },
+      "body": [
+        {
+          "neg": {
+            "pred": "=:=",
+            "args": [
+              {
+                "tuple": [
+                  {
+                    "atom_str": "+"
+                  },
+                  {
+                    "tuple": [
+                      {
+                        "atom_str": "decimal"
+                      },
+                      {
+                        "tuple": [
+                          {
+                            "atom_str": "int"
+                          },
+                          {
+                            "atom": "0001"
+                          }
+                        ]
+                      },
+                      {
+                        "tuple": [
+                          {
+                            "atom_str": "int"
+                          },
+                          {
+                            "atom": "00ea60"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "tuple": [
+                      {
+                        "atom_str": "decimal"
+                      },
+                      {
+                        "tuple": [
+                          {
+                            "atom_str": "int"
+                          },
+                          {
+                            "atom": "0001"
+                          }
+                        ]
+                      },
+                      {
+                        "tuple": [
+                          {
+                            "atom_str": "int"
+                          },
+                          {
+                            "atom": "01ea60"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "tuple": [
+                  {
+                    "atom_str": "int"
+                  },
+                  {
+                    "atom": "0001"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "r_neg_cap": {
+      "head": {
+        "pred": "r_neg_cap",
+        "args": []
+      },
+      "body": [
+        {
+          "neg": {
+            "pred": "q_neg_cap",
+            "args": []
+          }
+        }
+      ]
+    },
+    "q_cap_held": {
+      "head": {
+        "pred": "q_cap_held",
+        "args": []
+      },
+      "body": [
+        {
+          "pred": ">",
+          "args": [
+            {
+              "tuple": [
+                {
+                  "atom_str": "+"
+                },
+                {
+                  "tuple": [
+                    {
+                      "atom_str": "decimal"
+                    },
+                    {
+                      "tuple": [
+                        {
+                          "atom_str": "int"
+                        },
+                        {
+                          "atom": "0001"
+                        }
+                      ]
+                    },
+                    {
+                      "tuple": [
+                        {
+                          "atom_str": "int"
+                        },
+                        {
+                          "atom": "00ea60"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "tuple": [
+                    {
+                      "atom_str": "decimal"
+                    },
+                    {
+                      "tuple": [
+                        {
+                          "atom_str": "int"
+                        },
+                        {
+                          "atom": "0001"
+                        }
+                      ]
+                    },
+                    {
+                      "tuple": [
+                        {
+                          "atom_str": "int"
+                        },
+                        {
+                          "atom": "01ea60"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "tuple": [
+                {
+                  "atom_str": "int"
+                },
+                {
+                  "atom": "0001"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "r_cap_held": {
+      "head": {
+        "pred": "r_cap_held",
+        "args": []
+      },
+      "body": [
+        {
+          "neg": {
+            "pred": "q_cap_held",
+            "args": []
+          }
+        }
+      ]
+    }
+  },
+  "cases": [
+    {
+      "name": "closure_filter_past_the_work_cap_is_not_decided",
+      "note": "THE RED-FIRST WITNESS. q_cap :- 10^60000 + 10^-60000 > 1. r_cap :- \\+ q_cap. The certificate seals q_cap EMPTY. The comparison HOLDS (the sum exceeds 1), so q_cap is true and the certificate omits a true fact. The two operands are in ADR 0022's value domain, and aligning them needs a shift of 120,000 > MAX_DECIMAL_SCALE_SHIFT (65,536): a work cap, the value exists and was not computed. Until #3126 every core read the stop as Fails, so the closure saw a false body, asked for no head, and check ACCEPTED r_cap, certifying \\+ q_cap while q_cap holds. The closure now reads the literal NOT DECIDED, and a rule instance whose body is not decided and whose head is absent is refused builtin_not_decided.",
+      "claim": {
+        "pred": "r_cap",
+        "args": []
+      },
+      "derivation": {
+        "nodes": [
+          {
+            "kind": "rule",
+            "conclusion": {
+              "pred": "r_cap",
+              "args": []
+            },
+            "clause": "r_cap",
+            "subst": {},
+            "premises": [
+              {
+                "neg": {
+                  "atom": {
+                    "pred": "q_cap",
+                    "args": []
+                  },
+                  "cert": 0,
+                  "nonmember": "direct_lookup"
+                }
+              }
+            ]
+          }
+        ],
+        "root": 0,
+        "closed_world": [
+          {
+            "scope": {
+              "level": 1,
+              "predicates": [
+                "q_cap"
+              ]
+            },
+            "domains": [],
+            "extensions": [
+              {
+                "pred": "q_cap",
+                "arity": 0,
+                "rows": []
+              }
+            ],
+            "supports": [],
+            "limits_decl": {
+              "cert_facts": 0,
+              "domain_values": 0,
+              "support_edges": 0,
+              "rule_groundings": 10,
+              "join_steps": 10,
+              "cert_bytes": 4096
+            }
+          }
+        ]
+      },
+      "outcome": {
+        "reject": "builtin_not_decided"
+      }
+    },
+    {
+      "name": "closure_filter_in_bound_holds_control",
+      "note": "The control of closure_filter_past_the_work_cap_is_not_decided with a gap of 12: 10^6 + 10^-6 > 1 is DECIDED true, so the closure requires q_holds, and a certificate sealing it empty is not closed.",
+      "claim": {
+        "pred": "r_holds",
+        "args": []
+      },
+      "derivation": {
+        "nodes": [
+          {
+            "kind": "rule",
+            "conclusion": {
+              "pred": "r_holds",
+              "args": []
+            },
+            "clause": "r_holds",
+            "subst": {},
+            "premises": [
+              {
+                "neg": {
+                  "atom": {
+                    "pred": "q_holds",
+                    "args": []
+                  },
+                  "cert": 0,
+                  "nonmember": "direct_lookup"
+                }
+              }
+            ]
+          }
+        ],
+        "root": 0,
+        "closed_world": [
+          {
+            "scope": {
+              "level": 1,
+              "predicates": [
+                "q_holds"
+              ]
+            },
+            "domains": [],
+            "extensions": [
+              {
+                "pred": "q_holds",
+                "arity": 0,
+                "rows": []
+              }
+            ],
+            "supports": [],
+            "limits_decl": {
+              "cert_facts": 0,
+              "domain_values": 0,
+              "support_edges": 0,
+              "rule_groundings": 10,
+              "join_steps": 10,
+              "cert_bytes": 4096
+            }
+          }
+        ]
+      },
+      "outcome": {
+        "reject": "cert_not_closed"
+      }
+    },
+    {
+      "name": "closure_filter_in_bound_fails_control",
+      "note": "The accepted control: 10^6 + 10^-6 < 1 is DECIDED false, so the rule instance holds with q_fails absent, the certificate is closed, and \\+ q_fails is certified.",
+      "claim": {
+        "pred": "r_fails",
+        "args": []
+      },
+      "derivation": {
+        "nodes": [
+          {
+            "kind": "rule",
+            "conclusion": {
+              "pred": "r_fails",
+              "args": []
+            },
+            "clause": "r_fails",
+            "subst": {},
+            "premises": [
+              {
+                "neg": {
+                  "atom": {
+                    "pred": "q_fails",
+                    "args": []
+                  },
+                  "cert": 0,
+                  "nonmember": "direct_lookup"
+                }
+              }
+            ]
+          }
+        ],
+        "root": 0,
+        "closed_world": [
+          {
+            "scope": {
+              "level": 1,
+              "predicates": [
+                "q_fails"
+              ]
+            },
+            "domains": [],
+            "extensions": [
+              {
+                "pred": "q_fails",
+                "arity": 0,
+                "rows": []
+              }
+            ],
+            "supports": [],
+            "limits_decl": {
+              "cert_facts": 0,
+              "domain_values": 0,
+              "support_edges": 0,
+              "rule_groundings": 10,
+              "join_steps": 10,
+              "cert_bytes": 4096
+            }
+          }
+        ]
+      },
+      "outcome": "accept"
+    },
+    {
+      "name": "closure_absorbs_a_stop_by_a_later_false_literal",
+      "note": "q_cap_then_false :- 10^60000 + 10^-60000 > 1, 1 < 0. The first literal is not decided (the work cap, a literal-scoped stop) and the second is DECIDED false, so the body is false (F and U is F) and the instance holds with the head absent: accepted. A stop is refused only where no decided false absorbs it.",
+      "claim": {
+        "pred": "r_cap_then_false",
+        "args": []
+      },
+      "derivation": {
+        "nodes": [
+          {
+            "kind": "rule",
+            "conclusion": {
+              "pred": "r_cap_then_false",
+              "args": []
+            },
+            "clause": "r_cap_then_false",
+            "subst": {},
+            "premises": [
+              {
+                "neg": {
+                  "atom": {
+                    "pred": "q_cap_then_false",
+                    "args": []
+                  },
+                  "cert": 0,
+                  "nonmember": "direct_lookup"
+                }
+              }
+            ]
+          }
+        ],
+        "root": 0,
+        "closed_world": [
+          {
+            "scope": {
+              "level": 1,
+              "predicates": [
+                "q_cap_then_false"
+              ]
+            },
+            "domains": [],
+            "extensions": [
+              {
+                "pred": "q_cap_then_false",
+                "arity": 0,
+                "rows": []
+              }
+            ],
+            "supports": [],
+            "limits_decl": {
+              "cert_facts": 0,
+              "domain_values": 0,
+              "support_edges": 0,
+              "rule_groundings": 10,
+              "join_steps": 10,
+              "cert_bytes": 4096
+            }
+          }
+        ]
+      },
+      "outcome": "accept"
+    },
+    {
+      "name": "closure_prunes_at_a_false_literal_before_the_stop",
+      "note": "q_false_then_cap :- 1 < 0, 10^60000 + 10^-60000 > 1. The first literal is DECIDED false, so the body is false whatever the second is, and the closure prunes there: accepted, the order-swapped twin of closure_absorbs_a_stop_by_a_later_false_literal.",
+      "claim": {
+        "pred": "r_false_then_cap",
+        "args": []
+      },
+      "derivation": {
+        "nodes": [
+          {
+            "kind": "rule",
+            "conclusion": {
+              "pred": "r_false_then_cap",
+              "args": []
+            },
+            "clause": "r_false_then_cap",
+            "subst": {},
+            "premises": [
+              {
+                "neg": {
+                  "atom": {
+                    "pred": "q_false_then_cap",
+                    "args": []
+                  },
+                  "cert": 0,
+                  "nonmember": "direct_lookup"
+                }
+              }
+            ]
+          }
+        ],
+        "root": 0,
+        "closed_world": [
+          {
+            "scope": {
+              "level": 1,
+              "predicates": [
+                "q_false_then_cap"
+              ]
+            },
+            "domains": [],
+            "extensions": [
+              {
+                "pred": "q_false_then_cap",
+                "arity": 0,
+                "rows": []
+              }
+            ],
+            "supports": [],
+            "limits_decl": {
+              "cert_facts": 0,
+              "domain_values": 0,
+              "support_edges": 0,
+              "rule_groundings": 10,
+              "join_steps": 10,
+              "cert_bytes": 4096
+            }
+          }
+        ]
+      },
+      "outcome": "accept"
+    },
+    {
+      "name": "closure_negated_filter_past_the_work_cap_is_not_decided",
+      "note": "seat:caa's named witness: q_neg_cap :- \\+ (10^60000 + 10^-60000 =:= 1). A negation of a literal that is not decided is not decided (not(U) = U), so with q_neg_cap sealed empty the instance's truth is not established: refused builtin_not_decided. (Until #3126 the stop read Fails, the negation read true, and this was refused cert_not_closed, under a name that claimed a violation nobody had shown.)",
+      "claim": {
+        "pred": "r_neg_cap",
+        "args": []
+      },
+      "derivation": {
+        "nodes": [
+          {
+            "kind": "rule",
+            "conclusion": {
+              "pred": "r_neg_cap",
+              "args": []
+            },
+            "clause": "r_neg_cap",
+            "subst": {},
+            "premises": [
+              {
+                "neg": {
+                  "atom": {
+                    "pred": "q_neg_cap",
+                    "args": []
+                  },
+                  "cert": 0,
+                  "nonmember": "direct_lookup"
+                }
+              }
+            ]
+          }
+        ],
+        "root": 0,
+        "closed_world": [
+          {
+            "scope": {
+              "level": 1,
+              "predicates": [
+                "q_neg_cap"
+              ]
+            },
+            "domains": [],
+            "extensions": [
+              {
+                "pred": "q_neg_cap",
+                "arity": 0,
+                "rows": []
+              }
+            ],
+            "supports": [],
+            "limits_decl": {
+              "cert_facts": 0,
+              "domain_values": 0,
+              "support_edges": 0,
+              "rule_groundings": 10,
+              "join_steps": 10,
+              "cert_bytes": 4096
+            }
+          }
+        ]
+      },
+      "outcome": {
+        "reject": "builtin_not_decided"
+      }
+    },
+    {
+      "name": "support_builtin_past_the_work_cap_is_not_decided",
+      "note": "q_cap_held :- 10^60000 + 10^-60000 > 1, sealed WITH q_cap_held and a support edge whose builtin body ref is that comparison; the ref's arguments are in the certificate's domain (spec 3.4), so the support check is reached. The closure holds through the present head, and the support check must decide the builtin: not decided, refused builtin_not_decided. Until #3126 the stop read Fails and this was refused cert_unsupported ('does not hold'). Its control is support_builtin_in_bound_holds_control.",
+      "claim": {
+        "pred": "r_cap_held",
+        "args": []
+      },
+      "derivation": {
+        "nodes": [
+          {
+            "kind": "rule",
+            "conclusion": {
+              "pred": "r_cap_held",
+              "args": []
+            },
+            "clause": "r_cap_held",
+            "subst": {},
+            "premises": [
+              {
+                "neg": {
+                  "atom": {
+                    "pred": "q_cap_held",
+                    "args": []
+                  },
+                  "cert": 0,
+                  "nonmember": "direct_lookup"
+                }
+              }
+            ]
+          }
+        ],
+        "root": 0,
+        "closed_world": [
+          {
+            "scope": {
+              "level": 1,
+              "predicates": [
+                "q_cap_held"
+              ]
+            },
+            "domains": [
+              {
+                "type_tag": "v",
+                "values": [
+                  {
+                    "tuple": [
+                      {
+                        "atom_str": "int"
+                      },
+                      {
+                        "atom": "0001"
+                      }
+                    ]
+                  },
+                  {
+                    "tuple": [
+                      {
+                        "atom_str": "+"
+                      },
+                      {
+                        "tuple": [
+                          {
+                            "atom_str": "decimal"
+                          },
+                          {
+                            "tuple": [
+                              {
+                                "atom_str": "int"
+                              },
+                              {
+                                "atom": "0001"
+                              }
+                            ]
+                          },
+                          {
+                            "tuple": [
+                              {
+                                "atom_str": "int"
+                              },
+                              {
+                                "atom": "00ea60"
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "tuple": [
+                          {
+                            "atom_str": "decimal"
+                          },
+                          {
+                            "tuple": [
+                              {
+                                "atom_str": "int"
+                              },
+                              {
+                                "atom": "0001"
+                              }
+                            ]
+                          },
+                          {
+                            "tuple": [
+                              {
+                                "atom_str": "int"
+                              },
+                              {
+                                "atom": "01ea60"
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ],
+            "extensions": [
+              {
+                "pred": "q_cap_held",
+                "arity": 0,
+                "rows": [
+                  {
+                    "pred": "q_cap_held",
+                    "args": []
+                  }
+                ]
+              }
+            ],
+            "supports": [
+              {
+                "fact": {
+                  "pred": "q_cap_held",
+                  "args": []
+                },
+                "clause": "q_cap_held",
+                "subst": {},
+                "body_refs": [
+                  {
+                    "builtin": {
+                      "atom": {
+                        "pred": ">",
+                        "args": [
+                          {
+                            "tuple": [
+                              {
+                                "atom_str": "+"
+                              },
+                              {
+                                "tuple": [
+                                  {
+                                    "atom_str": "decimal"
+                                  },
+                                  {
+                                    "tuple": [
+                                      {
+                                        "atom_str": "int"
+                                      },
+                                      {
+                                        "atom": "0001"
+                                      }
+                                    ]
+                                  },
+                                  {
+                                    "tuple": [
+                                      {
+                                        "atom_str": "int"
+                                      },
+                                      {
+                                        "atom": "00ea60"
+                                      }
+                                    ]
+                                  }
+                                ]
+                              },
+                              {
+                                "tuple": [
+                                  {
+                                    "atom_str": "decimal"
+                                  },
+                                  {
+                                    "tuple": [
+                                      {
+                                        "atom_str": "int"
+                                      },
+                                      {
+                                        "atom": "0001"
+                                      }
+                                    ]
+                                  },
+                                  {
+                                    "tuple": [
+                                      {
+                                        "atom_str": "int"
+                                      },
+                                      {
+                                        "atom": "01ea60"
+                                      }
+                                    ]
+                                  }
+                                ]
+                              }
+                            ]
+                          },
+                          {
+                            "tuple": [
+                              {
+                                "atom_str": "int"
+                              },
+                              {
+                                "atom": "0001"
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ],
+                "rank": 0
+              }
+            ],
+            "limits_decl": {
+              "cert_facts": 1,
+              "domain_values": 2,
+              "support_edges": 1,
+              "rule_groundings": 10,
+              "join_steps": 10,
+              "cert_bytes": 4096
+            }
+          }
+        ]
+      },
+      "outcome": {
+        "reject": "builtin_not_decided"
+      }
+    },
+    {
+      "name": "support_builtin_in_bound_holds_control",
+      "note": "The control for support_builtin_past_the_work_cap_is_not_decided: the same shape over q_holds, whose comparison is in bound and holds. The certificate is valid (the support check decides the builtin ref and it holds), so check reaches the negation premise (ADR 0007 section 4, step 6 after step 2): q_holds IS sealed present, so \\+ q_holds is refused neg_atom_present. It passes before and after #3126, and it fails if the support check is never reached (an argument outside the domain would read cert_out_of_domain).",
+      "claim": {
+        "pred": "r_holds",
+        "args": []
+      },
+      "derivation": {
+        "nodes": [
+          {
+            "kind": "rule",
+            "conclusion": {
+              "pred": "r_holds",
+              "args": []
+            },
+            "clause": "r_holds",
+            "subst": {},
+            "premises": [
+              {
+                "neg": {
+                  "atom": {
+                    "pred": "q_holds",
+                    "args": []
+                  },
+                  "cert": 0,
+                  "nonmember": "direct_lookup"
+                }
+              }
+            ]
+          }
+        ],
+        "root": 0,
+        "closed_world": [
+          {
+            "scope": {
+              "level": 1,
+              "predicates": [
+                "q_holds"
+              ]
+            },
+            "domains": [
+              {
+                "type_tag": "v",
+                "values": [
+                  {
+                    "tuple": [
+                      {
+                        "atom_str": "int"
+                      },
+                      {
+                        "atom": "0001"
+                      }
+                    ]
+                  },
+                  {
+                    "tuple": [
+                      {
+                        "atom_str": "+"
+                      },
+                      {
+                        "tuple": [
+                          {
+                            "atom_str": "decimal"
+                          },
+                          {
+                            "tuple": [
+                              {
+                                "atom_str": "int"
+                              },
+                              {
+                                "atom": "0001"
+                              }
+                            ]
+                          },
+                          {
+                            "tuple": [
+                              {
+                                "atom_str": "int"
+                              },
+                              {
+                                "atom": "0006"
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "tuple": [
+                          {
+                            "atom_str": "decimal"
+                          },
+                          {
+                            "tuple": [
+                              {
+                                "atom_str": "int"
+                              },
+                              {
+                                "atom": "0001"
+                              }
+                            ]
+                          },
+                          {
+                            "tuple": [
+                              {
+                                "atom_str": "int"
+                              },
+                              {
+                                "atom": "0106"
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ],
+            "extensions": [
+              {
+                "pred": "q_holds",
+                "arity": 0,
+                "rows": [
+                  {
+                    "pred": "q_holds",
+                    "args": []
+                  }
+                ]
+              }
+            ],
+            "supports": [
+              {
+                "fact": {
+                  "pred": "q_holds",
+                  "args": []
+                },
+                "clause": "q_holds",
+                "subst": {},
+                "body_refs": [
+                  {
+                    "builtin": {
+                      "atom": {
+                        "pred": ">",
+                        "args": [
+                          {
+                            "tuple": [
+                              {
+                                "atom_str": "+"
+                              },
+                              {
+                                "tuple": [
+                                  {
+                                    "atom_str": "decimal"
+                                  },
+                                  {
+                                    "tuple": [
+                                      {
+                                        "atom_str": "int"
+                                      },
+                                      {
+                                        "atom": "0001"
+                                      }
+                                    ]
+                                  },
+                                  {
+                                    "tuple": [
+                                      {
+                                        "atom_str": "int"
+                                      },
+                                      {
+                                        "atom": "0006"
+                                      }
+                                    ]
+                                  }
+                                ]
+                              },
+                              {
+                                "tuple": [
+                                  {
+                                    "atom_str": "decimal"
+                                  },
+                                  {
+                                    "tuple": [
+                                      {
+                                        "atom_str": "int"
+                                      },
+                                      {
+                                        "atom": "0001"
+                                      }
+                                    ]
+                                  },
+                                  {
+                                    "tuple": [
+                                      {
+                                        "atom_str": "int"
+                                      },
+                                      {
+                                        "atom": "0106"
+                                      }
+                                    ]
+                                  }
+                                ]
+                              }
+                            ]
+                          },
+                          {
+                            "tuple": [
+                              {
+                                "atom_str": "int"
+                              },
+                              {
+                                "atom": "0001"
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ],
+                "rank": 0
+              }
+            ],
+            "limits_decl": {
+              "cert_facts": 1,
+              "domain_values": 2,
+              "support_edges": 1,
+              "rule_groundings": 10,
+              "join_steps": 10,
+              "cert_bytes": 4096
+            }
+          }
+        ]
+      },
+      "outcome": {
+        "reject": "neg_atom_present"
+      }
+    },
+    {
+      "name": "builtin_node_past_the_work_cap_is_not_decided",
+      "note": "A derivation whose root is the Builtin node 10^60000 + 10^-60000 > 1. The comparison holds and was not decided: refused builtin_not_decided (until #3126 it was refused builtin_failed, a decided false that is untrue).",
+      "claim": {
+        "pred": ">",
+        "args": [
+          {
+            "tuple": [
+              {
+                "atom_str": "+"
+              },
+              {
+                "tuple": [
+                  {
+                    "atom_str": "decimal"
+                  },
+                  {
+                    "tuple": [
+                      {
+                        "atom_str": "int"
+                      },
+                      {
+                        "atom": "0001"
+                      }
+                    ]
+                  },
+                  {
+                    "tuple": [
+                      {
+                        "atom_str": "int"
+                      },
+                      {
+                        "atom": "00ea60"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "tuple": [
+                  {
+                    "atom_str": "decimal"
+                  },
+                  {
+                    "tuple": [
+                      {
+                        "atom_str": "int"
+                      },
+                      {
+                        "atom": "0001"
+                      }
+                    ]
+                  },
+                  {
+                    "tuple": [
+                      {
+                        "atom_str": "int"
+                      },
+                      {
+                        "atom": "01ea60"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "tuple": [
+              {
+                "atom_str": "int"
+              },
+              {
+                "atom": "0001"
+              }
+            ]
+          }
+        ]
+      },
+      "derivation": {
+        "nodes": [
+          {
+            "kind": "builtin",
+            "conclusion": {
+              "pred": ">",
+              "args": [
+                {
+                  "tuple": [
+                    {
+                      "atom_str": "+"
+                    },
+                    {
+                      "tuple": [
+                        {
+                          "atom_str": "decimal"
+                        },
+                        {
+                          "tuple": [
+                            {
+                              "atom_str": "int"
+                            },
+                            {
+                              "atom": "0001"
+                            }
+                          ]
+                        },
+                        {
+                          "tuple": [
+                            {
+                              "atom_str": "int"
+                            },
+                            {
+                              "atom": "00ea60"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "tuple": [
+                        {
+                          "atom_str": "decimal"
+                        },
+                        {
+                          "tuple": [
+                            {
+                              "atom_str": "int"
+                            },
+                            {
+                              "atom": "0001"
+                            }
+                          ]
+                        },
+                        {
+                          "tuple": [
+                            {
+                              "atom_str": "int"
+                            },
+                            {
+                              "atom": "01ea60"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "tuple": [
+                    {
+                      "atom_str": "int"
+                    },
+                    {
+                      "atom": "0001"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ],
+        "root": 0
+      },
+      "outcome": {
+        "reject": "builtin_not_decided"
+      }
+    },
+    {
+      "name": "builtin_node_in_bound_control",
+      "note": "The control with a gap of 12: 10^6 + 10^-6 > 1 is decided and holds, so the Builtin node is accepted.",
+      "claim": {
+        "pred": ">",
+        "args": [
+          {
+            "tuple": [
+              {
+                "atom_str": "+"
+              },
+              {
+                "tuple": [
+                  {
+                    "atom_str": "decimal"
+                  },
+                  {
+                    "tuple": [
+                      {
+                        "atom_str": "int"
+                      },
+                      {
+                        "atom": "0001"
+                      }
+                    ]
+                  },
+                  {
+                    "tuple": [
+                      {
+                        "atom_str": "int"
+                      },
+                      {
+                        "atom": "0006"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "tuple": [
+                  {
+                    "atom_str": "decimal"
+                  },
+                  {
+                    "tuple": [
+                      {
+                        "atom_str": "int"
+                      },
+                      {
+                        "atom": "0001"
+                      }
+                    ]
+                  },
+                  {
+                    "tuple": [
+                      {
+                        "atom_str": "int"
+                      },
+                      {
+                        "atom": "0106"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "tuple": [
+              {
+                "atom_str": "int"
+              },
+              {
+                "atom": "0001"
+              }
+            ]
+          }
+        ]
+      },
+      "derivation": {
+        "nodes": [
+          {
+            "kind": "builtin",
+            "conclusion": {
+              "pred": ">",
+              "args": [
+                {
+                  "tuple": [
+                    {
+                      "atom_str": "+"
+                    },
+                    {
+                      "tuple": [
+                        {
+                          "atom_str": "decimal"
+                        },
+                        {
+                          "tuple": [
+                            {
+                              "atom_str": "int"
+                            },
+                            {
+                              "atom": "0001"
+                            }
+                          ]
+                        },
+                        {
+                          "tuple": [
+                            {
+                              "atom_str": "int"
+                            },
+                            {
+                              "atom": "0006"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "tuple": [
+                        {
+                          "atom_str": "decimal"
+                        },
+                        {
+                          "tuple": [
+                            {
+                              "atom_str": "int"
+                            },
+                            {
+                              "atom": "0001"
+                            }
+                          ]
+                        },
+                        {
+                          "tuple": [
+                            {
+                              "atom_str": "int"
+                            },
+                            {
+                              "atom": "0106"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "tuple": [
+                    {
+                      "atom_str": "int"
+                    },
+                    {
+                      "atom": "0001"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ],
+        "root": 0
+      },
+      "outcome": "accept"
+    },
+    {
+      "name": "builtin_node_in_bound_false_control",
+      "note": "The false control with a gap of 12: 10^6 + 10^-6 =\\= 1000000.000001 is decided and does not hold, so the Builtin node is refused builtin_failed, a completed decision.",
+      "claim": {
+        "pred": "=\\=",
+        "args": [
+          {
+            "tuple": [
+              {
+                "atom_str": "+"
+              },
+              {
+                "tuple": [
+                  {
+                    "atom_str": "decimal"
+                  },
+                  {
+                    "tuple": [
+                      {
+                        "atom_str": "int"
+                      },
+                      {
+                        "atom": "0001"
+                      }
+                    ]
+                  },
+                  {
+                    "tuple": [
+                      {
+                        "atom_str": "int"
+                      },
+                      {
+                        "atom": "0006"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "tuple": [
+                  {
+                    "atom_str": "decimal"
+                  },
+                  {
+                    "tuple": [
+                      {
+                        "atom_str": "int"
+                      },
+                      {
+                        "atom": "0001"
+                      }
+                    ]
+                  },
+                  {
+                    "tuple": [
+                      {
+                        "atom_str": "int"
+                      },
+                      {
+                        "atom": "0106"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "tuple": [
+              {
+                "atom_str": "decimal"
+              },
+              {
+                "tuple": [
+                  {
+                    "atom_str": "int"
+                  },
+                  {
+                    "atom": "00e8d4a51001"
+                  }
+                ]
+              },
+              {
+                "tuple": [
+                  {
+                    "atom_str": "int"
+                  },
+                  {
+                    "atom": "0106"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "derivation": {
+        "nodes": [
+          {
+            "kind": "builtin",
+            "conclusion": {
+              "pred": "=\\=",
+              "args": [
+                {
+                  "tuple": [
+                    {
+                      "atom_str": "+"
+                    },
+                    {
+                      "tuple": [
+                        {
+                          "atom_str": "decimal"
+                        },
+                        {
+                          "tuple": [
+                            {
+                              "atom_str": "int"
+                            },
+                            {
+                              "atom": "0001"
+                            }
+                          ]
+                        },
+                        {
+                          "tuple": [
+                            {
+                              "atom_str": "int"
+                            },
+                            {
+                              "atom": "0006"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "tuple": [
+                        {
+                          "atom_str": "decimal"
+                        },
+                        {
+                          "tuple": [
+                            {
+                              "atom_str": "int"
+                            },
+                            {
+                              "atom": "0001"
+                            }
+                          ]
+                        },
+                        {
+                          "tuple": [
+                            {
+                              "atom_str": "int"
+                            },
+                            {
+                              "atom": "0106"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "tuple": [
+                    {
+                      "atom_str": "decimal"
+                    },
+                    {
+                      "tuple": [
+                        {
+                          "atom_str": "int"
+                        },
+                        {
+                          "atom": "00e8d4a51001"
+                        }
+                      ]
+                    },
+                    {
+                      "tuple": [
+                        {
+                          "atom_str": "int"
+                        },
+                        {
+                          "atom": "0106"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ],
+        "root": 0
+      },
+      "outcome": {
+        "reject": "builtin_failed"
+      }
+    }
+  ]
+}

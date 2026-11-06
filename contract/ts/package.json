@@ -1,0 +1,38 @@
+{
+  "name": "@bitspark/logos-contract",
+  "version": "0.24.0",
+  "license": "MIT OR Apache-2.0",
+  "description": "logos-contract (TS binding): Term/Derivation + checker SPI + check(). A faithful idiomatic-TS mirror of the Rust crate, replaying the shared conformance vectors. Depends on @bitspark/ontos-core.",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Bitspark/logos-contract.git",
+    "directory": "contract/ts"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org",
+    "access": "public"
+  },
+  "files": [
+    "dist/src"
+  ],
+  "exports": {
+    ".": "./dist/src/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "pretest": "node scripts/check-test-placement.mjs",
+    "test": "tsc -p tsconfig.json && node --test dist/test/*.test.js"
+  },
+  "dependencies": {
+    "@noble/hashes": "^2.2.0",
+    "@bitspark/ontos-core": "0.13.0",
+    "@bitspark/ontos-codec": "0.13.0",
+    "@bitspark/ontos-data": "0.13.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7",
+    "@types/node": "^22"
+  }
+}

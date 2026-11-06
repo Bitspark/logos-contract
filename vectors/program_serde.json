@@ -1,0 +1,59 @@
+{
+  "spi": "logos-program-serde v1",
+  "note": "Canonical, byte-deterministic (de)serialization of a clause MapProgram to a ground ontos Value (logos-contract §10, issue #310), reusing the FROZEN §2a quote tags + the §9 account clause encoding. program_to_value(p) = Tuple[ Atom(version), entry... ], where version = 'logos/program/v1' (hex below) and each entry = Tuple[ Atom(<clause-id utf8 bytes>), clause_value(clause) ]; clause_value is the account encoding quote(Tuple[head-as-term, Tuple[body-lit-as-term...]]) (head/positive-body goal reads as Tuple[Atom(pred), args...]; a NEGATED body literal reads as Tuple[Atom(0x00), goal-as-term], authored {neg:<goal>}). The entries are emitted in CANONICAL ORDER — sorted ascending by the clause-id bytes — so the value and its ontos-codec-v1 bytes are INDEPENDENT of MapProgram insertion order. Canonical bytes := ontos-codec-v1(program_to_value(p)). Each {rs,go,ts} binding rebuilds the program below via its builder API, serializes it, and MUST reproduce program_bytes_hex AND round-trip (program_from_value(program_to_value(p)) == p). Term notation as in account.json: term = {atom:<hex>}|{atom_str:<utf8>}|{tuple:[term...]}|{int:N}; goal = {pred:<utf8>, args:[term...]}; negated body literal = {neg:<goal>}. The 'clauses' below are authored in a deliberately NON-sorted insertion order (reach_rec, permit, nested, nullary, edge_ab) to exercise the canonical sort.",
+  "version_atom_utf8": "logos/program/v1",
+  "version_atom_hex": "6c6f676f732f70726f6772616d2f7631",
+  "empty_program": {
+    "note": "program_to_value(empty) = Tuple[Atom(version)]; its ontos-codec-v1 bytes:",
+    "program_bytes_hex": "010100106c6f676f732f70726f6772616d2f7631"
+  },
+  "program": {
+    "note": "A representative program: facts, a multi-literal rule with vars, a negated body literal (ADR 0007), a nested compound + the ontos-data int embedding, and a nullary goal. clauses[] is the (id, head, body) set in INSERTION order; canonical_clause_order is the id order the serializer emits (sorted by id bytes).",
+    "clauses": [
+      {
+        "id": "reach_rec",
+        "head": { "pred": "reach", "args": [{ "var": "X" }, { "var": "Z" }] },
+        "body": [
+          { "pred": "edge", "args": [{ "var": "X" }, { "var": "Y" }] },
+          { "pred": "reach", "args": [{ "var": "Y" }, { "var": "Z" }] }
+        ],
+        "clause_bytes_hex": "01020001010102010200010101030102000100000572656163680102000102000158010200010200015a0102000101010201020001010103010200010000046564676501020001020001580102000102000159010200010101030102000100000572656163680102000102000159010200010200015a"
+      },
+      {
+        "id": "permit",
+        "head": { "pred": "permit", "args": [{ "var": "S" }, { "var": "A" }] },
+        "body": [
+          { "pred": "grant", "args": [{ "var": "S" }, { "var": "A" }] },
+          { "neg": { "pred": "denied", "args": [{ "var": "S" }, { "var": "A" }] } }
+        ],
+        "clause_bytes_hex": "0102000101010201020001010103010200010000067065726d6974010200010200015301020001020001410102000101010201020001010103010200010000056772616e7401020001020001530102000102000141010200010101020102000100000100010200010101030102000100000664656e69656401020001020001530102000102000141"
+      },
+      {
+        "id": "nested",
+        "head": {
+          "pred": "p",
+          "args": [
+            { "tuple": [{ "atom_str": "pair" }, { "atom_str": "q" }, { "atom_str": "x" }] },
+            { "int": 7 }
+          ]
+        },
+        "body": [],
+        "clause_bytes_hex": "01020001010102010200010101030102000100000170010200010101030102000100000470616972010200010000017101020001000001780102000101010201020001000003696e7401020001000002000701020001010100"
+      },
+      {
+        "id": "nullary",
+        "head": { "pred": "nullary", "args": [] },
+        "body": [],
+        "clause_bytes_hex": "0102000101010201020001010101010200010000076e756c6c61727901020001010100"
+      },
+      {
+        "id": "edge_ab",
+        "head": { "pred": "edge", "args": [{ "atom_str": "a" }, { "atom_str": "b" }] },
+        "body": [],
+        "clause_bytes_hex": "010200010101020102000101010301020001000004656467650102000100000161010200010000016201020001010100"
+      }
+    ],
+    "canonical_clause_order": ["edge_ab", "nested", "nullary", "permit", "reach_rec"],
+    "program_bytes_hex": "010600106c6f676f732f70726f6772616d2f763101020007656467655f6162010200010101020102000101010301020001000004656467650102000100000161010200010000016201020001010100010200066e657374656401020001010102010200010101030102000100000170010200010101030102000100000470616972010200010000017101020001000001780102000101010201020001000003696e7401020001000002000701020001010100010200076e756c6c6172790102000101010201020001010101010200010000076e756c6c61727901020001010100010200067065726d69740102000101010201020001010103010200010000067065726d6974010200010200015301020001020001410102000101010201020001010103010200010000056772616e7401020001020001530102000102000141010200010101020102000100000100010200010101030102000100000664656e696564010200010200015301020001020001410102000972656163685f72656301020001010102010200010101030102000100000572656163680102000102000158010200010200015a0102000101010201020001010103010200010000046564676501020001020001580102000102000159010200010101030102000100000572656163680102000102000159010200010200015a"
+  }
+}

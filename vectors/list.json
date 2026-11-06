@@ -1,0 +1,354 @@
+{
+  "seam": "logos ListTheory decision vector v1 (UNFROZEN v1)",
+  "note": "Language-AGNOSTIC tri-core THEORY-DECISION agreement vectors for the reified list-relation ListTheory (logos-core/list-theory@1.0.0, ADR 0016 Shelf A1). Each entry is a GROUND atom (predicate + args) together with the PINNED Theory.decide outcome. The decision oracle is the Rust ListTheory::decide; contract/{rs,go,ts} ListTheory.decide MUST reproduce every outcome byte-for-byte (the §7 dual-conformance law). The theory decides the relations length/2, nth0/3, last/2 over the ontos/data REIFIED list embedding list(e0..e_{n-1}) = Tuple(Atom(\"list\"), e0, ..., e_{n-1}) (spec §5.5) — the native A1 fast-path complement of the Shelf-B cons-cell lists@1.1.0 prelude (SAME relations, DIFFERENT representation). is_list/1 is already a TermTheory recognizer and is NOT owned here. Args are encoded as: {\"atom\": \"<utf8>\"} = a bare Atom of those UTF-8 bytes; {\"int\": N} = the frozen ontos-data int embedding Tuple(Atom(\"int\"), Atom(sign||be-magnitude)); {\"list\": [..]} = the ontos-data list embedding of the encoded children; {\"tuple\": [..]} = a raw compound Tuple of the encoded children (used to encode cons cells and non-list shapes). length(list(e0..e_{n-1}), int(n)) holds iff arg0 is a list of n elements and arg1 is the canonical int embedding of n; nth0(int(i), list(e0..), e_i) is 0-indexed (Prolog/SWI order index,list,element); last(list(e0..e_{n-1}), e_{n-1}) holds iff arg0 is a NON-EMPTY list and arg1 is its last element. Outcome is \"holds\" or {\"fails\": \"<code>\"} where the code is one of the pinned host-band sub-codes list_does_not_hold | list_bad_arity | list_unknown_predicate. owns: length, nth0, last.",
+  "identity": {
+    "id": "logos-core/list-theory",
+    "version": "1.0.0",
+    "config_digest_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "owns": {
+    "owned": ["length", "nth0", "last"],
+    "not_owned": ["is_list", "member", "reverse", "append", "nth1", "msort", "is", "atom", "compound", "==", "@<", "contains", "true", "nth0_", "rev_"]
+  },
+  "decisions": [
+    {
+      "name": "length_empty_holds",
+      "note": "length(list(), int(0)) — the empty list has length 0",
+      "pred": "length",
+      "args": [{ "list": [] }, { "int": 0 }],
+      "outcome": "holds"
+    },
+    {
+      "name": "length_singleton_holds",
+      "note": "length(list(a), int(1))",
+      "pred": "length",
+      "args": [{ "list": [{ "atom": "a" }] }, { "int": 1 }],
+      "outcome": "holds"
+    },
+    {
+      "name": "length_two_holds",
+      "note": "length(list(a, b), int(2))",
+      "pred": "length",
+      "args": [{ "list": [{ "atom": "a" }, { "atom": "b" }] }, { "int": 2 }],
+      "outcome": "holds"
+    },
+    {
+      "name": "length_three_holds",
+      "note": "length(list(a, b, c), int(3))",
+      "pred": "length",
+      "args": [{ "list": [{ "atom": "a" }, { "atom": "b" }, { "atom": "c" }] }, { "int": 3 }],
+      "outcome": "holds"
+    },
+    {
+      "name": "length_int_elements_holds",
+      "note": "elements may be any ground term — length(list(int(1), int(2)), int(2))",
+      "pred": "length",
+      "args": [{ "list": [{ "int": 1 }, { "int": 2 }] }, { "int": 2 }],
+      "outcome": "holds"
+    },
+    {
+      "name": "length_nested_list_element_holds",
+      "note": "a list element may itself be a list embedding — length(list(list(a), b), int(2))",
+      "pred": "length",
+      "args": [{ "list": [{ "list": [{ "atom": "a" }] }, { "atom": "b" }] }, { "int": 2 }],
+      "outcome": "holds"
+    },
+    {
+      "name": "length_wrong_count_fails",
+      "note": "length(list(a, b), int(3)) — count mismatch",
+      "pred": "length",
+      "args": [{ "list": [{ "atom": "a" }, { "atom": "b" }] }, { "int": 3 }],
+      "outcome": { "fails": "list_does_not_hold" }
+    },
+    {
+      "name": "length_empty_wrong_count_fails",
+      "note": "length(list(), int(1)) — empty list is not length 1",
+      "pred": "length",
+      "args": [{ "list": [] }, { "int": 1 }],
+      "outcome": { "fails": "list_does_not_hold" }
+    },
+    {
+      "name": "length_non_list_atom_fails",
+      "note": "length(not_a_list, int(0)) — arg0 is not a list embedding",
+      "pred": "length",
+      "args": [{ "atom": "not_a_list" }, { "int": 0 }],
+      "outcome": { "fails": "list_does_not_hold" }
+    },
+    {
+      "name": "length_cons_form_fails",
+      "note": "the CONS form .(a, []) is NOT the reified list() embedding -> fails (this theory is over list())",
+      "pred": "length",
+      "args": [
+        { "tuple": [{ "atom": "." }, { "atom": "a" }, { "atom": "[]" }] },
+        { "int": 1 }
+      ],
+      "outcome": { "fails": "list_does_not_hold" }
+    },
+    {
+      "name": "length_bare_nil_atom_fails",
+      "note": "the bare nil atom [] is not the empty list() embedding",
+      "pred": "length",
+      "args": [{ "atom": "[]" }, { "int": 0 }],
+      "outcome": { "fails": "list_does_not_hold" }
+    },
+    {
+      "name": "length_unlabeled_tuple_fails",
+      "note": "a bare unlabeled Tuple(a, b) is not a list embedding (no \"list\" label)",
+      "pred": "length",
+      "args": [
+        { "tuple": [{ "atom": "a" }, { "atom": "b" }] },
+        { "int": 2 }
+      ],
+      "outcome": { "fails": "list_does_not_hold" }
+    },
+    {
+      "name": "length_non_int_count_atom_fails",
+      "note": "length(list(a), \"1\") — a number-shaped atom is not the int embedding",
+      "pred": "length",
+      "args": [{ "list": [{ "atom": "a" }] }, { "atom": "1" }],
+      "outcome": { "fails": "list_does_not_hold" }
+    },
+    {
+      "name": "length_bad_arity_one",
+      "note": "length/1 is not the relation",
+      "pred": "length",
+      "args": [{ "list": [] }],
+      "outcome": { "fails": "list_bad_arity" }
+    },
+    {
+      "name": "length_bad_arity_three",
+      "note": "length/3 is not the relation",
+      "pred": "length",
+      "args": [{ "list": [{ "atom": "a" }] }, { "int": 1 }, { "atom": "x" }],
+      "outcome": { "fails": "list_bad_arity" }
+    },
+    {
+      "name": "nth0_index0_holds",
+      "note": "nth0(int(0), list(a, b, c), a)",
+      "pred": "nth0",
+      "args": [
+        { "int": 0 },
+        { "list": [{ "atom": "a" }, { "atom": "b" }, { "atom": "c" }] },
+        { "atom": "a" }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "nth0_index1_holds",
+      "note": "nth0(int(1), list(a, b, c), b)",
+      "pred": "nth0",
+      "args": [
+        { "int": 1 },
+        { "list": [{ "atom": "a" }, { "atom": "b" }, { "atom": "c" }] },
+        { "atom": "b" }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "nth0_last_index_holds",
+      "note": "nth0(int(2), list(a, b, c), c) — the highest valid 0-index",
+      "pred": "nth0",
+      "args": [
+        { "int": 2 },
+        { "list": [{ "atom": "a" }, { "atom": "b" }, { "atom": "c" }] },
+        { "atom": "c" }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "nth0_singleton_holds",
+      "note": "nth0(int(0), list(x), x)",
+      "pred": "nth0",
+      "args": [{ "int": 0 }, { "list": [{ "atom": "x" }] }, { "atom": "x" }],
+      "outcome": "holds"
+    },
+    {
+      "name": "nth0_int_element_holds",
+      "note": "the element may be an int embedding — nth0(int(1), list(int(7), int(8)), int(8))",
+      "pred": "nth0",
+      "args": [
+        { "int": 1 },
+        { "list": [{ "int": 7 }, { "int": 8 }] },
+        { "int": 8 }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "nth0_nested_list_element_holds",
+      "note": "nth0(int(0), list(list(a), b), list(a))",
+      "pred": "nth0",
+      "args": [
+        { "int": 0 },
+        { "list": [{ "list": [{ "atom": "a" }] }, { "atom": "b" }] },
+        { "list": [{ "atom": "a" }] }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "nth0_wrong_element_fails",
+      "note": "nth0(int(1), list(a, b, c), a) — wrong element at a valid index",
+      "pred": "nth0",
+      "args": [
+        { "int": 1 },
+        { "list": [{ "atom": "a" }, { "atom": "b" }, { "atom": "c" }] },
+        { "atom": "a" }
+      ],
+      "outcome": { "fails": "list_does_not_hold" }
+    },
+    {
+      "name": "nth0_out_of_range_fails",
+      "note": "nth0(int(3), list(a, b, c), _) — index == length is out of range (0-indexed)",
+      "pred": "nth0",
+      "args": [
+        { "int": 3 },
+        { "list": [{ "atom": "a" }, { "atom": "b" }, { "atom": "c" }] },
+        { "atom": "a" }
+      ],
+      "outcome": { "fails": "list_does_not_hold" }
+    },
+    {
+      "name": "nth0_empty_list_fails",
+      "note": "nth0(int(0), list(), _) — no element 0 in an empty list",
+      "pred": "nth0",
+      "args": [{ "int": 0 }, { "list": [] }, { "atom": "a" }],
+      "outcome": { "fails": "list_does_not_hold" }
+    },
+    {
+      "name": "nth0_negative_index_fails",
+      "note": "nth0(int(-1), list(a), _) — a negative index has no element",
+      "pred": "nth0",
+      "args": [{ "int": -1 }, { "list": [{ "atom": "a" }] }, { "atom": "a" }],
+      "outcome": { "fails": "list_does_not_hold" }
+    },
+    {
+      "name": "nth0_non_int_index_fails",
+      "note": "nth0(\"0\", list(a), a) — a number-shaped atom index is not the int embedding",
+      "pred": "nth0",
+      "args": [{ "atom": "0" }, { "list": [{ "atom": "a" }] }, { "atom": "a" }],
+      "outcome": { "fails": "list_does_not_hold" }
+    },
+    {
+      "name": "nth0_non_list_fails",
+      "note": "nth0(int(0), not_a_list, a) — arg1 is not a list embedding",
+      "pred": "nth0",
+      "args": [{ "int": 0 }, { "atom": "not_a_list" }, { "atom": "a" }],
+      "outcome": { "fails": "list_does_not_hold" }
+    },
+    {
+      "name": "nth0_cons_form_fails",
+      "note": "the cons form .(a, []) is not the reified list() embedding",
+      "pred": "nth0",
+      "args": [
+        { "int": 0 },
+        { "tuple": [{ "atom": "." }, { "atom": "a" }, { "atom": "[]" }] },
+        { "atom": "a" }
+      ],
+      "outcome": { "fails": "list_does_not_hold" }
+    },
+    {
+      "name": "nth0_bad_arity_two",
+      "note": "nth0/2 is not the relation",
+      "pred": "nth0",
+      "args": [{ "int": 0 }, { "list": [{ "atom": "a" }] }],
+      "outcome": { "fails": "list_bad_arity" }
+    },
+    {
+      "name": "nth0_bad_arity_four",
+      "note": "nth0/4 is not the relation",
+      "pred": "nth0",
+      "args": [
+        { "int": 0 },
+        { "list": [{ "atom": "a" }] },
+        { "atom": "a" },
+        { "atom": "x" }
+      ],
+      "outcome": { "fails": "list_bad_arity" }
+    },
+    {
+      "name": "last_singleton_holds",
+      "note": "last(list(x), x)",
+      "pred": "last",
+      "args": [{ "list": [{ "atom": "x" }] }, { "atom": "x" }],
+      "outcome": "holds"
+    },
+    {
+      "name": "last_two_holds",
+      "note": "last(list(a, b), b)",
+      "pred": "last",
+      "args": [{ "list": [{ "atom": "a" }, { "atom": "b" }] }, { "atom": "b" }],
+      "outcome": "holds"
+    },
+    {
+      "name": "last_three_holds",
+      "note": "last(list(a, b, c), c)",
+      "pred": "last",
+      "args": [
+        { "list": [{ "atom": "a" }, { "atom": "b" }, { "atom": "c" }] },
+        { "atom": "c" }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "last_int_element_holds",
+      "note": "last(list(int(1), int(2)), int(2))",
+      "pred": "last",
+      "args": [{ "list": [{ "int": 1 }, { "int": 2 }] }, { "int": 2 }],
+      "outcome": "holds"
+    },
+    {
+      "name": "last_nested_list_element_holds",
+      "note": "last(list(a, list(b)), list(b))",
+      "pred": "last",
+      "args": [
+        { "list": [{ "atom": "a" }, { "list": [{ "atom": "b" }] }] },
+        { "list": [{ "atom": "b" }] }
+      ],
+      "outcome": "holds"
+    },
+    {
+      "name": "last_wrong_element_fails",
+      "note": "last(list(a, b), a) — a is not the last element",
+      "pred": "last",
+      "args": [{ "list": [{ "atom": "a" }, { "atom": "b" }] }, { "atom": "a" }],
+      "outcome": { "fails": "list_does_not_hold" }
+    },
+    {
+      "name": "last_empty_fails",
+      "note": "last(list(), _) — the empty list has no last element",
+      "pred": "last",
+      "args": [{ "list": [] }, { "atom": "a" }],
+      "outcome": { "fails": "list_does_not_hold" }
+    },
+    {
+      "name": "last_non_list_fails",
+      "note": "last(not_a_list, _) — arg0 is not a list embedding",
+      "pred": "last",
+      "args": [{ "atom": "not_a_list" }, { "atom": "a" }],
+      "outcome": { "fails": "list_does_not_hold" }
+    },
+    {
+      "name": "last_cons_form_fails",
+      "note": "the cons form .(x, []) is not the reified list() embedding",
+      "pred": "last",
+      "args": [
+        { "tuple": [{ "atom": "." }, { "atom": "x" }, { "atom": "[]" }] },
+        { "atom": "x" }
+      ],
+      "outcome": { "fails": "list_does_not_hold" }
+    },
+    {
+      "name": "last_bad_arity_one",
+      "note": "last/1 is not the relation",
+      "pred": "last",
+      "args": [{ "list": [{ "atom": "a" }] }],
+      "outcome": { "fails": "list_bad_arity" }
+    },
+    {
+      "name": "last_bad_arity_three",
+      "note": "last/3 is not the relation",
+      "pred": "last",
+      "args": [{ "list": [{ "atom": "a" }] }, { "atom": "a" }, { "atom": "b" }],
+      "outcome": { "fails": "list_bad_arity" }
+    }
+  ]
+}

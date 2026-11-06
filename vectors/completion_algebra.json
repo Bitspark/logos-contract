@@ -1,0 +1,387 @@
+{
+  "description": "The completion algebra's not/and/or over ground outcomes (research 0031 row 15, #3164). HAND-AUTHORED from research 0031's advice section 3 (the strong-Kleene tables, the scoped-absorption rule, and the closure implication table), never from an implementation's output. A leaf is an outcome: {arm: holds} | {arm: fails, false_code} | {arm: not_completed, kind, scope} (a fault has no scope) | {arm: limit_exceeded, limit}. Each case's `why` is printed by every replay with a failure of that case. An expression is {op: not|and|or, args: [...]}; and/or fold their args left to right. A non-completion is a STOP (capacity, work_cap and instantiation at any scope; host_refusal and reply_unreadable at request scope only) or a FAULT (inconsistent_theory, malformed_outcome), which carries no scope and ranks above a caller's limit (seat:caa's ruling on #3179). A case with `construct` names a kind and scope that must be REFUSED by each core's checked constructor (`refused: true`); its `expr` holds a hand-built value of that illegal pair, which a core that can form one (Go, TypeScript) must read as malformed_outcome, and which Rust cannot form at all. Every core replays it: the written order must give `expect` exactly, and every reordering of every and/or node's args must give an outcome of the same CLASS (holds, fails, absorbable undecided, dominant undecided), so a correct verdict never depends on evaluation order. Within a class the leftmost operand is reported, so the exact cause is order-dependent by design. A limit is an opaque name here: the layer that sets a limit owns its vocabulary, and the algebra only carries it.",
+  "version": 1,
+  "vocabulary": {
+    "false_codes": ["unsatisfied"],
+    "kinds": [
+      "capacity",
+      "work_cap",
+      "instantiation",
+      "host_refusal",
+      "reply_unreadable",
+      "inconsistent_theory",
+      "malformed_outcome"
+    ],
+    "scoped_stops": ["capacity", "work_cap", "instantiation"],
+    "request_stops": ["host_refusal", "reply_unreadable"],
+    "faults": ["inconsistent_theory", "malformed_outcome"],
+    "scopes": ["literal", "branch", "enumeration", "dependency", "theory_snapshot", "request"],
+    "absorbable_scopes": ["literal", "branch", "enumeration"]
+  },
+  "cases": [
+    {
+      "name": "not_holds_is_fails",
+      "why": "not H = F",
+      "expr": {"op": "not", "args": [{"arm": "holds"}]},
+      "expect": {"arm": "fails", "false_code": "unsatisfied"}
+    },
+    {
+      "name": "not_fails_is_holds",
+      "why": "not F = H",
+      "expr": {"op": "not", "args": [{"arm": "fails", "false_code": "unsatisfied"}]},
+      "expect": {"arm": "holds"}
+    },
+    {
+      "name": "not_keeps_local_undecided",
+      "why": "not U = U: negating an undecided literal neither fires nor blocks",
+      "expr": {"op": "not", "args": [{"arm": "not_completed", "kind": "work_cap", "scope": "literal"}]},
+      "expect": {"arm": "not_completed", "kind": "work_cap", "scope": "literal"}
+    },
+    {
+      "name": "not_keeps_request_undecided",
+      "why": "not U = U at any scope",
+      "expr": {"op": "not", "args": [{"arm": "not_completed", "kind": "host_refusal", "scope": "request"}]},
+      "expect": {"arm": "not_completed", "kind": "host_refusal", "scope": "request"}
+    },
+    {
+      "name": "not_keeps_limit",
+      "why": "a caller's limit is the request's disposition, not a truth value",
+      "expr": {"op": "not", "args": [{"arm": "limit_exceeded", "limit": "check_nodes"}]},
+      "expect": {"arm": "limit_exceeded", "limit": "check_nodes"}
+    },
+    {
+      "name": "and_holds_holds",
+      "why": "H and H = H",
+      "expr": {"op": "and", "args": [{"arm": "holds"}, {"arm": "holds"}]},
+      "expect": {"arm": "holds"}
+    },
+    {
+      "name": "and_holds_fails",
+      "why": "H and F = F",
+      "expr": {"op": "and", "args": [{"arm": "holds"}, {"arm": "fails", "false_code": "unsatisfied"}]},
+      "expect": {"arm": "fails", "false_code": "unsatisfied"}
+    },
+    {
+      "name": "and_fails_holds",
+      "why": "F and H = F",
+      "expr": {"op": "and", "args": [{"arm": "fails", "false_code": "unsatisfied"}, {"arm": "holds"}]},
+      "expect": {"arm": "fails", "false_code": "unsatisfied"}
+    },
+    {
+      "name": "and_fails_fails",
+      "why": "F and F = F",
+      "expr": {"op": "and", "args": [{"arm": "fails", "false_code": "unsatisfied"}, {"arm": "fails", "false_code": "unsatisfied"}]},
+      "expect": {"arm": "fails", "false_code": "unsatisfied"}
+    },
+    {
+      "name": "and_holds_local_undecided",
+      "why": "H and U = U",
+      "expr": {"op": "and", "args": [{"arm": "holds"}, {"arm": "not_completed", "kind": "capacity", "scope": "literal"}]},
+      "expect": {"arm": "not_completed", "kind": "capacity", "scope": "literal"}
+    },
+    {
+      "name": "and_fails_absorbs_literal_undecided",
+      "why": "F and U = F when U is local: the false conjunct is an independent justification",
+      "expr": {"op": "and", "args": [{"arm": "fails", "false_code": "unsatisfied"}, {"arm": "not_completed", "kind": "work_cap", "scope": "literal"}]},
+      "expect": {"arm": "fails", "false_code": "unsatisfied"}
+    },
+    {
+      "name": "and_literal_undecided_then_fails",
+      "why": "the same with the undecided conjunct met first: correctness must not depend on order",
+      "expr": {"op": "and", "args": [{"arm": "not_completed", "kind": "work_cap", "scope": "literal"}, {"arm": "fails", "false_code": "unsatisfied"}]},
+      "expect": {"arm": "fails", "false_code": "unsatisfied"}
+    },
+    {
+      "name": "and_fails_absorbs_branch_undecided",
+      "why": "branch scope is local",
+      "expr": {"op": "and", "args": [{"arm": "fails", "false_code": "unsatisfied"}, {"arm": "not_completed", "kind": "capacity", "scope": "branch"}]},
+      "expect": {"arm": "fails", "false_code": "unsatisfied"}
+    },
+    {
+      "name": "and_enumeration_undecided_then_fails",
+      "why": "enumeration scope is local to the literal whose enumeration stopped",
+      "expr": {"op": "and", "args": [{"arm": "not_completed", "kind": "capacity", "scope": "enumeration"}, {"arm": "fails", "false_code": "unsatisfied"}]},
+      "expect": {"arm": "fails", "false_code": "unsatisfied"}
+    },
+    {
+      "name": "and_two_local_undecided_reports_first",
+      "why": "U and U = U; within one class the leftmost cause is reported",
+      "expr": {"op": "and", "args": [{"arm": "not_completed", "kind": "work_cap", "scope": "literal"}, {"arm": "not_completed", "kind": "capacity", "scope": "branch"}]},
+      "expect": {"arm": "not_completed", "kind": "work_cap", "scope": "literal"}
+    },
+    {
+      "name": "and_fails_keeps_request_undecided",
+      "why": "a request-wide stop may have compromised the evidence for the false conjunct, so it is never absorbed",
+      "expr": {"op": "and", "args": [{"arm": "fails", "false_code": "unsatisfied"}, {"arm": "not_completed", "kind": "host_refusal", "scope": "request"}]},
+      "expect": {"arm": "not_completed", "kind": "host_refusal", "scope": "request"}
+    },
+    {
+      "name": "and_request_undecided_then_fails",
+      "why": "the same with the request stop met first",
+      "expr": {"op": "and", "args": [{"arm": "not_completed", "kind": "work_cap", "scope": "request"}, {"arm": "fails", "false_code": "unsatisfied"}]},
+      "expect": {"arm": "not_completed", "kind": "work_cap", "scope": "request"}
+    },
+    {
+      "name": "and_fails_keeps_theory_snapshot_undecided",
+      "why": "a stop that reached the theory snapshot may have compromised the false conjunct's evidence",
+      "expr": {"op": "and", "args": [{"arm": "fails", "false_code": "unsatisfied"}, {"arm": "not_completed", "kind": "work_cap", "scope": "theory_snapshot"}]},
+      "expect": {"arm": "not_completed", "kind": "work_cap", "scope": "theory_snapshot"}
+    },
+    {
+      "name": "and_dependency_undecided_then_fails",
+      "why": "a failed dependency may underlie the false conjunct too",
+      "expr": {"op": "and", "args": [{"arm": "not_completed", "kind": "capacity", "scope": "dependency"}, {"arm": "fails", "false_code": "unsatisfied"}]},
+      "expect": {"arm": "not_completed", "kind": "capacity", "scope": "dependency"}
+    },
+    {
+      "name": "and_fails_keeps_limit",
+      "why": "a caller's limit is never absorbed",
+      "expr": {"op": "and", "args": [{"arm": "fails", "false_code": "unsatisfied"}, {"arm": "limit_exceeded", "limit": "check_nodes"}]},
+      "expect": {"arm": "limit_exceeded", "limit": "check_nodes"}
+    },
+    {
+      "name": "and_local_then_request_reports_request",
+      "why": "a dominant cause outranks a local one wherever it appears",
+      "expr": {"op": "and", "args": [{"arm": "not_completed", "kind": "work_cap", "scope": "literal"}, {"arm": "not_completed", "kind": "reply_unreadable", "scope": "request"}]},
+      "expect": {"arm": "not_completed", "kind": "reply_unreadable", "scope": "request"}
+    },
+    {
+      "name": "and_limit_then_request_reports_first",
+      "why": "a limit and a request stop are both dominant; the leftmost is reported",
+      "expr": {"op": "and", "args": [{"arm": "limit_exceeded", "limit": "search_depth"}, {"arm": "not_completed", "kind": "host_refusal", "scope": "request"}]},
+      "expect": {"arm": "limit_exceeded", "limit": "search_depth"}
+    },
+    {
+      "name": "and_request_then_limit_reports_first",
+      "why": "the same pair in the other order",
+      "expr": {"op": "and", "args": [{"arm": "not_completed", "kind": "host_refusal", "scope": "request"}, {"arm": "limit_exceeded", "limit": "search_depth"}]},
+      "expect": {"arm": "not_completed", "kind": "host_refusal", "scope": "request"}
+    },
+    {
+      "name": "or_fails_fails",
+      "why": "F or F = F",
+      "expr": {"op": "or", "args": [{"arm": "fails", "false_code": "unsatisfied"}, {"arm": "fails", "false_code": "unsatisfied"}]},
+      "expect": {"arm": "fails", "false_code": "unsatisfied"}
+    },
+    {
+      "name": "or_holds_fails",
+      "why": "H or F = H",
+      "expr": {"op": "or", "args": [{"arm": "holds"}, {"arm": "fails", "false_code": "unsatisfied"}]},
+      "expect": {"arm": "holds"}
+    },
+    {
+      "name": "or_fails_holds",
+      "why": "F or H = H",
+      "expr": {"op": "or", "args": [{"arm": "fails", "false_code": "unsatisfied"}, {"arm": "holds"}]},
+      "expect": {"arm": "holds"}
+    },
+    {
+      "name": "or_holds_holds",
+      "why": "H or H = H",
+      "expr": {"op": "or", "args": [{"arm": "holds"}, {"arm": "holds"}]},
+      "expect": {"arm": "holds"}
+    },
+    {
+      "name": "or_holds_absorbs_literal_undecided",
+      "why": "H or U = H when U is local",
+      "expr": {"op": "or", "args": [{"arm": "holds"}, {"arm": "not_completed", "kind": "work_cap", "scope": "literal"}]},
+      "expect": {"arm": "holds"}
+    },
+    {
+      "name": "or_branch_undecided_then_holds",
+      "why": "the same with the undecided disjunct met first",
+      "expr": {"op": "or", "args": [{"arm": "not_completed", "kind": "capacity", "scope": "branch"}, {"arm": "holds"}]},
+      "expect": {"arm": "holds"}
+    },
+    {
+      "name": "or_fails_local_undecided",
+      "why": "F or U = U",
+      "expr": {"op": "or", "args": [{"arm": "fails", "false_code": "unsatisfied"}, {"arm": "not_completed", "kind": "work_cap", "scope": "literal"}]},
+      "expect": {"arm": "not_completed", "kind": "work_cap", "scope": "literal"}
+    },
+    {
+      "name": "or_holds_keeps_request_undecided",
+      "why": "a request-wide stop is never absorbed by a true disjunct either",
+      "expr": {"op": "or", "args": [{"arm": "holds"}, {"arm": "not_completed", "kind": "host_refusal", "scope": "request"}]},
+      "expect": {"arm": "not_completed", "kind": "host_refusal", "scope": "request"}
+    },
+    {
+      "name": "or_limit_then_holds",
+      "why": "a caller's limit is never absorbed",
+      "expr": {"op": "or", "args": [{"arm": "limit_exceeded", "limit": "check_nodes"}, {"arm": "holds"}]},
+      "expect": {"arm": "limit_exceeded", "limit": "check_nodes"}
+    },
+    {
+      "name": "or_two_local_undecided_reports_first",
+      "why": "U or U = U; the leftmost cause is reported",
+      "expr": {"op": "or", "args": [{"arm": "not_completed", "kind": "capacity", "scope": "branch"}, {"arm": "not_completed", "kind": "work_cap", "scope": "literal"}]},
+      "expect": {"arm": "not_completed", "kind": "capacity", "scope": "branch"}
+    },
+    {
+      "name": "and3_fails_anywhere",
+      "why": "a conjunction with an independently false conjunct is false, wherever the local undecided conjunct sits",
+      "expr": {"op": "and", "args": [{"arm": "not_completed", "kind": "work_cap", "scope": "literal"}, {"arm": "holds"}, {"arm": "fails", "false_code": "unsatisfied"}]},
+      "expect": {"arm": "fails", "false_code": "unsatisfied"}
+    },
+    {
+      "name": "and4_request_anywhere",
+      "why": "one request-wide stop leaves the whole conjunction undecided",
+      "expr": {"op": "and", "args": [{"arm": "holds"}, {"arm": "not_completed", "kind": "work_cap", "scope": "literal"}, {"arm": "not_completed", "kind": "host_refusal", "scope": "request"}, {"arm": "fails", "false_code": "unsatisfied"}]},
+      "expect": {"arm": "not_completed", "kind": "host_refusal", "scope": "request"}
+    },
+    {
+      "name": "or3_holds_anywhere",
+      "why": "a disjunction with an independently true disjunct is true",
+      "expr": {"op": "or", "args": [{"arm": "fails", "false_code": "unsatisfied"}, {"arm": "not_completed", "kind": "capacity", "scope": "enumeration"}, {"arm": "holds"}]},
+      "expect": {"arm": "holds"}
+    },
+    {
+      "name": "and3_local_undecided_reports_first",
+      "why": "H and U1 and U2 = U1",
+      "expr": {"op": "and", "args": [{"arm": "holds"}, {"arm": "not_completed", "kind": "capacity", "scope": "branch"}, {"arm": "not_completed", "kind": "work_cap", "scope": "literal"}]},
+      "expect": {"arm": "not_completed", "kind": "capacity", "scope": "branch"}
+    },
+    {
+      "name": "closure_body_holds_head_absent",
+      "why": "closure obligation Body => Head-in-table, as (not Body) or Head: a true body with its head absent is a definite violation",
+      "expr": {"op": "or", "args": [{"op": "not", "args": [{"arm": "holds"}]}, {"arm": "fails", "false_code": "unsatisfied"}]},
+      "expect": {"arm": "fails", "false_code": "unsatisfied"}
+    },
+    {
+      "name": "closure_body_holds_head_present",
+      "why": "a true body with its head present satisfies the obligation",
+      "expr": {"op": "or", "args": [{"op": "not", "args": [{"arm": "holds"}]}, {"arm": "holds"}]},
+      "expect": {"arm": "holds"}
+    },
+    {
+      "name": "closure_body_fails_head_absent",
+      "why": "a false body satisfies the obligation whether or not the head is present",
+      "expr": {"op": "or", "args": [{"op": "not", "args": [{"arm": "fails", "false_code": "unsatisfied"}]}, {"arm": "fails", "false_code": "unsatisfied"}]},
+      "expect": {"arm": "holds"}
+    },
+    {
+      "name": "closure_body_undecided_head_absent",
+      "why": "an undecided body cannot conceal a missing head: closure is not established (the shape of the #3123 omission)",
+      "expr": {"op": "or", "args": [{"op": "not", "args": [{"arm": "not_completed", "kind": "work_cap", "scope": "literal"}]}, {"arm": "fails", "false_code": "unsatisfied"}]},
+      "expect": {"arm": "not_completed", "kind": "work_cap", "scope": "literal"}
+    },
+    {
+      "name": "closure_body_undecided_head_present",
+      "why": "a present head discharges the obligation even though the body is undecided",
+      "expr": {"op": "or", "args": [{"op": "not", "args": [{"arm": "not_completed", "kind": "work_cap", "scope": "literal"}]}, {"arm": "holds"}]},
+      "expect": {"arm": "holds"}
+    },
+    {
+      "name": "closure_false_conjunct_absorbs_undecided_body_literal",
+      "why": "another body conjunct is independently false, so the body is false and the head need not be present",
+      "expr": {"op": "or", "args": [{"op": "not", "args": [{"op": "and", "args": [{"arm": "not_completed", "kind": "work_cap", "scope": "literal"}, {"arm": "fails", "false_code": "unsatisfied"}]}]}, {"arm": "fails", "false_code": "unsatisfied"}]},
+      "expect": {"arm": "holds"}
+    },
+    {
+      "name": "closure_true_conjunct_keeps_undecided_body_literal",
+      "why": "H and U is U, so the body is undecided and an absent head stays not established",
+      "expr": {"op": "or", "args": [{"op": "not", "args": [{"op": "and", "args": [{"arm": "holds"}, {"arm": "not_completed", "kind": "capacity", "scope": "literal"}]}]}, {"arm": "fails", "false_code": "unsatisfied"}]},
+      "expect": {"arm": "not_completed", "kind": "capacity", "scope": "literal"}
+    },
+    {
+      "name": "closure_negated_undecided_literal",
+      "why": "a body \\+ q with q undecided: not(U) = U, so the rule neither fires nor is shown unable to fire",
+      "expr": {"op": "or", "args": [{"op": "not", "args": [{"op": "and", "args": [{"arm": "holds"}, {"op": "not", "args": [{"arm": "not_completed", "kind": "work_cap", "scope": "literal"}]}]}]}, {"arm": "fails", "false_code": "unsatisfied"}]},
+      "expect": {"arm": "not_completed", "kind": "work_cap", "scope": "literal"}
+    },
+    {
+      "name": "closure_request_stop_not_absorbed_by_present_head",
+      "why": "a request-wide stop is not discharged by a present head",
+      "expr": {"op": "or", "args": [{"op": "not", "args": [{"arm": "not_completed", "kind": "host_refusal", "scope": "request"}]}, {"arm": "holds"}]},
+      "expect": {"arm": "not_completed", "kind": "host_refusal", "scope": "request"}
+    },
+    {
+      "name": "not_keeps_fault",
+      "why": "not U = U for a fault too",
+      "expr": {"op": "not", "args": [{"arm": "not_completed", "kind": "inconsistent_theory"}]},
+      "expect": {"arm": "not_completed", "kind": "inconsistent_theory"}
+    },
+    {
+      "name": "and_fails_keeps_fault",
+      "why": "a fault says the evidence is invalid, so a false conjunct cannot absorb it",
+      "expr": {"op": "and", "args": [{"arm": "fails", "false_code": "unsatisfied"}, {"arm": "not_completed", "kind": "inconsistent_theory"}]},
+      "expect": {"arm": "not_completed", "kind": "inconsistent_theory"}
+    },
+    {
+      "name": "and_limit_then_fault_reports_fault",
+      "why": "a fault outranks a caller's limit, whichever comes first",
+      "expr": {"op": "and", "args": [{"arm": "limit_exceeded", "limit": "check_nodes"}, {"arm": "not_completed", "kind": "malformed_outcome"}]},
+      "expect": {"arm": "not_completed", "kind": "malformed_outcome"}
+    },
+    {
+      "name": "and_fault_then_limit_reports_fault",
+      "why": "the same pair in the other order",
+      "expr": {"op": "and", "args": [{"arm": "not_completed", "kind": "malformed_outcome"}, {"arm": "limit_exceeded", "limit": "check_nodes"}]},
+      "expect": {"arm": "not_completed", "kind": "malformed_outcome"}
+    },
+    {
+      "name": "or_holds_keeps_fault",
+      "why": "a true disjunct cannot absorb a fault either",
+      "expr": {"op": "or", "args": [{"arm": "holds"}, {"arm": "not_completed", "kind": "inconsistent_theory"}]},
+      "expect": {"arm": "not_completed", "kind": "inconsistent_theory"}
+    },
+    {
+      "name": "and_request_stop_then_fault_reports_fault",
+      "why": "a fault outranks a dominant stop",
+      "expr": {"op": "and", "args": [{"arm": "not_completed", "kind": "host_refusal", "scope": "request"}, {"arm": "not_completed", "kind": "inconsistent_theory"}]},
+      "expect": {"arm": "not_completed", "kind": "inconsistent_theory"}
+    },
+    {
+      "name": "and_two_faults_reports_first",
+      "why": "within the fault class the leftmost is reported",
+      "expr": {"op": "and", "args": [{"arm": "not_completed", "kind": "inconsistent_theory"}, {"arm": "not_completed", "kind": "malformed_outcome"}]},
+      "expect": {"arm": "not_completed", "kind": "inconsistent_theory"}
+    },
+    {
+      "name": "closure_fault_not_discharged_by_present_head",
+      "why": "a present head does not discharge a fault",
+      "expr": {"op": "or", "args": [{"op": "not", "args": [{"arm": "not_completed", "kind": "malformed_outcome"}]}, {"arm": "holds"}]},
+      "expect": {"arm": "not_completed", "kind": "malformed_outcome"}
+    },
+    {
+      "name": "fault_at_literal_scope_is_refused",
+      "why": "a fault with a chosen local scope would be absorbed into an answer, so it cannot be constructed, and a hand-built one reads as malformed",
+      "construct": {"kind": "inconsistent_theory", "scope": "literal"},
+      "refused": true,
+      "expr": {"op": "and", "args": [{"arm": "fails", "false_code": "unsatisfied"}, {"arm": "not_completed", "kind": "inconsistent_theory", "scope": "literal"}]},
+      "expect": {"arm": "not_completed", "kind": "malformed_outcome"}
+    },
+    {
+      "name": "malformed_outcome_at_request_scope_is_refused",
+      "why": "a fault carries no scope at all, not even the widest",
+      "construct": {"kind": "malformed_outcome", "scope": "request"},
+      "refused": true,
+      "expr": {"op": "or", "args": [{"arm": "holds"}, {"arm": "not_completed", "kind": "malformed_outcome", "scope": "request"}]},
+      "expect": {"arm": "not_completed", "kind": "malformed_outcome"}
+    },
+    {
+      "name": "host_refusal_at_literal_scope_is_refused",
+      "why": "a host refusal is request-wide: the refusal channel is sticky for the run",
+      "construct": {"kind": "host_refusal", "scope": "literal"},
+      "refused": true,
+      "expr": {"op": "and", "args": [{"arm": "fails", "false_code": "unsatisfied"}, {"arm": "not_completed", "kind": "host_refusal", "scope": "literal"}]},
+      "expect": {"arm": "not_completed", "kind": "malformed_outcome"}
+    },
+    {
+      "name": "reply_unreadable_at_branch_scope_is_refused",
+      "why": "an unreadable reply is request-wide too",
+      "construct": {"kind": "reply_unreadable", "scope": "branch"},
+      "refused": true,
+      "expr": {"op": "or", "args": [{"arm": "holds"}, {"arm": "not_completed", "kind": "reply_unreadable", "scope": "branch"}]},
+      "expect": {"arm": "not_completed", "kind": "malformed_outcome"}
+    },
+    {
+      "name": "stop_without_scope_is_refused",
+      "why": "a stop always says how far it reaches",
+      "construct": {"kind": "capacity"},
+      "refused": true,
+      "expr": {"op": "and", "args": [{"arm": "fails", "false_code": "unsatisfied"}, {"arm": "not_completed", "kind": "capacity"}]},
+      "expect": {"arm": "not_completed", "kind": "malformed_outcome"}
+    }
+  ]
+}

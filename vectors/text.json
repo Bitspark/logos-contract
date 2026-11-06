@@ -1,0 +1,169 @@
+{
+  "seam": "logos TextTheory decision vector v1 (UNFROZEN v1)",
+  "note": "Language-AGNOSTIC tri-core THEORY-DECISION agreement vectors for the byte-string TextTheory (logos-core/text-theory@1.0.0). Each entry is a ground text atom (predicate + args) together with the PINNED Theory.decide outcome. The decision oracle is the search-side builtins (builtin_contains/starts_with/ends_with in core/rs/src/builtins.rs); contract/{rs,go,ts} TextTheory.decide MUST reproduce every outcome byte-for-byte (the §7 dual-conformance law). Operands are RAW Atom bytes, NOT the utf8-text embedding: {\"atom\": \"<utf8>\"} = a bare Atom of those UTF-8 bytes (the oracle's path); {\"text\": \"<s>\"} = the ontos-data utf8-text embedding (a Tuple, used to pin the not-an-atom -> text_does_not_hold class); {\"tuple\": [..]} = a raw compound Tuple. Empty needle/prefix/suffix HOLD. Outcome is \"holds\" or {\"fails\": \"<code>\"} where the code is one of the pinned host-band sub-codes text_does_not_hold | text_bad_arity | text_unknown_predicate. owns: contains, starts_with, ends_with.",
+  "identity": {
+    "id": "logos-core/text-theory",
+    "version": "1.0.0",
+    "config_digest_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "owns": {
+    "owned": ["contains", "starts_with", "ends_with"],
+    "not_owned": ["is", "<", "concat", "substring", "length", "text", "atom", "="]
+  },
+  "decisions": [
+    {
+      "name": "contains_hit",
+      "note": "'world' is a contiguous subslice of 'hello world'",
+      "pred": "contains",
+      "args": [{ "atom": "hello world" }, { "atom": "world" }],
+      "outcome": "holds"
+    },
+    {
+      "name": "contains_miss",
+      "note": "'moon' is absent from 'hello world'",
+      "pred": "contains",
+      "args": [{ "atom": "hello world" }, { "atom": "moon" }],
+      "outcome": { "fails": "text_does_not_hold" }
+    },
+    {
+      "name": "contains_empty_needle",
+      "note": "the empty needle is contained in everything (needle.is_empty -> true)",
+      "pred": "contains",
+      "args": [{ "atom": "abc" }, { "atom": "" }],
+      "outcome": "holds"
+    },
+    {
+      "name": "contains_empty_haystack_empty_needle",
+      "note": "empty contained in empty",
+      "pred": "contains",
+      "args": [{ "atom": "" }, { "atom": "" }],
+      "outcome": "holds"
+    },
+    {
+      "name": "contains_needle_longer",
+      "note": "needle longer than haystack -> not contained",
+      "pred": "contains",
+      "args": [{ "atom": "abc" }, { "atom": "abcd" }],
+      "outcome": { "fails": "text_does_not_hold" }
+    },
+    {
+      "name": "contains_full_equal",
+      "note": "a slice contains itself",
+      "pred": "contains",
+      "args": [{ "atom": "abc" }, { "atom": "abc" }],
+      "outcome": "holds"
+    },
+    {
+      "name": "contains_multibyte_byte_level",
+      "note": "matching is byte-level over the UTF-8 encoding, not codepoint-level",
+      "pred": "contains",
+      "args": [{ "atom": "héllo" }, { "atom": "éll" }],
+      "outcome": "holds"
+    },
+    {
+      "name": "contains_non_atom_haystack_compound",
+      "note": "a compound first arg is not a bare Atom -> the byte test cannot run",
+      "pred": "contains",
+      "args": [{ "tuple": [{ "atom": "f" }, { "atom": "x" }] }, { "atom": "x" }],
+      "outcome": { "fails": "text_does_not_hold" }
+    },
+    {
+      "name": "contains_text_embedding_arg_fails",
+      "note": "the utf8-text embedding is a Tuple, not a bare Atom -> not the oracle's raw-bytes path",
+      "pred": "contains",
+      "args": [{ "text": "hello" }, { "atom": "hel" }],
+      "outcome": { "fails": "text_does_not_hold" }
+    },
+    {
+      "name": "contains_arity1_bad_arity",
+      "note": "contains/1 is not a binary relation",
+      "pred": "contains",
+      "args": [{ "atom": "abc" }],
+      "outcome": { "fails": "text_bad_arity" }
+    },
+    {
+      "name": "contains_arity3_bad_arity",
+      "note": "contains/3 is not a binary relation",
+      "pred": "contains",
+      "args": [{ "atom": "a" }, { "atom": "b" }, { "atom": "c" }],
+      "outcome": { "fails": "text_bad_arity" }
+    },
+    {
+      "name": "starts_with_hit",
+      "note": "'crates/foo' starts with 'crates/'",
+      "pred": "starts_with",
+      "args": [{ "atom": "crates/foo" }, { "atom": "crates/" }],
+      "outcome": "holds"
+    },
+    {
+      "name": "starts_with_miss",
+      "note": "'apps/x' does not start with 'crates/'",
+      "pred": "starts_with",
+      "args": [{ "atom": "apps/x" }, { "atom": "crates/" }],
+      "outcome": { "fails": "text_does_not_hold" }
+    },
+    {
+      "name": "starts_with_empty_prefix",
+      "note": "every slice starts with the empty prefix",
+      "pred": "starts_with",
+      "args": [{ "atom": "abc" }, { "atom": "" }],
+      "outcome": "holds"
+    },
+    {
+      "name": "starts_with_prefix_longer",
+      "note": "a prefix longer than the text cannot match",
+      "pred": "starts_with",
+      "args": [{ "atom": "ab" }, { "atom": "abc" }],
+      "outcome": { "fails": "text_does_not_hold" }
+    },
+    {
+      "name": "starts_with_non_atom_prefix_tuple",
+      "note": "a compound prefix is not a bare Atom",
+      "pred": "starts_with",
+      "args": [{ "atom": "abc" }, { "tuple": [{ "atom": "a" }] }],
+      "outcome": { "fails": "text_does_not_hold" }
+    },
+    {
+      "name": "starts_with_arity1_bad_arity",
+      "note": "starts_with/1 is not a binary relation",
+      "pred": "starts_with",
+      "args": [{ "atom": "abc" }],
+      "outcome": { "fails": "text_bad_arity" }
+    },
+    {
+      "name": "ends_with_hit",
+      "note": "'foo.tar.gz' ends with '.gz'",
+      "pred": "ends_with",
+      "args": [{ "atom": "foo.tar.gz" }, { "atom": ".gz" }],
+      "outcome": "holds"
+    },
+    {
+      "name": "ends_with_miss",
+      "note": "'apps/phos-studio' does not end with 'crates/'",
+      "pred": "ends_with",
+      "args": [{ "atom": "apps/phos-studio" }, { "atom": "crates/" }],
+      "outcome": { "fails": "text_does_not_hold" }
+    },
+    {
+      "name": "ends_with_empty_suffix",
+      "note": "every slice ends with the empty suffix",
+      "pred": "ends_with",
+      "args": [{ "atom": "abc" }, { "atom": "" }],
+      "outcome": "holds"
+    },
+    {
+      "name": "ends_with_suffix_longer",
+      "note": "a suffix longer than the text cannot match",
+      "pred": "ends_with",
+      "args": [{ "atom": "ab" }, { "atom": "abc" }],
+      "outcome": { "fails": "text_does_not_hold" }
+    },
+    {
+      "name": "ends_with_arity3_bad_arity",
+      "note": "ends_with/3 is not a binary relation",
+      "pred": "ends_with",
+      "args": [{ "atom": "a" }, { "atom": "b" }, { "atom": "c" }],
+      "outcome": { "fails": "text_bad_arity" }
+    }
+  ]
+}

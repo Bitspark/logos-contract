@@ -1,0 +1,42 @@
+{
+  "spi": "logos-contract accessor-totality pins v2",
+  "issue": 2733,
+  "note": "An INTERFACE section (vectors/CORPUS-CLASSES.md): every case has ONE outcome, identical in every core, and a per-core key here is refused. Until #2733 this file keyed outcomes per core to pin a known interface-parity defect (#728, ADR 0012): the partial BodyLit inner() accessor failed differently on a Count (rs trapped, go/ts returned the empty goal). That accessor was deleted tri-core in #2733 (seat:caa, D1), so the total as_inner()/AsInner()/asInner() is the only accessor, and its behaviour was always uniform. OUTCOME VOCABULARY: goal = returned the underlying Pos/Neg goal; none = the absent value (None / ok=false / null). The fixture is neutral vocabulary (ADR 0025).",
+  "fixture": {
+    "goal": {
+      "pred": "q",
+      "args": [
+        {
+          "atom_str": "a"
+        }
+      ]
+    },
+    "count": {
+      "pred": "r",
+      "arity": 1,
+      "filter": [],
+      "project": "rows",
+      "count_var": "N"
+    }
+  },
+  "cases": [
+    {
+      "name": "as_inner_on_pos",
+      "accessor": "as_inner",
+      "variant": "pos",
+      "outcome": "goal"
+    },
+    {
+      "name": "as_inner_on_neg",
+      "accessor": "as_inner",
+      "variant": "neg",
+      "outcome": "goal"
+    },
+    {
+      "name": "as_inner_on_count",
+      "accessor": "as_inner",
+      "variant": "count",
+      "outcome": "none"
+    }
+  ]
+}

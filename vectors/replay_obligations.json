@@ -1,0 +1,5134 @@
+{
+  "schema": "replay-obligations/v2",
+  "note": "Declared replay obligations per vector file (#2732, design vectors/REPLAY-ACCOUNTING.md). HAND-DECLARED, never derived from what the replays happen to do. Checked by conformance/rs/tests/replay_obligations.rs (increment 1: static, file-level; the per-assertion ledgers are increment 2). `cases` locates each file's cases: `path` is a dotted JSON path (`$` is the whole file), `id` is the key naming each case, `#index` for cases named by position, `#N` for tuple rows named by their Nth element, `$file` for a file that is one case. Each locator declares its corpus `class`, `interface`, `capability` or `integration` (#2733, vectors/CORPUS-CLASSES.md), with no default; an interface section keys no value by core, and a capability section does so only on a file that carries `pending_profiles: <issue>`, a counted interim the check permits on value_depth.json alone until #2733 increment 2 keys it by profile. Locators that share one array split it with `select` (`{field, equals}` or `{field, absent: true}`), and every case of the array belongs to exactly one of them. `waivers` (optional) lists temporary failures against an interface or capability case's uniform expectation: `case`, `assertion`, `target`, `signature`, `issue`, `owner`; a waiver expires at the next release cut. `assertions` is EXPLICIT (no default): the fields a case PINS as a result, or `outcome` where the result is carried by the case's section or row rather than by a field. `targets` per obliged deployment: `replays` (a source in that core names the file), `harness` (conformance/harness.mjs drives that core's CLI over it), or `{not_applicable: <reason>}` with a reason from `scope_reasons`, or `{unreplayed: <issue>}` for a replay the core OWES but does not perform (a tracked gap, never a pass: the check reds if a reader appears while it is still declared unreplayed, and it is refused on a tri_core_required file). `accounting` (optional, #2732 increment 2): `ledger` when the file's `replays` targets write a per-assertion ledger line through their core's adapter, checked by `replay_accounting` (conformance/rs/src/bin) against the obligations conformance/rs/src/replay_manifest.rs expands; absent or `static` when only this file-level check applies. `inputs`, `containers`, `unreviewed` and `input_reasons` (#2732 increment 2b, the closed world): every key a file's cases carry outside an assertion's value is an id key, an input (read by the replays or ignored, never compared), a container (holds assertions, is not compared itself) or unreviewed (a replay compares it and the file does not assert it yet; each is classified under `unreviewed_issue`, and the list only shrinks). An input whose value carries an assertion is refused for the file's owner to settle. An input that another file asserts, or that is named like an expected field, carries a one-line reason in `input_reasons`.",
+  "targets": [
+    "rs",
+    "go",
+    "ts",
+    "rs-cli",
+    "go-guest",
+    "ts-guest"
+  ],
+  "obliged": [
+    "rs",
+    "go",
+    "ts"
+  ],
+  "scope_reasons": {
+    "rs-cli-surface": "pins the logos binary's own contract; no go or ts binary carries it",
+    "engine-tier": "pins behaviour of a Rust-tier search engine or builtin (ADR 0004 tiering); ADR 0013 permits a reimplementation and does not require one",
+    "host-embedding": "pins a host-side API that exists only in go and ts"
+  },
+  "relational_reasons": {
+    "no-budget": "no LimitKind governs the operation: a codec, a digest, an identity, a parse, a declaration table, a decision table or a theory decision, so no allowance can be raised",
+    "completion-not-readable": "the file runs a budget-governed operation, but its cases do not state completion in a field a predicate can read (outcomes nested per group, or search and check expectations mixed in one case); caa's ruling on increment 3, Q1, puts such a file on this list, never silently out"
+  },
+  "vocabulary": [
+    "band",
+    "code",
+    "digest",
+    "digest_hex",
+    "*_digest_hex",
+    "expect",
+    "expect_*",
+    "expected",
+    "expected_*",
+    "outcome",
+    "refusal",
+    "refused",
+    "refused_*",
+    "reject",
+    "rejection",
+    "stage",
+    "verdict"
+  ],
+  "files": {
+    "host_memory.json": {
+      "cases": [{ "path": "cases", "id": "name", "class": "capability" }],
+      "metadata": ["spi", "issue", "capability", "registry", "note"],
+      "assertions": ["outcome"],
+      "inputs": ["profile", "offset", "construction", "injected_cap"],
+      "targets": {
+        "rs": { "not_applicable": "host-embedding" },
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": { "excluded": "no-budget" }
+    },
+    "accessor_totality.json": {
+      "cases": [
+        {
+          "path": "cases",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "spi",
+        "issue",
+        "note",
+        "fixture"
+      ],
+      "assertions": [
+        "outcome"
+      ],
+      "inputs": [
+        "accessor",
+        "variant"
+      ],
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "account-v2-list.json": {
+      "accounting": "ledger",
+      "cases": [
+        {
+          "path": "check_correspondence.account_equal",
+          "id": "case",
+          "class": "interface"
+        },
+        {
+          "path": "check_correspondence.account_distinct",
+          "id": "case",
+          "class": "interface"
+        },
+        {
+          "path": "fixtures",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "vector",
+        "note",
+        "default",
+        "reified",
+        "check_correspondence.note"
+      ],
+      "assertions": [
+        "cons_wire_hex",
+        "list_wire_hex",
+        "outcome"
+      ],
+      "inputs": [
+        "a",
+        "b",
+        "canonical",
+        "claim",
+        "cons",
+        "list",
+        "why"
+      ],
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "tri_core_required": true,
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "account.json": {
+      "cases": [
+        {
+          "path": "clauses",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "spi",
+        "note",
+        "clause_prefix_hex"
+      ],
+      "assertions": [
+        "id"
+      ],
+      "inputs": [
+        "args",
+        "atom_str",
+        "body",
+        "head",
+        "neg",
+        "pred",
+        "var"
+      ],
+      "targets": {
+        "rs": "harness",
+        "go": "harness",
+        "ts": "harness"
+      },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "aggregation.json": {
+      "cases": [
+        {
+          "path": "cases",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "spi",
+        "profile",
+        "note",
+        "extensional",
+        "edb",
+        "program",
+        "certs"
+      ],
+      "assertions": [
+        "outcome",
+        "reject"
+      ],
+      "inputs": [
+        "C",
+        "G",
+        "N",
+        "O",
+        "S",
+        "T",
+        "args",
+        "arity",
+        "atom_str",
+        "cert",
+        "certs",
+        "claim",
+        "clause",
+        "conclusion",
+        "count",
+        "decimal",
+        "derivation",
+        "distinct",
+        "filter",
+        "int",
+        "k",
+        "kind",
+        "limits",
+        "max",
+        "max_term_depth",
+        "min",
+        "nodes",
+        "note",
+        "pos",
+        "pred",
+        "premises",
+        "project",
+        "root",
+        "subst",
+        "sum",
+        "tuple",
+        "value"
+      ],
+      "input_reasons": {
+        "max_term_depth": "fed: contract/go/aggregation_vectors_test.go:57 decodes the case's check limit",
+        "nodes": "fed: contract/go/aggregation_vectors_test.go:47 decodes the derivation's nodes",
+        "root": "fed: contract/go/aggregation_vectors_test.go:48 decodes the derivation's root"
+      },
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "runs": [
+          {
+            "section": "cases",
+            "when": [
+              {
+                "at": "outcome",
+                "in": [
+                  "accept"
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "allowances.json": {
+      "cases": [
+        {
+          "path": "kinds",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "vector",
+        "issue",
+        "note",
+        "raised",
+        "reasons",
+        "cores"
+      ],
+      "assertions": [
+        "carriers",
+        "excluded"
+      ],
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "anonymous_variable.json": {
+      "cases": [
+        {
+          "path": "facts",
+          "id": "#index",
+          "class": "interface"
+        },
+        {
+          "path": "rules",
+          "id": "id",
+          "class": "interface"
+        },
+        {
+          "path": "queries",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "vector",
+        "note",
+        "source"
+      ],
+      "assertions": [
+        "answers"
+      ],
+      "inputs": [
+        "args",
+        "atom_str",
+        "body",
+        "goal",
+        "head",
+        "pred",
+        "var"
+      ],
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "runs": [
+          {
+            "section": "queries",
+            "when": []
+          }
+        ]
+      }
+    },
+    "answer_envelope.json": {
+      "cases": [
+        {
+          "path": "defaults",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "non_default",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "refusals",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "coordinates",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "seam",
+        "note",
+        "gate_refusal"
+      ],
+      "assertions": [
+        "refusal",
+        "wire_hex",
+        "coordinate"
+      ],
+      "inputs": [
+        "form",
+        "model"
+      ],
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "append_length_differential.json": {
+      "cases": [
+        {
+          "path": "cases",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "seam",
+        "note",
+        "bundle"
+      ],
+      "assertions": [
+        "answer"
+      ],
+      "inputs": [
+        "answer_var",
+        "args",
+        "atom_str",
+        "clause_answer",
+        "goal",
+        "kind",
+        "note",
+        "pred",
+        "tuple",
+        "var"
+      ],
+      "targets": {
+        "rs": "replays",
+        "go": {
+          "not_applicable": "engine-tier"
+        },
+        "ts": {
+          "not_applicable": "engine-tier"
+        }
+      },
+      "relational": {
+        "runs": [
+          {
+            "section": "cases",
+            "when": []
+          }
+        ]
+      }
+    },
+    "arithmetic.json": {
+      "cases": [
+        {
+          "path": "decisions",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "decimal_spellings.rows",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "seam",
+        "note",
+        "identity",
+        "owns",
+        "decimal_spellings.note",
+        "decimal_spellings.max_exponent"
+      ],
+      "assertions": [
+        "outcome",
+        "parses"
+      ],
+      "inputs": [
+        "args",
+        "atom",
+        "bigint",
+        "decimal",
+        "int",
+        "note",
+        "op",
+        "pred",
+        "prefix",
+        "suffix",
+        "text",
+        "tuple",
+        "zeros"
+      ],
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "asked.json": {
+      "cases": [
+        {
+          "path": "cases",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "distinct",
+          "id": "#index",
+          "class": "interface"
+        },
+        {
+          "path": "refused",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "refused_plan",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "policies",
+          "id": "#index",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "spi",
+        "issue",
+        "note",
+        "profiles"
+      ],
+      "assertions": [
+        "outcome",
+        "wire_hex",
+        "served"
+      ],
+      "inputs": [
+        "a",
+        "authorized",
+        "axis",
+        "b",
+        "binding",
+        "component_fallbacks",
+        "composition_refused",
+        "effective",
+        "executed",
+        "id",
+        "note",
+        "origin",
+        "origins",
+        "policy",
+        "requested",
+        "rule",
+        "side_condition",
+        "stratum",
+        "version",
+        "why"
+      ],
+      "input_reasons": {
+        "id": "fed: kernel/go/seam/asked_vectors_test.go:38 decodes the refused rule's id"
+      },
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "tri_core_required": true,
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "attestation_scope.json": {
+      "cases": [
+        {
+          "path": "scope",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "naming",
+          "id": "#index",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "seam",
+        "note"
+      ],
+      "assertions": [
+        "expected",
+        "wire_hex",
+        "literal_kind"
+      ],
+      "inputs": [
+        "arity",
+        "c1",
+        "c2",
+        "c9",
+        "cited",
+        "lit",
+        "pred",
+        "record"
+      ],
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "bottom_up_theory.json": {
+      "cases": [
+        {
+          "path": "cases",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "seam",
+        "note"
+      ],
+      "assertions": [
+        "standard"
+      ],
+      "inputs": [
+        "body",
+        "count",
+        "head",
+        "neg",
+        "old_rule",
+        "program",
+        "why"
+      ],
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "tri_core_required": true,
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "cert_encoded_bytes.json": {
+      "cases": [
+        {
+          "path": "cases",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "note"
+      ],
+      "assertions": [
+        "cert_bytes",
+        "produced",
+        "derivation_wire"
+      ],
+      "inputs": [],
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "cert_wire_spans.json": {
+      "cases": [
+        {
+          "path": "cases",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "note",
+        "cert_bytes_slack"
+      ],
+      "assertions": [
+        "refused",
+        "at",
+        "over_budget",
+        "spans",
+        "starts",
+        "tag",
+        "walk"
+      ],
+      "inputs": [
+        "frame",
+        "max_cert_bytes",
+        "measures",
+        "path"
+      ],
+      "input_reasons": {
+        "path": "fed: contract/go/cert_wire_spans_vectors_test.go:23 selects the span under test by it"
+      },
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "excluded": "completion-not-readable"
+      }
+    },
+    "certify.json": {
+      "cases": [
+        {
+          "path": "derived_digest",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "gate",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "seam",
+        "note"
+      ],
+      "assertions": [
+        "band",
+        "code",
+        "digest"
+      ],
+      "inputs": [],
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "check.json": {
+      "cases": [
+        {
+          "path": "cases",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "spi",
+        "profile",
+        "note",
+        "program"
+      ],
+      "assertions": [
+        "outcome",
+        "reject"
+      ],
+      "inputs": [
+        "X",
+        "Y",
+        "Z",
+        "args",
+        "atom",
+        "atom_str",
+        "claim",
+        "clause",
+        "conclusion",
+        "derivation",
+        "functor",
+        "kind",
+        "leaf",
+        "limits",
+        "max_depth",
+        "max_nodes",
+        "max_term_depth",
+        "nest",
+        "nodes",
+        "note",
+        "pred",
+        "premises",
+        "root",
+        "subst",
+        "times",
+        "tuple"
+      ],
+      "input_reasons": {
+        "max_nodes": "fed: contract/go/cmd/conformance/main.go:411 decodes the case's check limit (the harness)",
+        "max_term_depth": "fed: contract/go/cmd/conformance/main.go:413 decodes the case's check limit (the harness)",
+        "nodes": "fed: contract/go/cmd/conformance/main.go:416 decodes the derivation's nodes (the harness)",
+        "root": "fed: contract/go/cmd/conformance/main.go:417 decodes the derivation's root (the harness)"
+      },
+      "targets": {
+        "rs": "harness",
+        "go": "harness",
+        "ts": "harness"
+      },
+      "relational": {
+        "runs": [
+          {
+            "section": "cases",
+            "when": [
+              {
+                "at": "outcome",
+                "in": [
+                  "accept"
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "cli-exit.json": {
+      "cases": [
+        {
+          "path": "cases",
+          "id": "name",
+          "class": "integration",
+          "targets": { "rs": "replays" }
+        }
+      ],
+      "metadata": [
+        "vector",
+        "note",
+        "exit_codes",
+        "ndjson_records"
+      ],
+      "assertions": [
+        "exit",
+        "stdout_contains"
+      ],
+      "inputs": [
+        "args",
+        "meaning",
+        "note",
+        "reachable_from_valid_input",
+        "stdin"
+      ],
+      "targets": {
+        "rs": "replays",
+        "go": {
+          "not_applicable": "rs-cli-surface"
+        },
+        "ts": {
+          "not_applicable": "rs-cli-surface"
+        }
+      }
+    },
+    "cli-output.json": {
+      "cases": [
+        {
+          "path": "$",
+          "id": "$file",
+          "class": "integration",
+          "targets": { "rs": "replays" }
+        }
+      ],
+      "assertions": [
+        "answers_wire_hex",
+        "declines",
+        "expect_code",
+        "expect_delta_code",
+        "expect_providers",
+        "json",
+        "ndjson",
+        "refused",
+        "schema_version"
+      ],
+      "inputs": [
+        "arity",
+        "goal",
+        "note",
+        "pred",
+        "program",
+        "vector"
+      ],
+      "targets": {
+        "rs": "replays",
+        "go": {
+          "not_applicable": "rs-cli-surface"
+        },
+        "ts": {
+          "not_applicable": "rs-cli-surface"
+        }
+      }
+    },
+    "cli_behaviour.json": {
+      "cases": [
+        {
+          "path": "cases",
+          "id": "name",
+          "class": "integration",
+          "targets": { "rs": "replays" }
+        }
+      ],
+      "metadata": [
+        "spi",
+        "issue",
+        "note"
+      ],
+      "assertions": [
+        "expect"
+      ],
+      "inputs": [
+        "program",
+        "query",
+        "why"
+      ],
+      "targets": {
+        "rs": "replays",
+        "go": {
+          "unreplayed": "#2791"
+        },
+        "ts": {
+          "unreplayed": "#2791"
+        }
+      }
+    },
+    "closed_model_cert_digest.json": {
+      "cases": [
+        {
+          "path": "fixtures",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "seam",
+        "note",
+        "prefixes"
+      ],
+      "assertions": [
+        "digest_hex",
+        "wire_hex"
+      ],
+      "inputs": [
+        "note"
+      ],
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "closure_certificate.json": {
+      "cases": [
+        {
+          "path": "closure_certificate.positive",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "closure_certificate.malformed",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "source_closure_declaration.positive",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "boundary_requirement.positive",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "spi",
+        "note",
+        "prefixes",
+        "closure_certificate.distinct"
+      ],
+      "assertions": [
+        "digest_hex",
+        "wire_hex"
+      ],
+      "inputs": [
+        "note",
+        "why"
+      ],
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "commit.json": {
+      "cases": [
+        {
+          "path": "activation_barrier.cases",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "one_generation.cases",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "no_partial_success.cases",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "refusal_carries_the_violation.cases",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "generation_ordering.cases",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "tier_without_an_evidence_format_is_refused_before_the_ladder.cases",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "spi",
+        "note",
+        "spec_source",
+        "activation_barrier.law",
+        "activation_barrier.derivation",
+        "one_generation.law",
+        "one_generation.derivation",
+        "no_partial_success.law",
+        "no_partial_success.derivation",
+        "refusal_carries_the_violation.law",
+        "refusal_carries_the_violation.derivation",
+        "refusal_carries_the_violation.negative_control",
+        "generation_ordering.law",
+        "generation_ordering.derivation",
+        "tier_without_an_evidence_format_is_refused_before_the_ladder.law",
+        "tier_without_an_evidence_format_is_refused_before_the_ladder.derivation"
+      ],
+      "assertions": [
+        "expect",
+        "must_not_be",
+        "must_not_report",
+        "refusal_reports",
+        "may_run",
+        "output_visible",
+        "violation"
+      ],
+      "inputs": [
+        "certificate_visible",
+        "generation_advanced",
+        "min_tier",
+        "output_generation_equals_certificate_generation",
+        "producer_trusted",
+        "sequence_strictly_increasing",
+        "started_component_generation_equals_commit_generation",
+        "state",
+        "steps",
+        "tier",
+        "validation_passes",
+        "why",
+        "wraps"
+      ],
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "completeness.json": {
+      "cases": [
+        {
+          "path": "request_completeness",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "termination_status",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "relation_completeness",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "distinct",
+          "id": "#index",
+          "class": "interface"
+        },
+        {
+          "path": "recovery",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "binding_id",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "incomplete_cause",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "completeness",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "exhaustion_policy",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "spi",
+        "note"
+      ],
+      "assertions": [
+        "binding_hex",
+        "error_hex",
+        "wire_hex"
+      ],
+      "inputs": [
+        "a",
+        "attempted",
+        "b",
+        "by_relation",
+        "cause",
+        "causes",
+        "component",
+        "fallback",
+        "kind",
+        "modes",
+        "note",
+        "predicate",
+        "recovery",
+        "relation",
+        "request",
+        "termination",
+        "tier",
+        "value"
+      ],
+      "input_reasons": {
+        "cause": "fed: kernel/go/seam/completeness_vectors_test.go:88 decodes an incomplete cause into the value encoded"
+      },
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "completeness_certificate_digest.json": {
+      "cases": [
+        {
+          "path": "fixtures",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "seam",
+        "note",
+        "prefixes"
+      ],
+      "assertions": [
+        "digest_hex",
+        "wire_hex",
+        "links"
+      ],
+      "inputs": [
+        "note"
+      ],
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "completeness_gate.json": {
+      "cases": [
+        {
+          "path": "rows",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "vector",
+        "schema_version",
+        "note",
+        "fixtures",
+        "tampers"
+      ],
+      "assertions": [
+        "code",
+        "expect",
+        "reject"
+      ],
+      "inputs": [
+        "fixture",
+        "limits",
+        "max_cert_facts",
+        "max_domain_values",
+        "tamper"
+      ],
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "runs": [
+          {
+            "section": "rows",
+            "when": [
+              {
+                "at": "expect.step",
+                "in": [
+                  "accept"
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "completion_algebra.json": {
+      "cases": [
+        {
+          "path": "cases",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "description",
+        "version",
+        "vocabulary"
+      ],
+      "assertions": [
+        "expect",
+        "refused"
+      ],
+      "inputs": [
+        "args",
+        "arm",
+        "construct",
+        "expr",
+        "false_code",
+        "kind",
+        "limit",
+        "op",
+        "scope",
+        "why"
+      ],
+      "input_reasons": {
+        "arm": "fed: contract/rs/tests/completion_vectors.rs:129 decodes an operand's arm into a Completion",
+        "limit": "fed: contract/rs/tests/completion_vectors.rs:137 decodes a limit_exceeded operand's limit"
+      },
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "tri_core_required": true,
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "composed_derivation.json": {
+      "cases": [
+        {
+          "path": "cases",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "spi",
+        "profile",
+        "note",
+        "program"
+      ],
+      "assertions": [
+        "expect_flatten",
+        "outcome",
+        "reject"
+      ],
+      "inputs": [
+        "W",
+        "X",
+        "Y",
+        "Z",
+        "args",
+        "atom_str",
+        "claim",
+        "clause",
+        "components",
+        "conclusion",
+        "derivation",
+        "imports",
+        "kind",
+        "local",
+        "node",
+        "nodes",
+        "note",
+        "pred",
+        "premises",
+        "producer",
+        "proof",
+        "root",
+        "subst"
+      ],
+      "input_reasons": {
+        "components": "fed: core/rs/tests/composed_derivation_vectors.rs:223 decodes a case's components into the composed proof it checks",
+        "nodes": "fed: core/rs/tests/composed_derivation_vectors.rs:155 decodes a component proof's nodes",
+        "root": "fed: core/rs/tests/composed_derivation_vectors.rs:161 decodes a component proof's root"
+      },
+      "targets": {
+        "rs": "replays",
+        "go": "harness",
+        "ts": "harness"
+      },
+      "relational": {
+        "runs": [
+          {
+            "section": "cases",
+            "when": [
+              {
+                "at": "outcome",
+                "in": [
+                  "accept"
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "compound.json": {
+      "cases": [
+        {
+          "path": "decisions",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "seam",
+        "note",
+        "members",
+        "identity",
+        "owns"
+      ],
+      "assertions": [
+        "outcome"
+      ],
+      "inputs": [
+        "args",
+        "atom",
+        "int",
+        "note",
+        "op",
+        "pred"
+      ],
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "cost.json": {
+      "cases": [
+        {
+          "path": "cases",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "family",
+        "note",
+        "term_notation"
+      ],
+      "assertions": [
+        "answers",
+        "relational_rounds",
+        "relational_tuples",
+        "seminaive_rounds",
+        "seminaive_tuples",
+        "sldnf_steps"
+      ],
+      "inputs": [
+        "args",
+        "arity",
+        "atom_str",
+        "body",
+        "extensional",
+        "head",
+        "note",
+        "pred",
+        "program",
+        "query",
+        "var"
+      ],
+      "input_reasons": {
+        "extensional": "fed: conformance/rs/tests/cost_vectors.rs:145 builds the program's extensional set from it"
+      },
+      "targets": {
+        "rs": "replays",
+        "go": {
+          "not_applicable": "engine-tier"
+        },
+        "ts": {
+          "not_applicable": "engine-tier"
+        }
+      },
+      "relational": {
+        "runs": [
+          {
+            "section": "cases",
+            "when": []
+          }
+        ]
+      }
+    },
+    "dataset_snapshot.json": {
+      "cases": [
+        {
+          "path": "dataset_snapshot",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "seam",
+        "note"
+      ],
+      "assertions": [
+        "snapshot_id"
+      ],
+      "inputs": [
+        "bindings",
+        "body",
+        "facts",
+        "head",
+        "id",
+        "key",
+        "program"
+      ],
+      "input_reasons": {
+        "id": "fed: kernel/go/seam/dataset_vectors_test.go:27 decodes the snapshot program's rule id"
+      },
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "decode_stop.json": {
+      "cases": [
+        {
+          "path": "stops",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "restriction",
+          "id": "#index",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "vector",
+        "note",
+        "codec_max_depth",
+        "prefix_depth"
+      ],
+      "assertions": [
+        "code",
+        "expect"
+      ],
+      "inputs": [
+        "cause",
+        "file",
+        "hex",
+        "note"
+      ],
+      "input_reasons": {
+        "cause": "fed: kernel/rs/tests/decode_stop_vectors.rs:111 reads a row's cause name to select the case",
+        "hex": "fed: kernel/rs/tests/decode_stop_vectors.rs:64 decodes the stop's bytes from it"
+      },
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "decider_completion.json": {
+      "cases": [
+        {
+          "path": "declarations",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "seal_verdicts",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "vector",
+        "note",
+        "census"
+      ],
+      "assertions": [
+        "completion",
+        "decider",
+        "expect",
+        "verdict"
+      ],
+      "inputs": [
+        "arity",
+        "facts",
+        "goal",
+        "host_builtins",
+        "id",
+        "note",
+        "pred",
+        "rules",
+        "seal",
+        "source",
+        "theory",
+        "version"
+      ],
+      "input_reasons": {
+        "id": "fed: app/wasm/rs/src/tests_seal_verdict_3142.rs:44 builds each rule's clause id from it, and a declared host builtin's id at :58"
+      },
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "tri_core_required": true,
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "decomposition_witness.json": {
+      "cases": [
+        {
+          "path": "decomposition_witness.positive",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "decomposition_witness.malformed",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "seam",
+        "note",
+        "prefixes",
+        "decomposition_witness.distinct",
+        "decomposition_witness.sa1",
+        "decomposition_witness.sa2"
+      ],
+      "assertions": [
+        "analysis_digest_hex",
+        "digest_hex",
+        "program_digest_hex",
+        "wire_hex"
+      ],
+      "inputs": [
+        "components",
+        "edges",
+        "from",
+        "global_semantics",
+        "id",
+        "negated",
+        "note",
+        "predicates",
+        "rule",
+        "to",
+        "version",
+        "why"
+      ],
+      "input_reasons": {
+        "components": "fed: kernel/go/seam/decomposition_witness_vectors_test.go:117 decodes the strata the witness encodes",
+        "edges": "fed: kernel/go/seam/decomposition_witness_vectors_test.go:46 decodes the witness edges it encodes",
+        "from": "fed: kernel/go/seam/decomposition_witness_vectors_test.go:31 decodes a witness edge's source",
+        "id": "fed: kernel/go/seam/decomposition_witness_vectors_test.go:26 decodes a component id into the witness it encodes",
+        "to": "fed: kernel/go/seam/decomposition_witness_vectors_test.go:32 decodes a witness edge's target"
+      },
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "demand_pattern.json": {
+      "cases": [
+        {
+          "path": "demand_pattern.positive",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "demand_pattern.malformed",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "snapshot_id",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "epoch",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "spi",
+        "note",
+        "prefix",
+        "demand_pattern.distinct"
+      ],
+      "assertions": [
+        "digest_hex",
+        "snapshot_hex",
+        "wire_hex"
+      ],
+      "inputs": [
+        "epoch",
+        "filter",
+        "modes",
+        "note",
+        "why"
+      ],
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "derivation_wire.json": {
+      "cases": [
+        {
+          "path": "positive",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "malformed",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "decodes",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "spi",
+        "wrapper_tag",
+        "note"
+      ],
+      "assertions": [
+        "refusal",
+        "wire_hex",
+        "nodes",
+        "root",
+        "seam_refusal"
+      ],
+      "inputs": [
+        "layer",
+        "note"
+      ],
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "door_reply.json": {
+      "cases": [
+        {
+          "path": "replies",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "refusals",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "reply_stops",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "vector",
+        "note"
+      ],
+      "assertions": [
+        "code",
+        "expect",
+        "outcome",
+        "wire"
+      ],
+      "inputs": [
+        "cause",
+        "declined_after_prepare",
+        "detail",
+        "engine_error",
+        "file",
+        "ill_typed_data",
+        "note",
+        "payload",
+        "phase",
+        "provider",
+        "reason",
+        "requirement_failure",
+        "resolution",
+        "stop",
+        "undecodable"
+      ],
+      "input_reasons": {
+        "cause": "fed: kernel/rs/src/runtime/door_reply.rs:396 builds each reply's cause from the failure_cause.json row it names",
+        "provider": "fed: kernel/rs/src/runtime/door_reply.rs:428 builds the declined_after_prepare and engine_error replies' provider from it",
+        "stop": "fed: kernel/go/runtime/door_reply_2734_test.go:291 and kernel/ts/test/door_reply_2734.test.ts:215 decode the decode_stop.json row a reply_stops row names"
+      },
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "edb_snapshot_set.json": {
+      "cases": [
+        {
+          "path": "equal",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "differ",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "vector",
+        "note",
+        "pred",
+        "arity",
+        "rows",
+        "table_agrees"
+      ],
+      "assertions": [
+        "outcome"
+      ],
+      "inputs": [
+        "lists"
+      ],
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "embed.json": {
+      "cases": [
+        {
+          "path": "cases",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "seam",
+        "note"
+      ],
+      "assertions": [
+        "answers",
+        "expect",
+        "outcome",
+        "report"
+      ],
+      "inputs": [
+        "goal",
+        "source"
+      ],
+      "targets": {
+        "rs": {
+          "not_applicable": "host-embedding"
+        },
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "runs": [
+          {
+            "section": "cases",
+            "when": [
+              {
+                "at": "expect.outcome",
+                "in": [
+                  "certified"
+                ]
+              },
+              {
+                "at": "expect.complete",
+                "in": [
+                  true
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "evidence.json": {
+      "cases": [
+        {
+          "path": "requires_evidence",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "validate",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "supports_offline_audit",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "rate_from_ppm",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "verify_retained",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "spi",
+        "note",
+        "validate_accepted_count",
+        "rate_from_ppm_scope"
+      ],
+      "assertions": [
+        "expected",
+        "expected_examined",
+        "expected_ppm",
+        "snapshot_hex",
+        "conflict_carries"
+      ],
+      "inputs": [
+        "accounts",
+        "kind",
+        "policy",
+        "ppm",
+        "retention",
+        "verify",
+        "why"
+      ],
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "exact_answer_set.json": {
+      "cases": [
+        {
+          "path": "cases",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "vector",
+        "schema_version",
+        "note"
+      ],
+      "assertions": [
+        "outcome",
+        "reject",
+        "mismatch"
+      ],
+      "inputs": [
+        "args",
+        "atom_str",
+        "emitted",
+        "goal",
+        "note",
+        "pred",
+        "sealed",
+        "tuple",
+        "var"
+      ],
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "runs": [
+          {
+            "section": "cases",
+            "when": [
+              {
+                "at": "outcome",
+                "in": [
+                  "accept"
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "exact_claims.json": {
+      "cases": [
+        {
+          "path": "cases",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "spi",
+        "profile",
+        "note",
+        "extensional",
+        "edb",
+        "program"
+      ],
+      "assertions": [
+        "outcome",
+        "reject"
+      ],
+      "inputs": [
+        "X",
+        "args",
+        "arity",
+        "atom",
+        "atom_str",
+        "cert",
+        "cert_bytes",
+        "cert_facts",
+        "claim",
+        "clause",
+        "closed_world",
+        "conclusion",
+        "derivation",
+        "domain_values",
+        "domains",
+        "extensions",
+        "join_steps",
+        "kind",
+        "level",
+        "limits_decl",
+        "neg",
+        "nodes",
+        "nonmember",
+        "note",
+        "pred",
+        "predicates",
+        "premises",
+        "root",
+        "rows",
+        "rule_groundings",
+        "scope",
+        "subst",
+        "support_edges",
+        "supports",
+        "tuple",
+        "type_tag",
+        "values"
+      ],
+      "input_reasons": {
+        "cert_bytes": "fed: contract/rs/src/bin/conformance.rs:780 reads it into the derivation's declared limits",
+        "level": "fed: contract/rs/src/bin/conformance.rs:681 reads it into the derivation's scope",
+        "nodes": "fed: contract/go/cmd/conformance/main.go:416 decodes the derivation's nodes (the harness)",
+        "root": "fed: contract/go/cmd/conformance/main.go:417 decodes the derivation's root (the harness)"
+      },
+      "targets": {
+        "rs": "harness",
+        "go": "harness",
+        "ts": "harness"
+      },
+      "relational": {
+        "runs": [
+          {
+            "section": "cases",
+            "when": [
+              {
+                "at": "outcome",
+                "in": [
+                  "accept"
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "execution_event.json": {
+      "cases": [
+        {
+          "path": "event",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "refusal",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "spi",
+        "note",
+        "metrics"
+      ],
+      "assertions": [
+        "refused",
+        "report",
+        "report_from",
+        "wire_hex",
+        "arm",
+        "batch",
+        "counter",
+        "output_identity"
+      ],
+      "inputs": [
+        "batch_from",
+        "note"
+      ],
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "failure_cause.json": {
+      "cases": [
+        {
+          "path": "cases",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "vector",
+        "note",
+        "replayed_by"
+      ],
+      "assertions": [
+        "expect",
+        "refusal",
+        "wire"
+      ],
+      "inputs": [
+        "why"
+      ],
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "refusal_causes.json": {
+      "cases": [
+        {
+          "path": "cases",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "guest_refusal_codes",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "guest_host_sites",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "vector",
+        "note"
+      ],
+      "assertions": [
+        "cause_hex"
+      ],
+      "inputs": [
+        "arity",
+        "at",
+        "bound",
+        "clause",
+        "code",
+        "completion",
+        "component",
+        "constructed_by",
+        "consumed",
+        "decider_hex",
+        "decline",
+        "engine",
+        "engine_hex",
+        "error",
+        "functor",
+        "gate",
+        "guest_code",
+        "input",
+        "kind",
+        "limit",
+        "name_hex",
+        "non_stratified_negation",
+        "producer",
+        "query",
+        "rule",
+        "rule_index",
+        "site",
+        "subject",
+        "token",
+        "unsupported_functor",
+        "unsupported_query_goal",
+        "why"
+      ],
+      "input_reasons": {
+        "at": "fed: kernel/rs/src/seam/refusal_sites.rs:361 reads a case input's site to build the refusal site",
+        "code": "fed: kernel/go/seam/refusal_causes_vectors_test.go:50 hands it to the door fault's site constructor, which files it as the fault's code",
+        "completion": "fed: kernel/rs/src/seam/refusal_sites.rs:455 selects the refusing DecisionCompletion (may_not_complete or undeclared) the replay's SealedDecider carries",
+        "decline": "fed: kernel/rs/src/seam/refusal_sites.rs:365 selects the engine decline code the constructor files",
+        "limit": "fed: kernel/go/seam/refusal_causes_vectors_test.go:59 hands it to CertWireOverBudget as the budget's limit",
+        "name_hex": "fed: kernel/rs/src/seam/refusal_sites.rs builds the refusal site from a subject predicate's name bytes"
+      },
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "fixpoint_budget.json": {
+      "cases": [
+        {
+          "path": "cases",
+          "id": "name",
+          "select": {
+            "field": "arm",
+            "absent": true
+          },
+          "class": "interface"
+        },
+        {
+          "path": "cases",
+          "id": "name",
+          "select": {
+            "field": "arm",
+            "equals": "guest"
+          },
+          "class": "integration",
+          "targets": { "rs": { "not_applicable": "host-embedding" }, "go": "replays", "ts": "replays" }
+        }
+      ],
+      "metadata": [
+        "vector",
+        "note",
+        "guest_arms",
+        "fixtures",
+        "replayed_by",
+        "replay_note",
+        "case_shapes"
+      ],
+      "assertions": [
+        "answers",
+        "band",
+        "decline",
+        "outcome",
+        "refused_code"
+      ],
+      "inputs": [
+        "arm",
+        "fixture",
+        "guarantee",
+        "limits",
+        "max_rounds",
+        "why"
+      ],
+      "input_reasons": {
+        "arm": "fed: kernel/go/wasm/fixpoint_budget_vectors_test.go:33 decodes the arm a case runs"
+      },
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "runs": [
+          {
+            "section": "cases",
+            "when": [
+              {
+                "at": "outcome.band",
+                "in": [
+                  "solved"
+                ]
+              },
+              {
+                "at": "outcome.limit",
+                "in": [
+                  null
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "fragment.json": {
+      "cases": [
+        {
+          "path": "cases",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "note"
+      ],
+      "assertions": [
+        "expect"
+      ],
+      "inputs": [
+        "arity",
+        "body",
+        "clause",
+        "count",
+        "filter",
+        "head",
+        "neg",
+        "note",
+        "owns",
+        "pred",
+        "program",
+        "reads_lower",
+        "result",
+        "seals"
+      ],
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "tri_core_required": true,
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "identity_audit.json": {
+      "cases": [
+        {
+          "path": "cases",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "spi",
+        "issue",
+        "note",
+        "unidentified",
+        "components",
+        "compound_wrapper"
+      ],
+      "assertions": [
+        "config_digest",
+        "distinguishable"
+      ],
+      "inputs": [
+        "members"
+      ],
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "identity_bytes.json": {
+      "cases": [
+        {
+          "path": "checker_feature_set.cases",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "escaped_name.cases",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "projection_kind.cases",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "bindings_key.cases",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "param_names.cases",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "bare_name.cases",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "open_mode_identity.cases",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "closure_producer_version.cases",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "theory_version.cases",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "component_binding_version.cases",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "plan_contract_version.cases",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "decomposition_rule_version.cases",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "selector_engine_id.cases",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "analysis_order.cases",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "analysis_predicate_identity.cases",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "cone_predicate_identity.cases",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "goal_predicate.cases",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "seal_plan_identity.cases",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "undefined_predicate_name.cases",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "pin_mismatch_binding.cases",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "note",
+        "checker_feature_set.base",
+        "checker_feature_set.base_ref",
+        "checker_feature_set.decoder",
+        "escaped_name.rule",
+        "projection_kind.rule",
+        "projection_kind.cores",
+        "bindings_key.rule",
+        "bindings_key.cores",
+        "bindings_key.not_reachable_in",
+        "param_names.rule",
+        "param_names.base_ref",
+        "param_names.base_expect",
+        "param_names.cores",
+        "bare_name.rule",
+        "bare_name.cores",
+        "open_mode_identity.rule",
+        "open_mode_identity.cores",
+        "closure_producer_version.rule",
+        "closure_producer_version.base_ref",
+        "closure_producer_version.decoder",
+        "closure_producer_version.value_path",
+        "closure_producer_version.cores",
+        "theory_version.rule",
+        "theory_version.base_ref",
+        "theory_version.decoder",
+        "theory_version.value_path",
+        "theory_version.cores",
+        "component_binding_version.rule",
+        "component_binding_version.base_ref",
+        "component_binding_version.decoder",
+        "component_binding_version.value_path",
+        "component_binding_version.cores",
+        "plan_contract_version.rule",
+        "plan_contract_version.base_ref",
+        "plan_contract_version.decoder",
+        "plan_contract_version.value_path",
+        "plan_contract_version.cores",
+        "plan_contract_version.not_decoded_by",
+        "decomposition_rule_version.rule",
+        "decomposition_rule_version.base_ref",
+        "decomposition_rule_version.decoder",
+        "decomposition_rule_version.value_path",
+        "decomposition_rule_version.cores",
+        "selector_engine_id.rule",
+        "selector_engine_id.base_ref",
+        "selector_engine_id.decoder",
+        "selector_engine_id.value_path",
+        "selector_engine_id.cores",
+        "selector_engine_id.not_decoded_by",
+        "analysis_order.rule",
+        "analysis_order.cores",
+        "analysis_predicate_identity.rule",
+        "analysis_predicate_identity.cores",
+        "cone_predicate_identity.rule",
+        "cone_predicate_identity.cores",
+        "cone_predicate_identity.not_reachable_in",
+        "goal_predicate.rule",
+        "goal_predicate.base_ref",
+        "goal_predicate.decoder",
+        "goal_predicate.value_path",
+        "goal_predicate.cores",
+        "seal_plan_identity.rule",
+        "seal_plan_identity.cores",
+        "undefined_predicate_name.rule",
+        "undefined_predicate_name.cores",
+        "pin_mismatch_binding.rule",
+        "pin_mismatch_binding.cores"
+      ],
+      "assertions": [
+        "outcome",
+        "rendered",
+        "kind_hex",
+        "key_hex",
+        "expect",
+        "bare_hex",
+        "name_hex",
+        "edges",
+        "strata",
+        "recursion",
+        "extensional",
+        "relations_complete",
+        "level",
+        "undefined",
+        "required_operand_hex",
+        "offered_operand_hex"
+      ],
+      "inputs": [
+        "arity",
+        "atom",
+        "body",
+        "bytes_hex",
+        "collides_with",
+        "goal",
+        "head",
+        "head_compound",
+        "id_hex",
+        "identity_hex",
+        "neg",
+        "note",
+        "occurrence",
+        "offered",
+        "pred",
+        "pred_hex",
+        "program",
+        "required",
+        "slot",
+        "substitute",
+        "substitutes",
+        "version_hex",
+        "with_hex"
+      ],
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "integer_domain_refusal.json": {
+      "cases": [
+        {
+          "path": "host_builtin_arity.cases",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "note",
+        "host_builtin_arity.field",
+        "host_builtin_arity.domain",
+        "host_builtin_arity.min",
+        "host_builtin_arity.max",
+        "host_builtin_arity.spec",
+        "host_builtin_arity.base",
+        "host_builtin_arity.decoders",
+        "host_builtin_arity.encoders",
+        "host_builtin_arity.not_decoded_by"
+      ],
+      "assertions": [
+        "expect",
+        "refusal",
+        "wire"
+      ],
+      "inputs": [
+        "arity",
+        "why"
+      ],
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "list.json": {
+      "cases": [
+        {
+          "path": "decisions",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "seam",
+        "note",
+        "identity",
+        "owns"
+      ],
+      "assertions": [
+        "outcome"
+      ],
+      "inputs": [
+        "args",
+        "atom",
+        "int",
+        "list",
+        "note",
+        "pred",
+        "tuple"
+      ],
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "list_relations.json": {
+      "cases": [
+        {
+          "path": "cases",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "seam",
+        "note",
+        "bundle"
+      ],
+      "assertions": [
+        "answers"
+      ],
+      "inputs": [
+        "answer_var",
+        "args",
+        "atom",
+        "atom_str",
+        "goal",
+        "note",
+        "pred",
+        "relation",
+        "tuple",
+        "var"
+      ],
+      "targets": {
+        "rs": "replays",
+        "go": {
+          "not_applicable": "engine-tier"
+        },
+        "ts": {
+          "not_applicable": "engine-tier"
+        }
+      },
+      "relational": {
+        "runs": [
+          {
+            "section": "cases",
+            "when": []
+          }
+        ]
+      }
+    },
+    "list_relations_v2.json": {
+      "cases": [
+        {
+          "path": "cases",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "seam",
+        "note",
+        "bundle"
+      ],
+      "assertions": [
+        "answers"
+      ],
+      "inputs": [
+        "answer_var",
+        "args",
+        "atom",
+        "atom_str",
+        "goal",
+        "note",
+        "pred",
+        "relation",
+        "tuple",
+        "var"
+      ],
+      "targets": {
+        "rs": "replays",
+        "go": {
+          "not_applicable": "engine-tier"
+        },
+        "ts": {
+          "not_applicable": "engine-tier"
+        }
+      },
+      "relational": {
+        "runs": [
+          {
+            "section": "cases",
+            "when": []
+          }
+        ]
+      }
+    },
+    "mint_demotion.json": {
+      "cases": [
+        {
+          "path": "demotion",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "seam",
+        "note"
+      ],
+      "assertions": [
+        "demoted_hex",
+        "expected"
+      ],
+      "inputs": [
+        "offer_hex"
+      ],
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "negation.json": {
+      "cases": [
+        {
+          "path": "cases",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "spi",
+        "profile",
+        "note",
+        "extensional",
+        "edb",
+        "program"
+      ],
+      "assertions": [
+        "outcome",
+        "reject"
+      ],
+      "inputs": [
+        "S",
+        "X",
+        "Y",
+        "args",
+        "arity",
+        "atom",
+        "atom_str",
+        "body_refs",
+        "builtin",
+        "cert",
+        "cert_bytes",
+        "cert_context",
+        "cert_facts",
+        "claim",
+        "clause",
+        "closed_world",
+        "conclusion",
+        "count",
+        "ctx_hash",
+        "decomposition_witness",
+        "derivation",
+        "domain_values",
+        "domains",
+        "extensions",
+        "fact",
+        "filter",
+        "join_steps",
+        "k",
+        "kind",
+        "level",
+        "limits",
+        "limits_decl",
+        "lower_stratum",
+        "max_cert_bytes",
+        "max_cert_facts",
+        "max_domain_values",
+        "max_join_steps",
+        "max_rule_groundings",
+        "max_support_edges",
+        "max_term_depth",
+        "neg",
+        "neg_lower",
+        "nodes",
+        "nonmember",
+        "note",
+        "partial_scope",
+        "plain_check",
+        "pred",
+        "predicates",
+        "premises",
+        "profile_hash",
+        "program_hash",
+        "project",
+        "rank",
+        "root",
+        "rows",
+        "rule_groundings",
+        "same_stratum",
+        "scope",
+        "subst",
+        "support_edges",
+        "supports",
+        "theory_config_hash",
+        "tuple",
+        "type_tag",
+        "values"
+      ],
+      "input_reasons": {
+        "cert_bytes": "fed: contract/go/negation_vectors_test.go:409 decodes it into the claim, derivation or program check() reads",
+        "level": "fed: contract/go/negation_vectors_test.go:379 decodes it into the claim, derivation or program check() reads",
+        "max_term_depth": "fed: contract/go/negation_vectors_test.go:63 decodes the case's check limit",
+        "nodes": "fed: contract/go/negation_vectors_test.go:44 decodes it into the claim, derivation or program check() reads",
+        "root": "fed: contract/go/negation_vectors_test.go:45 decodes it into the claim, derivation or program check() reads"
+      },
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "runs": [
+          {
+            "section": "cases",
+            "when": [
+              {
+                "at": "outcome",
+                "in": [
+                  "accept"
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "negotiate.json": {
+      "cases": [
+        {
+          "path": "encode_int",
+          "id": "#index",
+          "class": "interface"
+        },
+        {
+          "path": "encode_bool",
+          "id": "#index",
+          "class": "interface"
+        },
+        {
+          "path": "check_profile_spec",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "eligibility",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "axis_negative",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "suggest_delta",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "search_request",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "candidate",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "profile",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "plan",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "resolution",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "analysis",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "analysis_rejection",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "kernel_outcome",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "seam",
+        "note"
+      ],
+      "assertions": [
+        "decision",
+        "digest",
+        "failure_axes",
+        "failure_causes",
+        "failure_suggests",
+        "rejection",
+        "satisfied",
+        "wire"
+      ],
+      "inputs": [
+        "admit",
+        "answer_completeness",
+        "answer_mode",
+        "body",
+        "config_digest_hex",
+        "estimated_cost",
+        "estimated_ms",
+        "estimated_nodes",
+        "evidence_plan",
+        "facts",
+        "goal",
+        "head",
+        "id",
+        "kind",
+        "leaves",
+        "limits",
+        "max_answers",
+        "max_depth",
+        "max_nodes",
+        "note",
+        "provider",
+        "rules",
+        "search_nodes",
+        "theories",
+        "value",
+        "version",
+        "wall_clock_ns"
+      ],
+      "input_reasons": {
+        "admit": "encoded in the check_profile_spec `wire`, which go and ts rebuild and compare (kernel/go/seam/negotiate_vectors_test.go:283, kernel/ts/test/negotiate_vectors.test.ts:351); the generated file is pinned by the drift guard kernel/rs/tests/negotiate_vectors.rs",
+        "config_digest_hex": "encoded in the check_profile_spec `wire`, which go and ts rebuild and compare (kernel/go/seam/negotiate_vectors_test.go:283, kernel/ts/test/negotiate_vectors.test.ts:351); the generated file is pinned by the drift guard kernel/rs/tests/negotiate_vectors.rs",
+        "id": "encoded in the `wire` go and ts rebuild and compare: check_profile_spec (kernel/go/seam/negotiate_vectors_test.go:283, kernel/ts/test/negotiate_vectors.test.ts:351) and search_request's rules (kernel/go/seam/negotiate_vectors_test.go:591, kernel/ts/test/negotiate_vectors.test.ts:308); the generated file is pinned by the drift guard kernel/rs/tests/negotiate_vectors.rs",
+        "leaves": "encoded in the check_profile_spec `wire`, which go and ts rebuild and compare (kernel/go/seam/negotiate_vectors_test.go:283, kernel/ts/test/negotiate_vectors.test.ts:351); the generated file is pinned by the drift guard kernel/rs/tests/negotiate_vectors.rs",
+        "max_nodes": "encoded in the check_profile_spec `wire`, which go and ts rebuild and compare (kernel/go/seam/negotiate_vectors_test.go:283, kernel/ts/test/negotiate_vectors.test.ts:351); the generated file is pinned by the drift guard kernel/rs/tests/negotiate_vectors.rs",
+        "provider": "committed to by the eligibility `digest` (Eligibility::as_value, kernel/rs/src/seam/spi.rs:352), which go and ts rebuild and compare for eligibility, axis_negative and suggest_delta (kernel/go/seam/negotiate_vectors_test.go:510, kernel/go/seam/negotiate_vectors_test.go:481, kernel/go/seam/negotiate_vectors_test.go:500; kernel/ts/test/negotiate_vectors.test.ts:654, kernel/ts/test/negotiate_vectors.test.ts:632, kernel/ts/test/negotiate_vectors.test.ts:645); the generated file is pinned by the drift guard kernel/rs/tests/negotiate_vectors.rs",
+        "theories": "encoded in the check_profile_spec `wire`, which go and ts rebuild and compare (kernel/go/seam/negotiate_vectors_test.go:283, kernel/ts/test/negotiate_vectors.test.ts:351); the generated file is pinned by the drift guard kernel/rs/tests/negotiate_vectors.rs"
+      },
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "nested_kernel_id.json": {
+      "cases": [
+        {
+          "path": "ids",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "records",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "spi",
+        "issue",
+        "note"
+      ],
+      "assertions": [
+        "expected_nested",
+        "wire_hex",
+        "id",
+        "nested"
+      ],
+      "inputs": [
+        "components",
+        "kind",
+        "why"
+      ],
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "input_reasons": {
+        "components": "fed: kernel/go/seam/nested_kernel_id_vectors_test.go:181 builds a composed path's components from the named kernels"
+      },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "nonground_admission.json": {
+      "cases": [
+        {
+          "path": "cases",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "surface",
+        "note"
+      ],
+      "assertions": [
+        "band",
+        "code",
+        "stage",
+        "verdict",
+        "analysis"
+      ],
+      "inputs": [
+        "answers",
+        "answers_completeness",
+        "answers_mode",
+        "certification_completeness",
+        "function_symbols",
+        "guarantee",
+        "id",
+        "program",
+        "registry"
+      ],
+      "containers": [
+        "negotiation"
+      ],
+      "input_reasons": {
+        "answers": "fed: kernel/go/runtime/nonground_admission_vectors_test.go:25 decodes a registry provider's answers capability",
+        "id": "fed: kernel/go/runtime/nonground_admission_vectors_test.go:23 decodes a registry provider's id"
+      },
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "parse.json": {
+      "cases": [
+        {
+          "path": "cases",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "seam",
+        "note"
+      ],
+      "assertions": [
+        "clause_ids",
+        "diagnostics",
+        "directives",
+        "goal_wire",
+        "stop",
+        "verdict"
+      ],
+      "inputs": [
+        "kind",
+        "source"
+      ],
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "partition_class.json": {
+      "cases": [
+        {
+          "path": "cases",
+          "id": "#0",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "description",
+        "columns",
+        "note_class",
+        "note_partition"
+      ],
+      "assertions": [
+        "outcome"
+      ],
+      "inputs": [],
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "positive_recursion.json": {
+      "cases": [
+        {
+          "path": "cases",
+          "id": "id",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "schema_version",
+        "vector",
+        "note",
+        "round_unit",
+        "semantics",
+        "modes",
+        "fixtures",
+        "consumer_mapping",
+        "replay_note"
+      ],
+      "assertions": [
+        "answers",
+        "complete",
+        "limit"
+      ],
+      "inputs": [
+        "case",
+        "fixture",
+        "max_rounds",
+        "predicate",
+        "seed_from"
+      ],
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "runs": [
+          {
+            "section": "cases",
+            "when": [
+              {
+                "at": "complete",
+                "in": [
+                  true
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "prelude.json": {
+      "cases": [
+        {
+          "path": "cases",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "seam",
+        "note",
+        "program_prefix_hex",
+        "clause_prefix_hex"
+      ],
+      "assertions": [
+        "outcome"
+      ],
+      "inputs": [
+        "args",
+        "atom",
+        "atom_str",
+        "body",
+        "clause",
+        "clauses",
+        "head",
+        "id",
+        "manifest",
+        "note",
+        "pred",
+        "program_digest",
+        "tuple",
+        "var",
+        "version"
+      ],
+      "input_reasons": {
+        "id": "fed: contract/go/prelude_vectors_test.go:39 passes the manifest to the prelude loader, clause ids included"
+      },
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "prepare_fallback.json": {
+      "cases": [
+        {
+          "path": "cases",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "vector",
+        "note",
+        "providers_note",
+        "reason_note",
+        "goal",
+        "replayed_by"
+      ],
+      "assertions": [
+        "outcome",
+        "band",
+        "code",
+        "answers",
+        "provider",
+        "path"
+      ],
+      "inputs": [
+        "id",
+        "prepare",
+        "providers",
+        "stream",
+        "why"
+      ],
+      "input_reasons": {
+        "id": "fed: kernel/go/runtime/prepare_fallback_vectors_test.go:22 decodes a provider's id"
+      },
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "runs": [
+          {
+            "section": "cases",
+            "when": [
+              {
+                "at": "outcome.band",
+                "in": [
+                  "certified"
+                ]
+              },
+              {
+                "at": "outcome.kind",
+                "in": [
+                  "solved"
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "producer_matrix.json": {
+      "cases": [
+        {
+          "path": "groups",
+          "id": "#index",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "spi",
+        "note"
+      ],
+      "assertions": [
+        "expect"
+      ],
+      "inputs": [
+        "answer_wire",
+        "cases",
+        "derivation_wire",
+        "goal",
+        "name",
+        "profile",
+        "program",
+        "semantic_class"
+      ],
+      "input_reasons": {
+        "derivation_wire": "fed: kernel/go/wasm/producer_matrix_test.go:36 decodes a row's derivation wire"
+      },
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "excluded": "completion-not-readable"
+      }
+    },
+    "profile_identity_advisory.json": {
+      "cases": [
+        {
+          "path": "cases",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "spi",
+        "issue",
+        "note",
+        "slot_order",
+        "bindings"
+      ],
+      "assertions": [
+        "admit",
+        "unidentified_slots"
+      ],
+      "inputs": [
+        "allow_unidentified",
+        "leaves",
+        "theory",
+        "why"
+      ],
+      "input_reasons": {
+        "leaves": "fed: contract/go/profile_identity_advisory_contract_tier_test.go:86 decodes a case's leaves slot"
+      },
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "profile_tag_refusal.json": {
+      "cases": [
+        {
+          "path": "required.cases",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "satisfied.cases",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "unsupported.cases",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "note",
+        "required.base",
+        "required.decoder",
+        "required.base_wire",
+        "satisfied.base",
+        "satisfied.decoder",
+        "satisfied.base_wire",
+        "unsupported.base",
+        "unsupported.decoder",
+        "unsupported.base_wire",
+        "not_covered"
+      ],
+      "assertions": [
+        "refused_rendering",
+        "wire"
+      ],
+      "inputs": [
+        "atom",
+        "occurrence",
+        "slot",
+        "substitute",
+        "with_hex"
+      ],
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "profiling.json": {
+      "cases": [
+        {
+          "path": "cases",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "family",
+        "note",
+        "term_notation",
+        "determinism_classes",
+        "capability",
+        "registry"
+      ],
+      "assertions": [
+        "present_fields_in_wire_order",
+        "stats",
+        "stats_wire"
+      ],
+      "inputs": [
+        "args",
+        "atom_str",
+        "body",
+        "head",
+        "negated",
+        "note",
+        "pred",
+        "program",
+        "query",
+        "var"
+      ],
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "program_serde.json": {
+      "cases": [
+        {
+          "path": "program.clauses",
+          "id": "id",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "spi",
+        "note",
+        "version_atom_utf8",
+        "version_atom_hex",
+        "empty_program",
+        "program.note",
+        "program.canonical_clause_order",
+        "program.program_bytes_hex"
+      ],
+      "assertions": [
+        "clause_bytes_hex"
+      ],
+      "inputs": [
+        "args",
+        "atom_str",
+        "body",
+        "head",
+        "int",
+        "neg",
+        "pred",
+        "tuple",
+        "var"
+      ],
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "provider_descriptor.json": {
+      "cases": [
+        {
+          "path": "provider_descriptor.fixture_registry",
+          "id": "id",
+          "class": "interface"
+        },
+        {
+          "path": "provider_descriptor.native_providers",
+          "id": "engine_id",
+          "class": "integration",
+          "targets": { "rs": "replays", "go": { "not_applicable": "engine-tier" }, "ts": { "not_applicable": "engine-tier" } }
+        }
+      ],
+      "metadata": [
+        "seam",
+        "note",
+        "prefixes"
+      ],
+      "assertions": [
+        "digest_hex",
+        "wire_hex"
+      ],
+      "inputs": [
+        "case",
+        "cost",
+        "estimated_ms",
+        "estimated_nodes",
+        "offer",
+        "rebind"
+      ],
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "query_mode.json": {
+      "cases": [
+        {
+          "path": "optimize",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "open",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "refused",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "spi",
+        "issue",
+        "note"
+      ],
+      "assertions": [
+        "optimize",
+        "refusal",
+        "wire_hex"
+      ],
+      "inputs": [],
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "query_mode_declarations.json": {
+      "cases": [
+        {
+          "path": "declarations",
+          "id": "identity",
+          "class": "interface"
+        },
+        {
+          "path": "pairs",
+          "id": "#index",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "spi",
+        "issue",
+        "note"
+      ],
+      "assertions": [
+        "covers",
+        "refines"
+      ],
+      "inputs": [
+        "offered",
+        "required"
+      ],
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "refusal_certificate.json": {
+      "cases": [
+        {
+          "path": "refusal_certificate.cases",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "seam",
+        "note",
+        "prefixes",
+        "refusal_certificate.refusal_program_digest_hex",
+        "refusal_certificate.profile_tag",
+        "refusal_certificate.theory_tag",
+        "refusal_certificate.clauses"
+      ],
+      "assertions": [
+        "digest_hex",
+        "edb_digest_hex",
+        "expected",
+        "proposed",
+        "vacuous",
+        "wire_hex",
+        "entries",
+        "inadmissible"
+      ],
+      "inputs": [
+        "accepted",
+        "candidates",
+        "k",
+        "minted_over",
+        "minted_properties",
+        "note",
+        "offer",
+        "properties",
+        "request"
+      ],
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "reify.json": {
+      "cases": [
+        {
+          "path": "refused",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "reifies",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "var_names",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "spec",
+        "note"
+      ],
+      "assertions": [
+        "in_domain",
+        "name_hex",
+        "outcome",
+        "term",
+        "utf16",
+        "value_hex"
+      ],
+      "inputs": [
+        "note"
+      ],
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "tri_core_required": true,
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "report.json": {
+      "cases": [
+        {
+          "path": "report",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "outcome",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "spi",
+        "note",
+        "why"
+      ],
+      "assertions": [
+        "analysis_digest_hex",
+        "check_profile_digest_hex",
+        "program_digest_hex",
+        "query_digest_hex",
+        "report",
+        "request_digest_hex",
+        "wire_hex"
+      ],
+      "inputs": [
+        "actual",
+        "arm",
+        "causes",
+        "certificates",
+        "completeness",
+        "edges",
+        "estimate",
+        "final_active",
+        "from",
+        "global_semantics",
+        "id",
+        "negated",
+        "note",
+        "predicates",
+        "provider",
+        "reason",
+        "relation",
+        "request",
+        "rule",
+        "search_nodes",
+        "segments",
+        "snapshot_byte",
+        "stratum",
+        "superseded",
+        "termination",
+        "to",
+        "value_component",
+        "variant",
+        "version",
+        "wall_clock"
+      ],
+      "containers": [
+        "components",
+        "envelope",
+        "plans",
+        "revisions",
+        "witness"
+      ],
+      "input_reasons": {
+        "arm": "fed: kernel/go/seam/report_vectors_test.go:48 decodes the plan's arm into the report it encodes",
+        "edges": "fed: kernel/go/seam/report_vectors_test.go:96 decodes the witness edges into the report it encodes",
+        "from": "fed: kernel/go/seam/report_vectors_test.go:86 decodes a witness edge's source",
+        "id": "fed: kernel/go/seam/report_vectors_test.go decodes a segment's id into the report it encodes",
+        "provider": "fed: kernel/go/seam/report_vectors_test.go:71 decodes it; inside the envelope, unreviewed under #3198, and decided again with it",
+        "to": "fed: kernel/go/seam/report_vectors_test.go:87 decodes a witness edge's target"
+      },
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "request_origin.json": {
+      "cases": [
+        {
+          "path": "bound_origin",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "axis_binding",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "profile_origins",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "distinct",
+          "id": "#index",
+          "class": "interface"
+        },
+        {
+          "path": "scenario",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "scenario_distinct",
+          "id": "#index",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "spi",
+        "note"
+      ],
+      "assertions": [
+        "wire_hex",
+        {
+          "name": "reached_by",
+          "class": "integration",
+          "targets": { "rs": "replays", "go": { "not_applicable": "rs-cli-surface" }, "ts": { "not_applicable": "rs-cli-surface" } }
+        }
+      ],
+      "inputs": [
+        "a",
+        "axes",
+        "axis",
+        "b",
+        "binding",
+        "kind",
+        "note",
+        "origin",
+        "policy"
+      ],
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "resolution_decode.json": {
+      "cases": [
+        {
+          "path": "cases",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "refusals",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "seam",
+        "note"
+      ],
+      "assertions": [
+        "wire"
+      ],
+      "inputs": [
+        "arity",
+        "tag"
+      ],
+      "input_reasons": {
+        "tag": "fed: kernel/go/runtime/resolution_decode_corpus_test.go:28 decodes a case's report tag"
+      },
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "resolve.json": {
+      "accounting": "ledger",
+      "cases": [
+        {
+          "path": "resolve",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "seam",
+        "note"
+      ],
+      "assertions": [
+        "band",
+        "chosen",
+        "components",
+        "fallbacks",
+        "g4_expected",
+        "wire"
+      ],
+      "inputs": [
+        "compose",
+        "cost",
+        "decomposition_rule",
+        "driver",
+        "estimate",
+        "estimated_ms",
+        "estimated_nodes",
+        "id",
+        "not_minted",
+        "note",
+        "offer",
+        "prefer_providers",
+        "program",
+        "rebind",
+        "registry",
+        "request",
+        "selector",
+        "target",
+        "termination",
+        "unspecified"
+      ],
+      "input_reasons": {
+        "id": "fed: kernel/go/runtime/resolve_vectors_test.go:41 decodes a registry offer's id"
+      },
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "seal_plan.json": {
+      "cases": [
+        {
+          "path": "cases",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "layers",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "seam",
+        "note",
+        "layers_note"
+      ],
+      "assertions": [
+        "classified",
+        "extensional",
+        "level",
+        "open_compound",
+        "outside",
+        "refused",
+        "seal_plan",
+        "stack"
+      ],
+      "inputs": [
+        "body",
+        "head",
+        "neg",
+        "program",
+        "query",
+        "why"
+      ],
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "tri_core_required": true,
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "search.json": {
+      "cases": [
+        {
+          "path": "$",
+          "id": "$file",
+          "class": "interface"
+        }
+      ],
+      "assertions": [
+        "answers_wire_hex"
+      ],
+      "inputs": [
+        "arity",
+        "goal",
+        "note",
+        "pred",
+        "vector"
+      ],
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "runs": [
+          {
+            "section": "$",
+            "when": []
+          }
+        ]
+      }
+    },
+    "semantic_identity.json": {
+      "cases": [
+        {
+          "path": "core_bytes",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "open_identities",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "malformed",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "refusals",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "spi",
+        "note"
+      ],
+      "assertions": [
+        "band",
+        "candidates_slot_hex",
+        "expected",
+        "unserved",
+        "unserved_slot_hex",
+        "wire_hex"
+      ],
+      "inputs": [
+        "answers",
+        "args",
+        "base",
+        "body",
+        "bool",
+        "floor",
+        "form",
+        "goal",
+        "guarantee",
+        "head",
+        "id",
+        "identities",
+        "identity",
+        "kind",
+        "names",
+        "note",
+        "objective",
+        "offer",
+        "optimize",
+        "params",
+        "polarity",
+        "pred",
+        "program",
+        "registry",
+        "requirement",
+        "strata_required",
+        "value",
+        "why",
+        "why_pre_probe"
+      ],
+      "input_reasons": {
+        "answers": "fed: kernel/go/runtime/semantic_identity_refusals_2150_test.go:168 reads the request's answers requirement",
+        "id": "fed: kernel/go/runtime/semantic_identity_refusals_2150_test.go:55 decodes a registry offer's id",
+        "optimize": "fed: kernel/go/runtime/semantic_identity_refusals_2150_test.go:52 decodes the request's optimize requirement"
+      },
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "semantic_offer_floor.json": {
+      "cases": [
+        {
+          "path": "wire",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "satisfies",
+          "id": "#index",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "spi",
+        "issue",
+        "note"
+      ],
+      "assertions": [
+        "satisfied",
+        "hex"
+      ],
+      "inputs": [
+        "class",
+        "floor",
+        "requirement"
+      ],
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "semantics_declarations.json": {
+      "cases": [
+        {
+          "path": "declarations",
+          "id": "#index",
+          "class": "interface"
+        },
+        {
+          "path": "pairs",
+          "id": "#index",
+          "class": "interface"
+        },
+        {
+          "path": "applies",
+          "id": "#index",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "spi",
+        "issue",
+        "note"
+      ],
+      "assertions": [
+        "holds",
+        "satisfies"
+      ],
+      "inputs": [
+        "applies",
+        "applies_to",
+        "dimensions",
+        "identity",
+        "offered",
+        "on",
+        "refines",
+        "required",
+        "to"
+      ],
+      "input_reasons": {
+        "on": "fed: kernel/go/seam/semantics_refinement_test.go:181 decodes a declaration's refinement properties",
+        "refines": "fed: kernel/go/seam/semantics_refinement_test.go:182 decodes the declaration's refinements",
+        "to": "fed: kernel/go/seam/semantics_refinement_test.go:180 decodes a declaration's refinement target"
+      },
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "semantics_refinement.json": {
+      "cases": [
+        {
+          "path": "edges",
+          "id": "#index",
+          "class": "interface"
+        },
+        {
+          "path": "pairs",
+          "id": "#index",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "spi",
+        "issue",
+        "note"
+      ],
+      "assertions": [
+        "satisfies",
+        "from",
+        "to",
+        "on"
+      ],
+      "inputs": [
+        "offered",
+        "required"
+      ],
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "session.json": {
+      "cases": [
+        {
+          "path": "batches",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "stale_bindings",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "unread_bindings",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "vector",
+        "schema_version",
+        "note",
+        "interpretations",
+        "candidates"
+      ],
+      "assertions": [
+        "expect",
+        "band",
+        "code",
+        "refusal"
+      ],
+      "inputs": [
+        "session",
+        "requests",
+        "evidence_of",
+        "bindings",
+        "key",
+        "facts"
+      ],
+      "targets": {
+        "rs": {
+          "unreplayed": "#1820"
+        },
+        "go": {
+          "unreplayed": "#1820"
+        },
+        "ts": "replays"
+      },
+      "relational": {
+        "excluded": "completion-not-readable"
+      }
+    },
+    "session_retraction.json": {
+      "cases": [
+        {
+          "path": "cases",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "vector",
+        "schema_version",
+        "note",
+        "rule"
+      ],
+      "assertions": [
+        "expect",
+        "code"
+      ],
+      "inputs": [
+        "why",
+        "clauses",
+        "head",
+        "body",
+        "facts",
+        "certificates",
+        "certificate",
+        "predicates",
+        "retract"
+      ],
+      "targets": {
+        "rs": {
+          "unreplayed": "#1820"
+        },
+        "go": {
+          "unreplayed": "#1820"
+        },
+        "ts": {
+          "unreplayed": "#1820"
+        }
+      },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "stack_ref_frames.json": {
+      "cases": [
+        {
+          "path": "cases",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "note"
+      ],
+      "assertions": [
+        "refused_at"
+      ],
+      "inputs": [
+        "frames",
+        "kind",
+        "plain",
+        "shared"
+      ],
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "term.json": {
+      "cases": [
+        {
+          "path": "decisions",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "seam",
+        "note",
+        "identity",
+        "owns"
+      ],
+      "assertions": [
+        "outcome"
+      ],
+      "inputs": [
+        "args",
+        "atom",
+        "decimal",
+        "int",
+        "note",
+        "pred",
+        "tuple"
+      ],
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "text.json": {
+      "cases": [
+        {
+          "path": "decisions",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "seam",
+        "note",
+        "identity",
+        "owns"
+      ],
+      "assertions": [
+        "outcome"
+      ],
+      "inputs": [
+        "args",
+        "atom",
+        "note",
+        "pred",
+        "text",
+        "tuple"
+      ],
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "theory_not_decided.json": {
+      "cases": [
+        {
+          "path": "cases",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "spi",
+        "profile",
+        "note",
+        "extensional",
+        "edb",
+        "program"
+      ],
+      "assertions": [
+        "outcome",
+        "reject"
+      ],
+      "inputs": [
+        "args",
+        "arity",
+        "atom",
+        "atom_str",
+        "body_refs",
+        "builtin",
+        "cert",
+        "cert_bytes",
+        "cert_facts",
+        "claim",
+        "clause",
+        "closed_world",
+        "conclusion",
+        "derivation",
+        "domain_values",
+        "domains",
+        "extensions",
+        "fact",
+        "join_steps",
+        "kind",
+        "level",
+        "limits_decl",
+        "neg",
+        "nodes",
+        "nonmember",
+        "note",
+        "pred",
+        "predicates",
+        "premises",
+        "rank",
+        "root",
+        "rows",
+        "rule_groundings",
+        "scope",
+        "subst",
+        "support_edges",
+        "supports",
+        "tuple",
+        "type_tag",
+        "values"
+      ],
+      "input_reasons": {
+        "cert_bytes": "fed: contract/rs/src/bin/conformance.rs:780 reads it into the derivation's declared limits",
+        "level": "fed: contract/rs/src/bin/conformance.rs:681 reads it into the derivation's scope",
+        "nodes": "fed: contract/go/cmd/conformance/main.go:416 decodes the derivation's nodes (the harness)",
+        "root": "fed: contract/go/cmd/conformance/main.go:417 decodes the derivation's root (the harness)"
+      },
+      "targets": {
+        "rs": "harness",
+        "go": "harness",
+        "ts": "harness"
+      },
+      "relational": {
+        "runs": [
+          {
+            "section": "cases",
+            "when": [
+              {
+                "at": "outcome",
+                "in": [
+                  "accept"
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "truncation.json": {
+      "cases": [
+        {
+          "path": "cases",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "completion_wire.cases",
+          "id": "case",
+          "class": "interface"
+        },
+        {
+          "path": "run_case_incomplete",
+          "id": "#self",
+          "class": "integration",
+          "targets": { "rs": "replays", "go": "replays", "ts": "replays" }
+        },
+        {
+          "path": "run_case_abandoned",
+          "id": "#self",
+          "class": "integration",
+          "targets": { "rs": "replays", "go": "replays", "ts": "replays" }
+        }
+      ],
+      "metadata": [
+        "vector",
+        "note",
+        "fixtures",
+        "fixture_note",
+        "goal",
+        "replayed_by",
+        "rs_arm",
+        "replay_note",
+        "completion_wire.note",
+        "completion_wire.transition_control",
+        "completion_wire.run_case_deferred",
+        "completion_wire.incomplete_note",
+        "completion_wire.replayed_by"
+      ],
+      "assertions": [
+        "answers",
+        "band",
+        "outcome",
+        "wire_hex",
+        "cause"
+      ],
+      "inputs": [
+        "bounds",
+        "chain_len",
+        "doors",
+        "goal",
+        "hand_derived",
+        "independence",
+        "k",
+        "limit",
+        "limits",
+        "max_depth",
+        "neuter_check",
+        "note",
+        "program",
+        "replayed_by",
+        "value",
+        "why"
+      ],
+      "input_reasons": {
+        "limit": "fed: kernel/go/outcome/completion_wire_vectors_test.go:22 decodes a completion-wire row's limit into the value encoded"
+      },
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "runs": [
+          {
+            "section": "cases",
+            "when": [
+              {
+                "at": "outcome.band",
+                "in": [
+                  "solved"
+                ]
+              },
+              {
+                "at": "outcome.completion",
+                "in": [
+                  "exhausted"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "containers": [
+        "control"
+      ]
+    },
+    "undefined_predicates.json": {
+      "cases": [
+        {
+          "path": "cases",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "vector",
+        "issue",
+        "note",
+        "theory",
+        "refusal"
+      ],
+      "assertions": [
+        "expect"
+      ],
+      "inputs": [
+        "args",
+        "arity",
+        "atom_str",
+        "body",
+        "clauses",
+        "count",
+        "declared",
+        "head",
+        "neg",
+        "note",
+        "pred",
+        "query",
+        "tuple",
+        "var"
+      ],
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "unknown_tag_rendering.json": {
+      "cases": [
+        {
+          "path": "resolution_arm.cases",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "plan_evidence.cases",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "plan_optimality.cases",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "selector_arm.cases",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "closure_claim.cases",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "closure_tier.cases",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "descriptor_varies_location.cases",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "not_minted_location.cases",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "note",
+        "resolution_arm.what",
+        "resolution_arm.base_ref",
+        "resolution_arm.decoder",
+        "resolution_arm.value_path",
+        "resolution_arm.cores",
+        "resolution_arm.not_decoded_by",
+        "plan_evidence.what",
+        "plan_evidence.base_ref",
+        "plan_evidence.decoder",
+        "plan_evidence.value_path",
+        "plan_evidence.cores",
+        "plan_evidence.not_decoded_by",
+        "plan_optimality.what",
+        "plan_optimality.base_ref",
+        "plan_optimality.decoder",
+        "plan_optimality.value_path",
+        "plan_optimality.cores",
+        "plan_optimality.not_decoded_by",
+        "selector_arm.what",
+        "selector_arm.base_ref",
+        "selector_arm.decoder",
+        "selector_arm.value_path",
+        "selector_arm.cores",
+        "selector_arm.not_decoded_by",
+        "closure_claim.what",
+        "closure_claim.base_ref",
+        "closure_claim.decoder",
+        "closure_claim.value_path",
+        "closure_claim.cores",
+        "closure_tier.what",
+        "closure_tier.base_ref",
+        "closure_tier.decoder",
+        "closure_tier.value_path",
+        "closure_tier.cores",
+        "descriptor_varies_location.what",
+        "descriptor_varies_location.base_ref",
+        "descriptor_varies_location.decoder",
+        "descriptor_varies_location.value_path",
+        "descriptor_varies_location.cores",
+        "not_minted_location.what",
+        "not_minted_location.base_ref",
+        "not_minted_location.decoder",
+        "not_minted_location.value_path",
+        "not_minted_location.cores"
+      ],
+      "assertions": [
+        "outcome",
+        "refused_rendering"
+      ],
+      "inputs": [
+        "atom",
+        "occurrence",
+        "slot",
+        "substitute",
+        "with_hex"
+      ],
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "utf8_text_refusal.json": {
+      "cases": [
+        {
+          "path": "unsupported.cases",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "closure_claim.cases",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "request_rule.cases",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "engine_meta.cases",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "note",
+        "unsupported.base",
+        "unsupported.base_ref",
+        "unsupported.decoder",
+        "closure_claim.base",
+        "closure_claim.base_ref",
+        "closure_claim.decoder",
+        "request_rule.base",
+        "request_rule.base_ref",
+        "request_rule.decoder",
+        "request_rule.cores",
+        "request_rule.not_decoded_by",
+        "engine_meta.base",
+        "engine_meta.decoder",
+        "engine_meta.base_wire"
+      ],
+      "assertions": [
+        "outcome"
+      ],
+      "inputs": [
+        "atom",
+        "occurrence",
+        "slot",
+        "substitute",
+        "with_hex"
+      ],
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "value_depth.json": {
+      "cases": [
+        {
+          "path": "cases",
+          "id": "name",
+          "class": "capability"
+        }
+      ],
+      "metadata": [
+        "spi",
+        "issue",
+        "capability",
+        "registry",
+        "note"
+      ],
+      "assertions": [
+        "outcome"
+      ],
+      "inputs": [
+        "offset",
+        "profile"
+      ],
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "runs": [
+          {
+            "section": "cases",
+            "when": [
+              {
+                "at": "offset",
+                "in": [
+                  -1,
+                  0
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "verdict_key.json": {
+      "cases": [
+        {
+          "path": "keys",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "note",
+        "profile",
+        "check_profile_digest",
+        "checker_version"
+      ],
+      "assertions": [
+        "checker_version"
+      ],
+      "inputs": [],
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "vocabulary.json": {
+      "cases": [
+        {
+          "path": "vocabularies",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "seam",
+        "note"
+      ],
+      "assertions": [
+        "arms"
+      ],
+      "inputs": [],
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "tri_core_required": true,
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "wasm_host_builtins.json": {
+      "cases": [
+        {
+          "path": "decisions",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "bottom_up_fold.cases",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "vector",
+        "note",
+        "identity",
+        "bottom_up_fold.note"
+      ],
+      "assertions": [
+        "admit",
+        "code",
+        "check",
+        "host_calls",
+        "max_term_depth",
+        "search",
+        "leaves",
+        "max_nodes",
+        "theories"
+      ],
+      "inputs": [
+        "args",
+        "arity",
+        "atom",
+        "body",
+        "declared",
+        "goal",
+        "has_arith",
+        "head",
+        "host",
+        "id",
+        "kind",
+        "negotiate",
+        "note",
+        "op",
+        "pred",
+        "requested_theories",
+        "rules",
+        "var"
+      ],
+      "containers": [
+        "limits"
+      ],
+      "input_reasons": {
+        "id": "fed: kernel/go/wasm/host_builtins_test.go:43 decodes a rule or identity id"
+      },
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "excluded": "completion-not-readable"
+      }
+    },
+    "wasm_theory.json": {
+      "cases": [
+        {
+          "path": "decisions",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "vector",
+        "note"
+      ],
+      "assertions": [
+        "answers",
+        "binds"
+      ],
+      "inputs": [
+        "args",
+        "atom",
+        "body",
+        "facts",
+        "goal",
+        "head",
+        "id",
+        "int",
+        "kind",
+        "note",
+        "op",
+        "pred",
+        "rules",
+        "var"
+      ],
+      "input_reasons": {
+        "id": "fed: kernel/go/wasm/theory_test.go:141 decodes a rule's id"
+      },
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "runs": [
+          {
+            "section": "decisions",
+            "when": []
+          }
+        ]
+      }
+    },
+    "door_request.json": {
+      "cases": [
+        {
+          "path": "rows",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "seam",
+        "note",
+        "completeness_members",
+        "multiplicity_members"
+      ],
+      "assertions": [
+        "request_hex"
+      ],
+      "inputs": [
+        "guarantee",
+        "completeness",
+        "multiplicity"
+      ],
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "tri_core_required": true,
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "static_decline_admission.json": {
+      "cases": [
+        {
+          "path": "rows",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "vector",
+        "note"
+      ],
+      "assertions": [
+        "expect",
+        "member",
+        "table"
+      ],
+      "inputs": [
+        "claims_set",
+        "count_filter_position",
+        "extensional",
+        "goal",
+        "guarantee",
+        "program",
+        "semantics",
+        "theory",
+        "theory_builtins"
+      ],
+      "input_reasons": {
+        "extensional": "fed: kernel/rs/tests/static_decline_admission_2734.rs:132 builds the extensional predicate set admission reads"
+      },
+      "targets": {
+        "rs": "replays",
+        "go": {
+          "not_applicable": "engine-tier"
+        },
+        "ts": {
+          "not_applicable": "engine-tier"
+        }
+      },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    }
+  }
+}
