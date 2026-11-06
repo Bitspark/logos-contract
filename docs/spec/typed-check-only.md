@@ -66,7 +66,7 @@ in dependency lists are legal: preflight counts every entry, while admission and
 the reported closure treat their identities as a set.
 
 Rust exposes `logos_contract::typed::check`; Go exposes the `typed` subpackage of
-`github.com/Bitspark/logos/contract/go`; TypeScript exports namespace `typed` from
+`github.com/Bitspark/logos-contract/contract/go`; TypeScript exports namespace `typed` from
 `@bitspark/logos-contract`. Their ordinary idiomatic constructors/accessors may
 differ; meanings and outcome codes are shared. No kernel, engine, provider
 registry, search service or external solver is required.
