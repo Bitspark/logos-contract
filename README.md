@@ -5,16 +5,15 @@ codecs, and independent checkers in Rust, Go and TypeScript. It depends on publi
 Ontos packages. It contains no Logos kernel, engine, search service or private
 repository dependency.
 
-Source distribution is independent of registry publication. The initial npm and
-crates.io packages are pending authenticated bootstrap publication; the table
-names their intended coordinates. Go consumers can use the public source tags
-or commit revisions directly.
+Release 0.24.0 is available from the public registries below. Go consumers use
+the public source tags or commit revisions directly. No private repository
+credential is required.
 
 | Language | Public dependency |
 | --- | --- |
-| Rust | `logos-contract` on crates.io |
+| Rust | [`logos-contract`](https://crates.io/crates/logos-contract) on crates.io |
 | Go | `github.com/Bitspark/logos-contract/contract/go` |
-| TypeScript | `@bitspark/logos-contract` on npmjs.org |
+| TypeScript | [`@bitspark/logos-contract`](https://www.npmjs.com/package/@bitspark/logos-contract) on npmjs.org |
 
 Release tags `vX.Y.Z` and `contract/go/vX.Y.Z` name the same public commit.
 Released versions follow the Logos release family. Main may contain unreleased
@@ -42,6 +41,9 @@ The `contract` workflow runs formatting, Clippy, Rust tests and doctests, Go tes
 including the race detector, Go vet, TypeScript typechecking and tests, and
 package preparation on GitHub runners using public registries without private
 credentials. The `release` workflow publishes existing immutable release tags
-after that gate passes. No build or test runs on the maintainer's workstation.
+after that gate passes, and verifies actual installed packages without credentials.
+Its `prepare` operation produces verified archives for a first native upload;
+`consume` independently exercises an already published release. No build or test
+runs on the maintainer's workstation.
 
 Licensed under MIT OR Apache-2.0. See LICENSE-MIT and LICENSE-APACHE.
