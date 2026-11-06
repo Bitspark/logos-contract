@@ -5,7 +5,7 @@ codecs, and independent checkers in Rust, Go and TypeScript. It depends on publi
 Ontos packages. It contains no Logos kernel, engine, search service or private
 repository dependency.
 
-Release 0.24.0 is available from the public registries below. Go consumers use
+Published versions are available from the public registries below. Go consumers use
 the public source tags or commit revisions directly. No private repository
 credential is required.
 
@@ -18,7 +18,7 @@ credential is required.
 Release tags `vX.Y.Z` and `contract/go/vX.Y.Z` name the same public commit.
 Released versions follow the Logos release family. Main may contain unreleased
 changes; pin a full commit when consuming those changes. In particular the typed
-check-only service was added after 0.24.0 and is not part of that release.
+check-only service requires 0.25.0 or later; it is not part of 0.24.0.
 
 The [contract specification](docs/spec/logos-contract.md) describes the account,
 codecs and checker SPI. On revisions containing the typed checker, its
