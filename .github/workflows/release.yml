@@ -6,10 +6,11 @@ on:
         description: 'Existing immutable contract release tag (vX.Y.Z)'
         type: string
         required: true
-      bootstrap:
-        description: 'First 0.24.0 publication using temporary registry bootstrap credentials'
-        type: boolean
-        default: false
+      operation:
+        description: 'Publish with trusted identities, prepare archives for native bootstrap, or consume a published release'
+        type: choice
+        options: [publish, prepare, consume]
+        default: publish
 permissions:
   contents: read
 concurrency:
@@ -17,24 +18,27 @@ concurrency:
   cancel-in-progress: false
 jobs:
   test:
+    if: ${{ inputs.operation != 'consume' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
         with:
+          ref: ${{ inputs.version }}
           persist-credentials: false
           fetch-depth: 0
       - name: Require this workflow to run at the requested release
         env:
           RELEASE: ${{ inputs.version }}
-          BOOTSTRAP: ${{ inputs.bootstrap }}
+          OPERATION: ${{ inputs.operation }}
         run: |
           set -euo pipefail
           [[ "$RELEASE" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
-          test "$GITHUB_REF" = "refs/tags/$RELEASE"
-          if [ "$BOOTSTRAP" = true ]; then test "$RELEASE" = v0.24.0; fi
-          test "$(git rev-parse "$RELEASE^{commit}")" = "$GITHUB_SHA"
-          test "$(git rev-parse "contract/go/$RELEASE^{commit}")" = "$GITHUB_SHA"
+          if [ "$OPERATION" = publish ]; then test "$GITHUB_REF" = "refs/tags/$RELEASE"; fi
+          source="$(git rev-parse HEAD)"
+          test "$(git rev-parse "$RELEASE^{commit}")" = "$source"
+          test "$(git rev-parse "contract/go/$RELEASE^{commit}")" = "$source"
+          echo "Release source: $source ($RELEASE)"
           python3 - "$RELEASE" <<'PY'
           import json, sys, tomllib
           version = sys.argv[1][1:]
@@ -53,8 +57,62 @@ jobs:
           toolchain: '1.98.1'
           components: rustfmt, clippy
       - run: bash scripts/check.sh
+      - name: Prepare already verified packages for upload without local build work
+        if: ${{ inputs.operation == 'prepare' }}
+        env:
+          RELEASE: ${{ inputs.version }}
+          NPM_CONFIG_PROVENANCE: 'false'
+        run: |
+          set -euo pipefail
+          destination="$RUNNER_TEMP/registry-packages"
+          mkdir "$destination"
+          (cd contract/ts && npm pack --ignore-scripts --pack-destination "$destination")
+          cargo metadata --locked --no-deps --format-version 1 > "$RUNNER_TEMP/package-metadata.json"
+          python3 - "$RELEASE" "$RUNNER_TEMP/package-metadata.json" "$destination" <<'PY'
+          import json, pathlib, shutil, struct, sys, tarfile
+          version, metadata_path, destination = sys.argv[1][1:], pathlib.Path(sys.argv[2]), pathlib.Path(sys.argv[3])
+          packages = json.loads(metadata_path.read_text())['packages']
+          package, = [p for p in packages if p['name'] == 'logos-contract']
+          assert package['version'] == version
+          crate = pathlib.Path('target/package') / f'logos-contract-{version}.crate'
+          archive = crate.read_bytes()
+          # Cargo's documented registry upload protocol, including renamed dependencies:
+          # https://doc.rust-lang.org/cargo/reference/registry-web-api.html#publish
+          deps = []
+          for dep in package['dependencies']:
+              assert dep['source'] == 'registry+https://github.com/rust-lang/crates.io-index', dep['name']
+              assert not dep.get('path'), dep['name']
+              deps.append(dict(name=dep['name'], version_req=dep['req'], features=dep['features'],
+                               optional=dep['optional'], default_features=dep['uses_default_features'],
+                               target=dep['target'], kind=dep['kind'] or 'normal', registry=dep.get('registry'),
+                               explicit_name_in_toml=dep['rename']))
+          metadata = {k: package.get(k) for k in ('authors', 'description', 'documentation', 'homepage',
+                      'keywords', 'categories', 'license', 'license_file', 'repository', 'links', 'rust_version')}
+          metadata.update(name=package['name'], vers=version, deps=deps, features=package['features'],
+                          readme=None, readme_file=package['readme'], badges={})
+          if package['readme']:
+              with tarfile.open(crate) as source:
+                  metadata['readme'] = source.extractfile(f'logos-contract-{version}/{package["readme"]}').read().decode()
+          encoded = json.dumps(metadata, separators=(',', ':')).encode()
+          (destination / 'cargo-upload.bin').write_bytes(struct.pack('<I', len(encoded)) + encoded +
+                                                        struct.pack('<I', len(archive)) + archive)
+          (destination / 'cargo-upload.json').write_text(json.dumps(metadata, indent=2) + '\n')
+          shutil.copyfile(crate, destination / crate.name)
+          PY
+          mkdir "$RUNNER_TEMP/archive-consumer"
+          cd "$RUNNER_TEMP/archive-consumer"
+          npm install --ignore-scripts --no-audit --no-fund "$destination/bitspark-logos-contract-${RELEASE#v}.tgz"
+          node --input-type=module -e 'import assert from "node:assert/strict"; import * as logos from "@bitspark/logos-contract"; assert.equal(typeof logos.check, "function");'
+      - uses: actions/upload-artifact@v4
+        if: ${{ inputs.operation == 'prepare' }}
+        with:
+          name: registry-packages-${{ inputs.version }}
+          path: ${{ runner.temp }}/registry-packages/
+          if-no-files-found: error
+          retention-days: 7
   npm:
     needs: test
+    if: ${{ inputs.operation == 'publish' }}
     runs-on: ubuntu-24.04
     environment: npm
     env:
@@ -76,19 +134,11 @@ jobs:
           npm ci --ignore-scripts
           npm run build
       - name: Publish with the trusted identity
-        if: ${{ !inputs.bootstrap }}
         working-directory: contract/ts
         run: npm publish --access public
-      - name: Create the initial package with temporary bootstrap access
-        if: ${{ inputs.bootstrap }}
-        working-directory: contract/ts
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_BOOTSTRAP_TOKEN }}
-        run: |
-          test -n "$NODE_AUTH_TOKEN"
-          npm publish --access public
   cargo:
     needs: test
+    if: ${{ inputs.operation == 'publish' }}
     runs-on: ubuntu-24.04
     environment: crates-io
     permissions:
@@ -103,21 +153,13 @@ jobs:
           toolchain: '1.98.1'
       - uses: rust-lang/crates-io-auth-action@v1
         id: auth
-        if: ${{ !inputs.bootstrap }}
       - name: Publish the contract
-        if: ${{ !inputs.bootstrap }}
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
         run: cargo publish -p logos-contract --locked
-      - name: Create the initial crate with temporary bootstrap access
-        if: ${{ inputs.bootstrap }}
-        env:
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_BOOTSTRAP_TOKEN }}
-        run: |
-          test -n "$CARGO_REGISTRY_TOKEN"
-          cargo publish -p logos-contract --locked
   consume:
     needs: [npm, cargo]
+    if: ${{ always() && (inputs.operation == 'consume' || (needs.npm.result == 'success' && needs.cargo.result == 'success')) }}
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -137,6 +179,7 @@ jobs:
           RELEASE: ${{ inputs.version }}
         run: |
           set -euo pipefail
+          [[ "$RELEASE" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
           version="${RELEASE#v}"
           export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_TERMINAL_PROMPT=0
           export GOPROXY=https://proxy.golang.org,direct GOSUMDB=sum.golang.org
