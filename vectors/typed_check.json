@@ -1,0 +1,764 @@
+{
+  "schema": "logos/typed-check-fixtures/v1",
+  "foundation": "logos/dependent-fragment-1/edition-1",
+  "note": "Hand-authored AST fixtures from the selected rulebook. Declaration-set names and JSON are test notation, not a production proof protocol. Consumer premises are explicitly assumed; no Horos/Go artifact extractor is exercised.",
+  "declaration_sets": {
+    "empty": [],
+    "unused": [
+      {"kind": "assume", "symbol": "unused", "type": ["nat"], "dependencies": ["unused-assumption"]}
+    ],
+    "erased": [
+      {"kind": "assume", "symbol": "secret", "type": ["nat"], "dependencies": ["erased-argument"]}
+    ],
+    "context": [
+      {"kind": "assume", "symbol": "A", "type": ["sort", 0], "dependencies": ["context-meaning"]}
+    ],
+    "unicode": [
+      {"kind": "assume", "symbol": "e\u0301", "type": ["nat"], "dependencies": ["\ud800\udc00", "\ue000", "e\u0301", "\u00e9", "\ue000"]}
+    ],
+    "definition": [
+      {"kind": "assume", "symbol": "secret", "type": ["nat"], "dependencies": ["erased-argument"]},
+      {"kind": "define", "symbol": "hidden", "type": ["nat"], "value": ["app", ["lam", ["nat"], ["zero"]], ["const", "secret"]]}
+    ],
+    "duplicate": [
+      {"kind": "define", "symbol": "x", "type": ["nat"], "value": ["zero"]},
+      {"kind": "define", "symbol": "x", "type": ["nat"], "value": ["zero"]}
+    ],
+    "forward": [
+      {"kind": "define", "symbol": "x", "type": ["nat"], "value": ["const", "y"]},
+      {"kind": "define", "symbol": "y", "type": ["nat"], "value": ["zero"]}
+    ],
+    "recursive": [
+      {"kind": "define", "symbol": "x", "type": ["nat"], "value": ["const", "x"]}
+    ],
+    "empty-name": [
+      {"kind": "define", "symbol": "", "type": ["nat"], "value": ["zero"]}
+    ],
+    "missing-assumptions": [
+      {"kind": "assume", "symbol": "x", "type": ["nat"], "dependencies": []}
+    ],
+    "textBox": [
+      {"kind": "assume", "symbol": "H", "type": ["sort", 0], "dependencies": ["fixture.source-model"]},
+      {"kind": "assume", "symbol": "N", "type": ["sort", 0], "dependencies": ["fixture.native-model"]},
+      {"kind": "assume", "symbol": "D", "type": ["sort", 0], "dependencies": ["fixture.native-model"]},
+      {"kind": "assume", "symbol": "canonical.bool", "type": ["const", "H"], "dependencies": ["fixture.source-model"]},
+      {"kind": "assume", "symbol": "canonical.other", "type": ["const", "H"], "dependencies": ["fixture.source-model"]},
+      {"kind": "assume", "symbol": "native.bool", "type": ["const", "N"], "dependencies": ["fixture.native-model"]},
+      {"kind": "assume", "symbol": "TextBox.any", "type": ["const", "D"], "dependencies": ["fixture.native-model"]},
+      {"kind": "assume", "symbol": "TextBox.changed", "type": ["const", "D"], "dependencies": ["fixture.native-model"]},
+      {"kind": "assume", "symbol": "Text", "type": ["pi", ["const", "H"], ["sort", 0]], "dependencies": ["fixture.source-model"]},
+      {"kind": "assume", "symbol": "Admits", "type": ["pi", ["const", "D"], ["pi", ["const", "N"], ["sort", 0]]], "dependencies": ["fixture.native-model"]},
+      {"kind": "assume", "symbol": "Rep", "type": ["pi", ["const", "H"], ["pi", ["const", "N"], ["sort", 0]]], "dependencies": ["fixture.mapping-meaning"]},
+      {"kind": "define", "symbol": "Empty", "type": ["sort", 0], "value": ["id", ["bool"], ["true"], ["false"]]},
+      {"kind": "assume", "symbol": "source.bool-not-text", "type": ["pi", ["app", ["const", "Text"], ["const", "canonical.bool"]], ["const", "Empty"]], "dependencies": ["horos.bool-refuted-text"]},
+      {"kind": "assume", "symbol": "native.bool-admitted", "type": ["app", ["app", ["const", "Admits"], ["const", "TextBox.any"]], ["const", "native.bool"]], "dependencies": ["go.textbox-bool-admission"]},
+      {"kind": "assume", "symbol": "mapping.bool", "type": ["app", ["app", ["const", "Rep"], ["const", "canonical.bool"]], ["const", "native.bool"]], "dependencies": ["mapping.bool"]},
+      {"kind": "define", "symbol": "association-and-refutation", "type": ["sort", 0], "value": ["sigma", ["app", ["app", ["const", "Rep"], ["const", "canonical.bool"]], ["const", "native.bool"]], ["pi", ["app", ["const", "Text"], ["const", "canonical.bool"]], ["const", "Empty"]]]},
+      {"kind": "define", "symbol": "counterexample", "type": ["sort", 0], "value": ["sigma", ["app", ["app", ["const", "Admits"], ["const", "TextBox.any"]], ["const", "native.bool"]], ["const", "association-and-refutation"]]},
+      {"kind": "define", "symbol": "changed-counterexample", "type": ["sort", 0], "value": ["sigma", ["app", ["app", ["const", "Admits"], ["const", "TextBox.changed"]], ["const", "native.bool"]], ["const", "association-and-refutation"]]}
+    ],
+    "page": [
+      {"kind": "assume", "symbol": "H", "type": ["sort", 0], "dependencies": ["fixture.source-model"]},
+      {"kind": "assume", "symbol": "N", "type": ["sort", 0], "dependencies": ["fixture.native-model"]},
+      {"kind": "assume", "symbol": "Member", "type": ["pi", ["const", "H"], ["sort", 0]], "dependencies": ["fixture.source-data-kind"]},
+      {"kind": "assume", "symbol": "Rep", "type": ["pi", ["const", "H"], ["pi", ["const", "N"], ["sort", 0]]], "dependencies": ["fixture.mapping-meaning"]},
+      {"kind": "assume", "symbol": "Rep.other", "type": ["pi", ["const", "H"], ["pi", ["const", "N"], ["sort", 0]]], "dependencies": ["fixture.other-mapping-meaning"]},
+      {"kind": "assume", "symbol": "SourceBodyOf", "type": ["pi", ["const", "H"], ["pi", ["const", "H"], ["sort", 0]]], "dependencies": ["fixture.source-model"]},
+      {"kind": "assume", "symbol": "NativeBodyOf", "type": ["pi", ["const", "N"], ["pi", ["const", "N"], ["sort", 0]]], "dependencies": ["fixture.native-model"]},
+      {"kind": "assume", "symbol": "h.text", "type": ["const", "H"], "dependencies": ["fixture.source-model"]},
+      {"kind": "assume", "symbol": "n.string", "type": ["const", "N"], "dependencies": ["fixture.native-model"]},
+      {"kind": "assume", "symbol": "h.person", "type": ["const", "H"], "dependencies": ["fixture.source-model"]},
+      {"kind": "assume", "symbol": "n.person", "type": ["const", "N"], "dependencies": ["fixture.native-model"]},
+      {"kind": "assume", "symbol": "h.list", "type": ["pi", ["const", "H"], ["const", "H"]], "dependencies": ["fixture.source-model"]},
+      {"kind": "assume", "symbol": "n.slice", "type": ["pi", ["const", "N"], ["const", "N"]], "dependencies": ["fixture.native-model"]},
+      {"kind": "assume", "symbol": "h.optional", "type": ["pi", ["const", "H"], ["const", "H"]], "dependencies": ["fixture.source-model"]},
+      {"kind": "assume", "symbol": "n.optional", "type": ["pi", ["const", "N"], ["const", "N"]], "dependencies": ["fixture.native-model"]},
+      {"kind": "assume", "symbol": "h.record", "type": ["pi", ["const", "H"], ["pi", ["const", "H"], ["const", "H"]]], "dependencies": ["fixture.source-model"]},
+      {"kind": "assume", "symbol": "n.record", "type": ["pi", ["const", "N"], ["pi", ["const", "N"], ["const", "N"]]], "dependencies": ["fixture.native-model"]},
+      {"kind": "assume", "symbol": "h.page", "type": ["pi", ["const", "H"], ["const", "H"]], "dependencies": ["fixture.source-model"]},
+      {"kind": "assume", "symbol": "n.page", "type": ["pi", ["const", "N"], ["const", "N"]], "dependencies": ["fixture.native-model"]},
+      {"kind": "assume", "symbol": "h.page.other-source", "type": ["pi", ["const", "H"], ["const", "H"]], "dependencies": ["fixture.source-model"]},
+      {"kind": "assume", "symbol": "n.page.other-helper", "type": ["pi", ["const", "N"], ["const", "N"]], "dependencies": ["fixture.native-model"]},
+      {"kind": "assume", "symbol": "n.page.missing-next", "type": ["pi", ["const", "N"], ["const", "N"]], "dependencies": ["fixture.native-model"]},
+      {
+        "kind": "define", "symbol": "SourceBody", "type": ["pi", ["const", "H"], ["const", "H"]],
+        "value": ["lam", ["const", "H"], ["app", ["app", ["const", "h.record"], ["app", ["const", "h.list"], ["var", 0]]], ["app", ["const", "h.optional"], ["const", "h.text"]]]]
+      },
+      {
+        "kind": "define", "symbol": "NativeBody", "type": ["pi", ["const", "N"], ["const", "N"]],
+        "value": ["lam", ["const", "N"], ["app", ["app", ["const", "n.record"], ["app", ["const", "n.slice"], ["var", 0]]], ["app", ["const", "n.optional"], ["const", "n.string"]]]]
+      },
+      {
+        "kind": "assume", "symbol": "source.page-body",
+        "type": ["pi", ["const", "H"], ["app", ["app", ["const", "SourceBodyOf"], ["app", ["const", "h.page"], ["var", 0]]], ["app", ["const", "SourceBody"], ["var", 0]]]],
+        "dependencies": ["horos.page-body"]
+      },
+      {
+        "kind": "assume", "symbol": "native.page-body",
+        "type": ["pi", ["const", "N"], ["app", ["app", ["const", "NativeBodyOf"], ["app", ["const", "n.page"], ["var", 0]]], ["app", ["const", "NativeBody"], ["var", 0]]]],
+        "dependencies": ["go.page-fields-and-helper"]
+      },
+      {
+        "kind": "assume", "symbol": "source.page-kind",
+        "type": ["pi", ["const", "H"], ["pi", ["app", ["const", "Member"], ["var", 0]], ["app", ["const", "Member"], ["app", ["const", "h.page"], ["var", 1]]]]],
+        "dependencies": ["horos.page-constructor-kind"]
+      },
+      {"kind": "assume", "symbol": "member.person", "type": ["app", ["const", "Member"], ["const", "h.person"]], "dependencies": ["horos.person-kind"]},
+      {"kind": "assume", "symbol": "rep.person", "type": ["app", ["app", ["const", "Rep"], ["const", "h.person"]], ["const", "n.person"]], "dependencies": ["mapping.person"]},
+      {"kind": "assume", "symbol": "rep.text", "type": ["app", ["app", ["const", "Rep"], ["const", "h.text"]], ["const", "n.string"]], "dependencies": ["mapping.text"]},
+      {
+        "kind": "assume", "symbol": "law.list",
+        "type": ["pi", ["const", "H"], ["pi", ["const", "N"],
+          ["pi", ["app", ["app", ["const", "Rep"], ["var", 1]], ["var", 0]],
+            ["app", ["app", ["const", "Rep"], ["app", ["const", "h.list"], ["var", 2]]], ["app", ["const", "n.slice"], ["var", 1]]]]]],
+        "dependencies": ["mapping.list-slice-law"]
+      },
+      {
+        "kind": "assume", "symbol": "law.optional",
+        "type": ["pi", ["const", "H"], ["pi", ["const", "N"],
+          ["pi", ["app", ["app", ["const", "Rep"], ["var", 1]], ["var", 0]],
+            ["app", ["app", ["const", "Rep"], ["app", ["const", "h.optional"], ["var", 2]]], ["app", ["const", "n.optional"], ["var", 1]]]]]],
+        "dependencies": ["mapping.optional-presence-law"]
+      },
+      {
+        "kind": "assume", "symbol": "law.record",
+        "type": ["pi", ["const", "H"], ["pi", ["const", "H"], ["pi", ["const", "N"], ["pi", ["const", "N"],
+          ["pi", ["app", ["app", ["const", "Rep"], ["var", 3]], ["var", 1]],
+            ["pi", ["app", ["app", ["const", "Rep"], ["var", 3]], ["var", 1]],
+              ["app", ["app", ["const", "Rep"], ["app", ["app", ["const", "h.record"], ["var", 5]], ["var", 4]]],
+                ["app", ["app", ["const", "n.record"], ["var", 3]], ["var", 2]]]]]]]]],
+        "dependencies": ["mapping.record-fields-law"]
+      },
+      {
+        "kind": "assume", "symbol": "law.named",
+        "type": ["pi", ["const", "H"], ["pi", ["const", "H"], ["pi", ["const", "N"], ["pi", ["const", "N"],
+          ["pi", ["app", ["app", ["const", "SourceBodyOf"], ["var", 3]], ["var", 2]],
+            ["pi", ["app", ["app", ["const", "NativeBodyOf"], ["var", 2]], ["var", 1]],
+              ["pi", ["app", ["app", ["const", "Rep"], ["var", 4]], ["var", 2]],
+                ["app", ["app", ["const", "Rep"], ["var", 6]], ["var", 4]]]]]]]]],
+        "dependencies": ["mapping.named-family-law"]
+      },
+      {
+        "kind": "define", "symbol": "body-representation",
+        "type": ["pi", ["const", "H"], ["pi", ["const", "N"],
+          ["pi", ["app", ["app", ["const", "Rep"], ["var", 1]], ["var", 0]],
+            ["app", ["app", ["const", "Rep"], ["app", ["const", "SourceBody"], ["var", 2]]], ["app", ["const", "NativeBody"], ["var", 1]]]]]],
+        "value": ["lam", ["const", "H"], ["lam", ["const", "N"],
+          ["lam", ["app", ["app", ["const", "Rep"], ["var", 1]], ["var", 0]],
+            ["app",
+              ["app",
+                ["app", ["app", ["app", ["app", ["const", "law.record"],
+                  ["app", ["const", "h.list"], ["var", 2]]],
+                  ["app", ["const", "h.optional"], ["const", "h.text"]]],
+                  ["app", ["const", "n.slice"], ["var", 1]]],
+                  ["app", ["const", "n.optional"], ["const", "n.string"]]],
+                ["app", ["app", ["app", ["const", "law.list"], ["var", 2]], ["var", 1]], ["var", 0]]],
+              ["app", ["app", ["app", ["const", "law.optional"], ["const", "h.text"]], ["const", "n.string"]], ["const", "rep.text"]]]]]]
+      },
+      {
+        "kind": "define", "symbol": "PageResult", "type": ["pi", ["const", "H"], ["pi", ["const", "N"], ["sort", 0]]],
+        "value": ["lam", ["const", "H"], ["lam", ["const", "N"],
+          ["sigma", ["app", ["const", "Member"], ["app", ["const", "h.page"], ["var", 1]]],
+            ["app", ["app", ["const", "Rep"], ["app", ["const", "h.page"], ["var", 2]]], ["app", ["const", "n.page"], ["var", 1]]]]]]
+      },
+      {
+        "kind": "define", "symbol": "PageStatement", "type": ["sort", 0],
+        "value": ["pi", ["const", "H"], ["pi", ["const", "N"],
+          ["pi", ["app", ["const", "Member"], ["var", 1]],
+            ["pi", ["app", ["app", ["const", "Rep"], ["var", 2]], ["var", 1]],
+              ["app", ["app", ["const", "PageResult"], ["var", 3]], ["var", 2]]]]]]
+      },
+      {
+        "kind": "define", "symbol": "page.proof", "type": ["const", "PageStatement"],
+        "value": ["lam", ["const", "H"], ["lam", ["const", "N"],
+          ["lam", ["app", ["const", "Member"], ["var", 1]],
+            ["lam", ["app", ["app", ["const", "Rep"], ["var", 2]], ["var", 1]],
+              ["pair", ["app", ["app", ["const", "PageResult"], ["var", 3]], ["var", 2]],
+                ["app", ["app", ["const", "source.page-kind"], ["var", 3]], ["var", 1]],
+                ["app",
+                  ["app",
+                    ["app",
+                      ["app", ["app", ["app", ["app", ["const", "law.named"],
+                        ["app", ["const", "h.page"], ["var", 3]]],
+                        ["app", ["const", "SourceBody"], ["var", 3]]],
+                        ["app", ["const", "n.page"], ["var", 2]]],
+                        ["app", ["const", "NativeBody"], ["var", 2]]],
+                      ["app", ["const", "source.page-body"], ["var", 3]]],
+                    ["app", ["const", "native.page-body"], ["var", 2]]],
+                  ["app", ["app", ["app", ["const", "body-representation"], ["var", 3]], ["var", 2]], ["var", 0]]]]]]]]
+      }
+    ],
+    "pageChangedHelper": [
+      {"kind": "assume", "symbol": "H", "type": ["sort", 0], "dependencies": ["fixture.source-model"]},
+      {"kind": "assume", "symbol": "N", "type": ["sort", 0], "dependencies": ["fixture.native-model"]},
+      {"kind": "assume", "symbol": "Member", "type": ["pi", ["const", "H"], ["sort", 0]], "dependencies": ["fixture.source-data-kind"]},
+      {"kind": "assume", "symbol": "Rep", "type": ["pi", ["const", "H"], ["pi", ["const", "N"], ["sort", 0]]], "dependencies": ["fixture.mapping-meaning"]},
+      {"kind": "assume", "symbol": "Rep.other", "type": ["pi", ["const", "H"], ["pi", ["const", "N"], ["sort", 0]]], "dependencies": ["fixture.other-mapping-meaning"]},
+      {"kind": "assume", "symbol": "SourceBodyOf", "type": ["pi", ["const", "H"], ["pi", ["const", "H"], ["sort", 0]]], "dependencies": ["fixture.source-model"]},
+      {"kind": "assume", "symbol": "NativeBodyOf", "type": ["pi", ["const", "N"], ["pi", ["const", "N"], ["sort", 0]]], "dependencies": ["fixture.native-model"]},
+      {"kind": "assume", "symbol": "h.text", "type": ["const", "H"], "dependencies": ["fixture.source-model"]},
+      {"kind": "assume", "symbol": "n.string", "type": ["const", "N"], "dependencies": ["fixture.native-model"]},
+      {"kind": "assume", "symbol": "h.person", "type": ["const", "H"], "dependencies": ["fixture.source-model"]},
+      {"kind": "assume", "symbol": "n.person", "type": ["const", "N"], "dependencies": ["fixture.native-model"]},
+      {"kind": "assume", "symbol": "h.list", "type": ["pi", ["const", "H"], ["const", "H"]], "dependencies": ["fixture.source-model"]},
+      {"kind": "assume", "symbol": "n.slice", "type": ["pi", ["const", "N"], ["const", "N"]], "dependencies": ["fixture.native-model"]},
+      {"kind": "assume", "symbol": "h.optional", "type": ["pi", ["const", "H"], ["const", "H"]], "dependencies": ["fixture.source-model"]},
+      {"kind": "assume", "symbol": "n.optional", "type": ["pi", ["const", "N"], ["const", "N"]], "dependencies": ["fixture.native-model"]},
+      {"kind": "assume", "symbol": "n.optional.changed-helper", "type": ["pi", ["const", "N"], ["const", "N"]], "dependencies": ["fixture.native-model"]},
+      {"kind": "assume", "symbol": "h.record", "type": ["pi", ["const", "H"], ["pi", ["const", "H"], ["const", "H"]]], "dependencies": ["fixture.source-model"]},
+      {"kind": "assume", "symbol": "n.record", "type": ["pi", ["const", "N"], ["pi", ["const", "N"], ["const", "N"]]], "dependencies": ["fixture.native-model"]},
+      {"kind": "assume", "symbol": "h.page", "type": ["pi", ["const", "H"], ["const", "H"]], "dependencies": ["fixture.source-model"]},
+      {"kind": "assume", "symbol": "n.page", "type": ["pi", ["const", "N"], ["const", "N"]], "dependencies": ["fixture.native-model"]},
+      {"kind": "assume", "symbol": "h.page.other-source", "type": ["pi", ["const", "H"], ["const", "H"]], "dependencies": ["fixture.source-model"]},
+      {"kind": "assume", "symbol": "n.page.other-helper", "type": ["pi", ["const", "N"], ["const", "N"]], "dependencies": ["fixture.native-model"]},
+      {"kind": "assume", "symbol": "n.page.missing-next", "type": ["pi", ["const", "N"], ["const", "N"]], "dependencies": ["fixture.native-model"]},
+      {
+        "kind": "define", "symbol": "SourceBody", "type": ["pi", ["const", "H"], ["const", "H"]],
+        "value": ["lam", ["const", "H"], ["app", ["app", ["const", "h.record"], ["app", ["const", "h.list"], ["var", 0]]], ["app", ["const", "h.optional"], ["const", "h.text"]]]]
+      },
+      {
+        "kind": "define", "symbol": "NativeBody", "type": ["pi", ["const", "N"], ["const", "N"]],
+        "value": ["lam", ["const", "N"], ["app", ["app", ["const", "n.record"], ["app", ["const", "n.slice"], ["var", 0]]], ["app", ["const", "n.optional"], ["const", "n.string"]]]]
+      },
+      {
+        "kind": "assume", "symbol": "source.page-body",
+        "type": ["pi", ["const", "H"], ["app", ["app", ["const", "SourceBodyOf"], ["app", ["const", "h.page"], ["var", 0]]], ["app", ["const", "SourceBody"], ["var", 0]]]],
+        "dependencies": ["horos.page-body"]
+      },
+      {
+        "kind": "assume", "symbol": "native.page-body",
+        "type": ["pi", ["const", "N"], ["app", ["app", ["const", "NativeBodyOf"], ["app", ["const", "n.page"], ["var", 0]]],
+          ["app", ["app", ["const", "n.record"], ["app", ["const", "n.slice"], ["var", 0]]], ["app", ["const", "n.optional.changed-helper"], ["const", "n.string"]]]]],
+        "dependencies": ["go.page-fields-and-helper"]
+      },
+      {
+        "kind": "assume", "symbol": "source.page-kind",
+        "type": ["pi", ["const", "H"], ["pi", ["app", ["const", "Member"], ["var", 0]], ["app", ["const", "Member"], ["app", ["const", "h.page"], ["var", 1]]]]],
+        "dependencies": ["horos.page-constructor-kind"]
+      },
+      {"kind": "assume", "symbol": "member.person", "type": ["app", ["const", "Member"], ["const", "h.person"]], "dependencies": ["horos.person-kind"]},
+      {"kind": "assume", "symbol": "rep.person", "type": ["app", ["app", ["const", "Rep"], ["const", "h.person"]], ["const", "n.person"]], "dependencies": ["mapping.person"]},
+      {"kind": "assume", "symbol": "rep.text", "type": ["app", ["app", ["const", "Rep"], ["const", "h.text"]], ["const", "n.string"]], "dependencies": ["mapping.text"]},
+      {
+        "kind": "assume", "symbol": "law.list",
+        "type": ["pi", ["const", "H"], ["pi", ["const", "N"],
+          ["pi", ["app", ["app", ["const", "Rep"], ["var", 1]], ["var", 0]],
+            ["app", ["app", ["const", "Rep"], ["app", ["const", "h.list"], ["var", 2]]], ["app", ["const", "n.slice"], ["var", 1]]]]]],
+        "dependencies": ["mapping.list-slice-law"]
+      },
+      {
+        "kind": "assume", "symbol": "law.optional",
+        "type": ["pi", ["const", "H"], ["pi", ["const", "N"],
+          ["pi", ["app", ["app", ["const", "Rep"], ["var", 1]], ["var", 0]],
+            ["app", ["app", ["const", "Rep"], ["app", ["const", "h.optional"], ["var", 2]]], ["app", ["const", "n.optional"], ["var", 1]]]]]],
+        "dependencies": ["mapping.optional-presence-law"]
+      },
+      {
+        "kind": "assume", "symbol": "law.record",
+        "type": ["pi", ["const", "H"], ["pi", ["const", "H"], ["pi", ["const", "N"], ["pi", ["const", "N"],
+          ["pi", ["app", ["app", ["const", "Rep"], ["var", 3]], ["var", 1]],
+            ["pi", ["app", ["app", ["const", "Rep"], ["var", 3]], ["var", 1]],
+              ["app", ["app", ["const", "Rep"], ["app", ["app", ["const", "h.record"], ["var", 5]], ["var", 4]]],
+                ["app", ["app", ["const", "n.record"], ["var", 3]], ["var", 2]]]]]]]]],
+        "dependencies": ["mapping.record-fields-law"]
+      },
+      {
+        "kind": "assume", "symbol": "law.named",
+        "type": ["pi", ["const", "H"], ["pi", ["const", "H"], ["pi", ["const", "N"], ["pi", ["const", "N"],
+          ["pi", ["app", ["app", ["const", "SourceBodyOf"], ["var", 3]], ["var", 2]],
+            ["pi", ["app", ["app", ["const", "NativeBodyOf"], ["var", 2]], ["var", 1]],
+              ["pi", ["app", ["app", ["const", "Rep"], ["var", 4]], ["var", 2]],
+                ["app", ["app", ["const", "Rep"], ["var", 6]], ["var", 4]]]]]]]]],
+        "dependencies": ["mapping.named-family-law"]
+      },
+      {
+        "kind": "define", "symbol": "body-representation",
+        "type": ["pi", ["const", "H"], ["pi", ["const", "N"],
+          ["pi", ["app", ["app", ["const", "Rep"], ["var", 1]], ["var", 0]],
+            ["app", ["app", ["const", "Rep"], ["app", ["const", "SourceBody"], ["var", 2]]], ["app", ["const", "NativeBody"], ["var", 1]]]]]],
+        "value": ["lam", ["const", "H"], ["lam", ["const", "N"],
+          ["lam", ["app", ["app", ["const", "Rep"], ["var", 1]], ["var", 0]],
+            ["app",
+              ["app",
+                ["app", ["app", ["app", ["app", ["const", "law.record"],
+                  ["app", ["const", "h.list"], ["var", 2]]],
+                  ["app", ["const", "h.optional"], ["const", "h.text"]]],
+                  ["app", ["const", "n.slice"], ["var", 1]]],
+                  ["app", ["const", "n.optional"], ["const", "n.string"]]],
+                ["app", ["app", ["app", ["const", "law.list"], ["var", 2]], ["var", 1]], ["var", 0]]],
+              ["app", ["app", ["app", ["const", "law.optional"], ["const", "h.text"]], ["const", "n.string"]], ["const", "rep.text"]]]]]]
+      },
+      {
+        "kind": "define", "symbol": "PageResult", "type": ["pi", ["const", "H"], ["pi", ["const", "N"], ["sort", 0]]],
+        "value": ["lam", ["const", "H"], ["lam", ["const", "N"],
+          ["sigma", ["app", ["const", "Member"], ["app", ["const", "h.page"], ["var", 1]]],
+            ["app", ["app", ["const", "Rep"], ["app", ["const", "h.page"], ["var", 2]]], ["app", ["const", "n.page"], ["var", 1]]]]]]
+      },
+      {
+        "kind": "define", "symbol": "PageStatement", "type": ["sort", 0],
+        "value": ["pi", ["const", "H"], ["pi", ["const", "N"],
+          ["pi", ["app", ["const", "Member"], ["var", 1]],
+            ["pi", ["app", ["app", ["const", "Rep"], ["var", 2]], ["var", 1]],
+              ["app", ["app", ["const", "PageResult"], ["var", 3]], ["var", 2]]]]]]
+      },
+      {
+        "kind": "define", "symbol": "page.proof", "type": ["const", "PageStatement"],
+        "value": ["lam", ["const", "H"], ["lam", ["const", "N"],
+          ["lam", ["app", ["const", "Member"], ["var", 1]],
+            ["lam", ["app", ["app", ["const", "Rep"], ["var", 2]], ["var", 1]],
+              ["pair", ["app", ["app", ["const", "PageResult"], ["var", 3]], ["var", 2]],
+                ["app", ["app", ["const", "source.page-kind"], ["var", 3]], ["var", 1]],
+                ["app",
+                  ["app",
+                    ["app",
+                      ["app", ["app", ["app", ["app", ["const", "law.named"],
+                        ["app", ["const", "h.page"], ["var", 3]]],
+                        ["app", ["const", "SourceBody"], ["var", 3]]],
+                        ["app", ["const", "n.page"], ["var", 2]]],
+                        ["app", ["const", "NativeBody"], ["var", 2]]],
+                      ["app", ["const", "source.page-body"], ["var", 3]]],
+                    ["app", ["const", "native.page-body"], ["var", 2]]],
+                  ["app", ["app", ["app", ["const", "body-representation"], ["var", 3]], ["var", 2]], ["var", 0]]]]]]]]
+      }
+    ]
+  },
+  "cases": [
+    {
+      "id": "universe-successor",
+      "statement": {"declarations": "empty", "context": [], "expected": ["sort", 1]},
+      "candidate": ["sort", 0], "policy": {"dependencies": []},
+      "expect": {"status": "accepted", "dependencies": []}
+    },
+    {
+      "id": "universe-is-not-self-typed",
+      "statement": {"declarations": "empty", "context": [], "expected": ["sort", 0]},
+      "candidate": ["sort", 0], "policy": {"dependencies": []},
+      "expect": {"status": "invalid", "code": "type-mismatch"}
+    },
+    {
+      "id": "polymorphic-identity",
+      "statement": {"declarations": "empty", "context": [], "expected": ["pi", ["sort", 0], ["pi", ["var", 0], ["var", 1]]]},
+      "candidate": ["lam", ["sort", 0], ["lam", ["var", 0], ["var", 0]]], "policy": {"dependencies": []},
+      "expect": {"status": "accepted", "dependencies": []}
+    },
+    {
+      "id": "identity-application",
+      "statement": {"declarations": "empty", "context": [], "expected": ["nat"]},
+      "candidate": ["app", ["app", ["lam", ["sort", 0], ["lam", ["var", 0], ["var", 0]]], ["nat"]], ["succ", ["zero"]]], "policy": {"dependencies": []},
+      "expect": {"status": "accepted", "dependencies": []}
+    },
+    {
+      "id": "capture-avoiding-substitution",
+      "statement": {"declarations": "empty", "context": [["sort", 0], ["var", 0]], "expected": ["pi", ["bool"], ["var", 2]]},
+      "candidate": ["app", ["lam", ["var", 1], ["lam", ["bool"], ["var", 1]]], ["var", 0]], "policy": {"dependencies": []},
+      "expect": {"status": "accepted", "dependencies": []}
+    },
+    {
+      "id": "captured-argument-is-wrong-type",
+      "statement": {"declarations": "empty", "context": [["sort", 0], ["var", 0]], "expected": ["pi", ["bool"], ["var", 2]]},
+      "candidate": ["lam", ["bool"], ["var", 0]], "policy": {"dependencies": []},
+      "expect": {"status": "invalid", "code": "type-mismatch"}
+    },
+    {
+      "id": "escaping-free-variable",
+      "statement": {"declarations": "empty", "context": [], "expected": ["nat"]},
+      "candidate": ["var", 0], "policy": {"dependencies": []},
+      "expect": {"status": "invalid", "code": "escaped-variable"}
+    },
+    {
+      "id": "closed-special-case-cannot-generalize",
+      "statement": {"declarations": "empty", "context": [], "expected": ["pi", ["sort", 0], ["pi", ["var", 0], ["var", 1]]]},
+      "candidate": ["lam", ["sort", 0], ["lam", ["var", 0], ["true"]]], "policy": {"dependencies": []},
+      "expect": {"status": "invalid", "code": "type-mismatch"}
+    },
+    {
+      "id": "dependent-pair",
+      "statement": {"declarations": "empty", "context": [], "expected": ["sigma", ["nat"], ["id", ["nat"], ["var", 0], ["var", 0]]]},
+      "candidate": ["pair", ["sigma", ["nat"], ["id", ["nat"], ["var", 0], ["var", 0]]], ["zero"], ["refl", ["nat"], ["zero"]]], "policy": {"dependencies": []},
+      "expect": {"status": "accepted", "dependencies": []}
+    },
+    {
+      "id": "pair-first-projection",
+      "statement": {"declarations": "empty", "context": [], "expected": ["nat"]},
+      "candidate": ["fst", ["pair", ["sigma", ["nat"], ["id", ["nat"], ["var", 0], ["var", 0]]], ["zero"], ["refl", ["nat"], ["zero"]]]], "policy": {"dependencies": []},
+      "expect": {"status": "accepted", "dependencies": []}
+    },
+    {
+      "id": "dependent-second-projection",
+      "statement": {"declarations": "empty", "context": [], "expected": ["id", ["nat"], ["zero"], ["zero"]]},
+      "candidate": ["snd", ["pair", ["sigma", ["nat"], ["id", ["nat"], ["var", 0], ["var", 0]]], ["zero"], ["refl", ["nat"], ["zero"]]]], "policy": {"dependencies": []},
+      "expect": {"status": "accepted", "dependencies": []}
+    },
+    {
+      "id": "natural-elimination",
+      "statement": {"declarations": "empty", "context": [], "expected": ["nat"]},
+      "candidate": ["nat-elim", ["lam", ["nat"], ["nat"]], ["zero"], ["lam", ["nat"], ["lam", ["nat"], ["succ", ["var", 0]]]], ["succ", ["succ", ["zero"]]]], "policy": {"dependencies": []},
+      "expect": {"status": "accepted", "dependencies": []}
+    },
+    {
+      "id": "boolean-elimination",
+      "statement": {"declarations": "empty", "context": [], "expected": ["nat"]},
+      "candidate": ["bool-elim", ["lam", ["bool"], ["nat"]], ["zero"], ["succ", ["zero"]], ["true"]], "policy": {"dependencies": []},
+      "expect": {"status": "accepted", "dependencies": []}
+    },
+    {
+      "id": "unselected-boolean-branch-is-checked",
+      "statement": {"declarations": "empty", "context": [], "expected": ["nat"]},
+      "candidate": ["bool-elim", ["lam", ["bool"], ["nat"]], ["false"], ["succ", ["zero"]], ["true"]], "policy": {"dependencies": []},
+      "expect": {"status": "invalid", "code": "type-mismatch"}
+    },
+    {
+      "id": "identity-transport",
+      "statement": {"declarations": "empty", "context": [], "expected": ["bool"]},
+      "candidate": ["transport", ["nat"], ["zero"], ["zero"], ["refl", ["nat"], ["zero"]], ["lam", ["nat"], ["bool"]], ["true"]], "policy": {"dependencies": []},
+      "expect": {"status": "accepted", "dependencies": []}
+    },
+    {
+      "id": "transport-requires-exact-endpoints",
+      "statement": {"declarations": "empty", "context": [], "expected": ["bool"]},
+      "candidate": ["transport", ["nat"], ["zero"], ["succ", ["zero"]], ["refl", ["nat"], ["zero"]], ["lam", ["nat"], ["bool"]], ["true"]], "policy": {"dependencies": []},
+      "expect": {"status": "invalid", "code": "type-mismatch"}
+    },
+    {
+      "id": "wrong-exact-expected-type",
+      "statement": {"declarations": "empty", "context": [], "expected": ["bool"]},
+      "candidate": ["zero"], "policy": {"dependencies": []},
+      "expect": {"status": "invalid", "code": "type-mismatch"}
+    },
+    {
+      "id": "expected-expression-must-be-a-type",
+      "statement": {"declarations": "empty", "context": [], "expected": ["zero"]},
+      "candidate": ["zero"], "policy": {"dependencies": []},
+      "expect": {"status": "invalid", "code": "expected-universe"}
+    },
+    {
+      "id": "application-requires-function",
+      "statement": {"declarations": "empty", "context": [], "expected": ["nat"]},
+      "candidate": ["app", ["zero"], ["zero"]], "policy": {"dependencies": []},
+      "expect": {"status": "invalid", "code": "expected-function"}
+    },
+    {
+      "id": "projection-requires-sigma",
+      "statement": {"declarations": "empty", "context": [], "expected": ["nat"]},
+      "candidate": ["fst", ["zero"]], "policy": {"dependencies": []},
+      "expect": {"status": "invalid", "code": "expected-sigma"}
+    },
+    {
+      "id": "unknown-constant",
+      "statement": {"declarations": "empty", "context": [], "expected": ["nat"]},
+      "candidate": ["const", "absent"], "policy": {"dependencies": []},
+      "expect": {"status": "invalid", "code": "unknown-constant"}
+    },
+    {
+      "id": "duplicate-declaration",
+      "statement": {"declarations": "duplicate", "context": [], "expected": ["nat"]},
+      "candidate": ["zero"], "policy": {"dependencies": []},
+      "expect": {"status": "invalid", "code": "duplicate-constant"}
+    },
+    {
+      "id": "forward-declaration",
+      "statement": {"declarations": "forward", "context": [], "expected": ["nat"]},
+      "candidate": ["zero"], "policy": {"dependencies": []},
+      "expect": {"status": "invalid", "code": "unknown-constant"}
+    },
+    {
+      "id": "recursive-declaration",
+      "statement": {"declarations": "recursive", "context": [], "expected": ["nat"]},
+      "candidate": ["zero"], "policy": {"dependencies": []},
+      "expect": {"status": "invalid", "code": "unknown-constant"}
+    },
+    {
+      "id": "empty-declaration-name",
+      "statement": {"declarations": "empty-name", "context": [], "expected": ["nat"]},
+      "candidate": ["zero"], "policy": {"dependencies": []},
+      "expect": {"status": "invalid", "code": "empty-constant-name"}
+    },
+    {
+      "id": "opaque-declaration-needs-explicit-basis",
+      "statement": {"declarations": "missing-assumptions", "context": [], "expected": ["nat"]},
+      "candidate": ["zero"], "policy": {"dependencies": []},
+      "expect": {"status": "invalid", "code": "missing-assumptions"}
+    },
+    {
+      "id": "unused-declaration-not-in-actual-basis",
+      "statement": {"declarations": "unused", "context": [], "expected": ["nat"]},
+      "candidate": ["zero"], "policy": {"dependencies": ["unused-allowance"]},
+      "expect": {"status": "accepted", "dependencies": []}
+    },
+    {
+      "id": "dependency-identities-use-utf8-order-and-set-semantics",
+      "statement": {"declarations": "unicode", "context": [], "expected": ["nat"]},
+      "candidate": ["const", "e\u0301"], "policy": {"dependencies": ["\ud800\udc00", "\ue000", "e\u0301", "\u00e9", "\ue000"]},
+      "limits": {"collection_entries": 11},
+      "expect": {"status": "accepted", "dependencies": ["e\u0301", "\u00e9", "\ue000", "\ud800\udc00"]}
+    },
+    {
+      "id": "names-are-not-unicode-normalized",
+      "statement": {"declarations": "unicode", "context": [], "expected": ["nat"]},
+      "candidate": ["const", "\u00e9"], "policy": {"dependencies": ["\ud800\udc00", "\ue000", "e\u0301", "\u00e9", "\ue000"]},
+      "expect": {"status": "invalid", "code": "unknown-constant"}
+    },
+    {
+      "id": "duplicate-dependency-entries-still-consume-input-capacity",
+      "statement": {"declarations": "unicode", "context": [], "expected": ["nat"]},
+      "candidate": ["const", "e\u0301"], "policy": {"dependencies": ["\ud800\udc00", "\ue000", "e\u0301", "\u00e9", "\ue000"]},
+      "limits": {"collection_entries": 10},
+      "expect": {"status": "incomplete", "code": "collection-entries"}
+    },
+    {
+      "id": "erased-argument-remains-in-basis",
+      "statement": {"declarations": "erased", "context": [], "expected": ["nat"]},
+      "candidate": ["app", ["lam", ["nat"], ["zero"]], ["const", "secret"]], "policy": {"dependencies": ["erased-argument"]},
+      "expect": {"status": "accepted", "dependencies": ["erased-argument"]}
+    },
+    {
+      "id": "erased-argument-cannot-bypass-policy",
+      "statement": {"declarations": "erased", "context": [], "expected": ["nat"]},
+      "candidate": ["app", ["lam", ["nat"], ["zero"]], ["const", "secret"]], "policy": {"dependencies": []},
+      "expect": {"status": "unsupported", "code": "unadmitted-dependency"}
+    },
+    {
+      "id": "expected-type-erased-argument-remains-in-basis",
+      "statement": {"declarations": "erased", "context": [], "expected": ["app", ["lam", ["nat"], ["nat"]], ["const", "secret"]]},
+      "candidate": ["zero"], "policy": {"dependencies": ["erased-argument"]},
+      "expect": {"status": "accepted", "dependencies": ["erased-argument"]}
+    },
+    {
+      "id": "unused-context-entry-remains-in-basis",
+      "statement": {"declarations": "context", "context": [["const", "A"]], "expected": ["nat"]},
+      "candidate": ["zero"], "policy": {"dependencies": ["context-meaning"]},
+      "expect": {"status": "accepted", "dependencies": ["context-meaning"]}
+    },
+    {
+      "id": "definition-retains-erased-dependency",
+      "statement": {"declarations": "definition", "context": [], "expected": ["nat"]},
+      "candidate": ["const", "hidden"], "policy": {"dependencies": ["erased-argument"]},
+      "expect": {"status": "accepted", "dependencies": ["erased-argument"]}
+    },
+    {
+      "id": "definition-narrowed-policy",
+      "statement": {"declarations": "definition", "context": [], "expected": ["nat"]},
+      "candidate": ["const", "hidden"], "policy": {"dependencies": []},
+      "expect": {"status": "unsupported", "code": "unadmitted-dependency"}
+    },
+    {
+      "id": "unsupported-foundation",
+      "statement": {"foundation": "unknown-foundation", "declarations": "empty", "context": [], "expected": ["nat"]},
+      "candidate": ["zero"], "policy": {"dependencies": []},
+      "expect": {"status": "unsupported", "code": "foundation"}
+    },
+    {
+      "id": "unadmitted-foundation",
+      "statement": {"declarations": "empty", "context": [], "expected": ["nat"]},
+      "candidate": ["zero"], "policy": {"foundation": "unadmitted", "dependencies": []},
+      "expect": {"status": "unsupported", "code": "unadmitted-foundation"}
+    },
+    {
+      "id": "unadmitted-checker",
+      "statement": {"declarations": "empty", "context": [], "expected": ["nat"]},
+      "candidate": ["zero"], "policy": {"checker": "unadmitted", "dependencies": []},
+      "expect": {"status": "unsupported", "code": "unadmitted-checker"}
+    },
+    {
+      "id": "input-node-budget",
+      "statement": {"declarations": "empty", "context": [], "expected": ["nat"]},
+      "candidate": ["zero"], "policy": {"dependencies": []}, "limits": {"input_nodes": 1},
+      "expect": {"status": "incomplete", "code": "input-nodes"}
+    },
+    {
+      "id": "input-depth-budget",
+      "statement": {"declarations": "empty", "context": [], "expected": ["nat"]},
+      "candidate": ["zero"], "policy": {"dependencies": []}, "limits": {"input_depth": 0},
+      "expect": {"status": "incomplete", "code": "input-depth"}
+    },
+    {
+      "id": "collection-entry-budget",
+      "statement": {"declarations": "unused", "context": [], "expected": ["nat"]},
+      "candidate": ["zero"], "policy": {"dependencies": []}, "limits": {"collection_entries": 0},
+      "expect": {"status": "incomplete", "code": "collection-entries"}
+    },
+    {
+      "id": "identity-byte-budget",
+      "statement": {"declarations": "empty", "context": [], "expected": ["nat"]},
+      "candidate": ["zero"], "policy": {"dependencies": []}, "limits": {"name_bytes": 1},
+      "expect": {"status": "incomplete", "code": "name-bytes"}
+    },
+    {
+      "id": "work-budget",
+      "statement": {"declarations": "empty", "context": [], "expected": ["nat"]},
+      "candidate": ["zero"], "policy": {"dependencies": []}, "limits": {"work": 0},
+      "expect": {"status": "incomplete", "code": "work"}
+    },
+    {
+      "id": "internal-depth-budget",
+      "statement": {"declarations": "empty", "context": [], "expected": ["nat"]},
+      "candidate": ["zero"], "policy": {"dependencies": []}, "limits": {"depth": 0},
+      "expect": {"status": "incomplete", "code": "depth"}
+    },
+    {
+      "id": "universe-capacity-is-incomplete",
+      "statement": {"declarations": "empty", "context": [], "expected": ["sort", 4294967295]},
+      "candidate": ["sort", 0], "policy": {"dependencies": []},
+      "expect": {"status": "incomplete", "code": "universe-capacity"}
+    },
+    {
+      "id": "textbox-explicit-counterexample",
+      "statement": {"declarations": "textBox", "context": [], "expected": ["const", "counterexample"]},
+      "candidate": ["pair", ["const", "counterexample"], ["const", "native.bool-admitted"], ["pair", ["const", "association-and-refutation"], ["const", "mapping.bool"], ["const", "source.bool-not-text"]]],
+      "policy": {"dependencies": ["fixture.mapping-meaning", "fixture.native-model", "fixture.source-model", "go.textbox-bool-admission", "horos.bool-refuted-text", "mapping.bool"]},
+      "expect": {"status": "accepted", "dependencies": ["fixture.mapping-meaning", "fixture.native-model", "fixture.source-model", "go.textbox-bool-admission", "horos.bool-refuted-text", "mapping.bool"]}
+    },
+    {
+      "id": "textbox-changed-output-is-not-the-same-claim",
+      "statement": {"declarations": "textBox", "context": [], "expected": ["const", "changed-counterexample"]},
+      "candidate": ["pair", ["const", "counterexample"], ["const", "native.bool-admitted"], ["pair", ["const", "association-and-refutation"], ["const", "mapping.bool"], ["const", "source.bool-not-text"]]],
+      "policy": {"dependencies": ["fixture.mapping-meaning", "fixture.native-model", "fixture.source-model", "go.textbox-bool-admission", "horos.bool-refuted-text", "mapping.bool"]},
+      "expect": {"status": "invalid", "code": "type-mismatch"}
+    },
+    {
+      "id": "textbox-boolean-is-not-nonmembership-evidence",
+      "statement": {"declarations": "textBox", "context": [], "expected": ["const", "counterexample"]},
+      "candidate": ["pair", ["const", "counterexample"], ["const", "native.bool-admitted"], ["pair", ["const", "association-and-refutation"], ["const", "mapping.bool"], ["false"]]],
+      "policy": {"dependencies": ["fixture.mapping-meaning", "fixture.native-model", "fixture.source-model", "go.textbox-bool-admission", "horos.bool-refuted-text", "mapping.bool"]},
+      "expect": {"status": "invalid", "code": "type-mismatch"}
+    },
+    {
+      "id": "textbox-source-procedure-trust-is-explicit",
+      "statement": {"declarations": "textBox", "context": [], "expected": ["const", "counterexample"]},
+      "candidate": ["pair", ["const", "counterexample"], ["const", "native.bool-admitted"], ["pair", ["const", "association-and-refutation"], ["const", "mapping.bool"], ["const", "source.bool-not-text"]]],
+      "policy": {"dependencies": ["fixture.mapping-meaning", "fixture.native-model", "fixture.source-model", "go.textbox-bool-admission", "mapping.bool"]},
+      "expect": {"status": "unsupported", "code": "unadmitted-dependency"}
+    },
+    {
+      "id": "page-symbolic-theorem",
+      "statement": {"declarations": "page", "context": [], "expected": ["const", "PageStatement"]},
+      "candidate": ["lam", ["const", "H"], ["lam", ["const", "N"],
+        ["lam", ["app", ["const", "Member"], ["var", 1]],
+          ["lam", ["app", ["app", ["const", "Rep"], ["var", 2]], ["var", 1]],
+            ["pair", ["app", ["app", ["const", "PageResult"], ["var", 3]], ["var", 2]],
+              ["app", ["app", ["const", "source.page-kind"], ["var", 3]], ["var", 1]],
+              ["app",
+                ["app",
+                  ["app",
+                    ["app", ["app", ["app", ["app", ["const", "law.named"],
+                      ["app", ["const", "h.page"], ["var", 3]]],
+                      ["app", ["const", "SourceBody"], ["var", 3]]],
+                      ["app", ["const", "n.page"], ["var", 2]]],
+                      ["app", ["const", "NativeBody"], ["var", 2]]],
+                    ["app", ["const", "source.page-body"], ["var", 3]]],
+                  ["app", ["const", "native.page-body"], ["var", 2]]],
+                ["app", ["app", ["app", ["const", "body-representation"], ["var", 3]], ["var", 2]], ["var", 0]]]]]]]],
+      "policy": {"dependencies": ["fixture.mapping-meaning", "fixture.native-model", "fixture.source-data-kind", "fixture.source-model", "go.page-fields-and-helper", "horos.page-body", "horos.page-constructor-kind", "mapping.list-slice-law", "mapping.named-family-law", "mapping.optional-presence-law", "mapping.record-fields-law", "mapping.text"]},
+      "limits": {"work": 20000000},
+      "expect": {"status": "accepted", "dependencies": ["fixture.mapping-meaning", "fixture.native-model", "fixture.source-data-kind", "fixture.source-model", "go.page-fields-and-helper", "horos.page-body", "horos.page-constructor-kind", "mapping.list-slice-law", "mapping.named-family-law", "mapping.optional-presence-law", "mapping.record-fields-law", "mapping.text"]}
+    },
+    {
+      "id": "page-checked-theorem-reuse",
+      "statement": {"declarations": "page", "context": [], "expected": ["const", "PageStatement"]},
+      "candidate": ["const", "page.proof"],
+      "policy": {"dependencies": ["fixture.mapping-meaning", "fixture.native-model", "fixture.source-data-kind", "fixture.source-model", "go.page-fields-and-helper", "horos.page-body", "horos.page-constructor-kind", "mapping.list-slice-law", "mapping.named-family-law", "mapping.optional-presence-law", "mapping.record-fields-law", "mapping.text"]},
+      "limits": {"work": 20000000},
+      "expect": {"status": "accepted", "dependencies": ["fixture.mapping-meaning", "fixture.native-model", "fixture.source-data-kind", "fixture.source-model", "go.page-fields-and-helper", "horos.page-body", "horos.page-constructor-kind", "mapping.list-slice-law", "mapping.named-family-law", "mapping.optional-presence-law", "mapping.record-fields-law", "mapping.text"]}
+    },
+    {
+      "id": "page-person-application",
+      "statement": {"declarations": "page", "context": [], "expected": ["app", ["app", ["const", "PageResult"], ["const", "h.person"]], ["const", "n.person"]]},
+      "candidate": ["app", ["app", ["app", ["app", ["const", "page.proof"], ["const", "h.person"]], ["const", "n.person"]], ["const", "member.person"]], ["const", "rep.person"]],
+      "policy": {"dependencies": ["fixture.mapping-meaning", "fixture.native-model", "fixture.source-data-kind", "fixture.source-model", "go.page-fields-and-helper", "horos.page-body", "horos.page-constructor-kind", "horos.person-kind", "mapping.list-slice-law", "mapping.named-family-law", "mapping.optional-presence-law", "mapping.person", "mapping.record-fields-law", "mapping.text"]},
+      "limits": {"work": 20000000},
+      "expect": {"status": "accepted", "dependencies": ["fixture.mapping-meaning", "fixture.native-model", "fixture.source-data-kind", "fixture.source-model", "go.page-fields-and-helper", "horos.page-body", "horos.page-constructor-kind", "horos.person-kind", "mapping.list-slice-law", "mapping.named-family-law", "mapping.optional-presence-law", "mapping.person", "mapping.record-fields-law", "mapping.text"]}
+    },
+    {
+      "id": "page-nested-application-consumes-both-projections",
+      "statement": {"declarations": "page", "context": [], "expected": ["app", ["app", ["const", "PageResult"], ["app", ["const", "h.page"], ["const", "h.person"]]], ["app", ["const", "n.page"], ["const", "n.person"]]]},
+      "candidate": ["app",
+        ["lam", ["app", ["app", ["const", "PageResult"], ["const", "h.person"]], ["const", "n.person"]],
+          ["app", ["app", ["app", ["app", ["const", "page.proof"],
+            ["app", ["const", "h.page"], ["const", "h.person"]]],
+            ["app", ["const", "n.page"], ["const", "n.person"]]],
+            ["fst", ["var", 0]]], ["snd", ["var", 0]]]],
+        ["app", ["app", ["app", ["app", ["const", "page.proof"], ["const", "h.person"]], ["const", "n.person"]], ["const", "member.person"]], ["const", "rep.person"]]],
+      "policy": {"dependencies": ["fixture.mapping-meaning", "fixture.native-model", "fixture.source-data-kind", "fixture.source-model", "go.page-fields-and-helper", "horos.page-body", "horos.page-constructor-kind", "horos.person-kind", "mapping.list-slice-law", "mapping.named-family-law", "mapping.optional-presence-law", "mapping.person", "mapping.record-fields-law", "mapping.text"]},
+      "limits": {"work": 20000000},
+      "expect": {"status": "accepted", "dependencies": ["fixture.mapping-meaning", "fixture.native-model", "fixture.source-data-kind", "fixture.source-model", "go.page-fields-and-helper", "horos.page-body", "horos.page-constructor-kind", "horos.person-kind", "mapping.list-slice-law", "mapping.named-family-law", "mapping.optional-presence-law", "mapping.person", "mapping.record-fields-law", "mapping.text"]}
+    },
+    {
+      "id": "page-nesting-cannot-substitute-membership-for-representation",
+      "statement": {"declarations": "page", "context": [], "expected": ["app", ["app", ["const", "PageResult"], ["app", ["const", "h.page"], ["const", "h.person"]]], ["app", ["const", "n.page"], ["const", "n.person"]]]},
+      "candidate": ["app",
+        ["lam", ["app", ["app", ["const", "PageResult"], ["const", "h.person"]], ["const", "n.person"]],
+          ["app", ["app", ["app", ["app", ["const", "page.proof"],
+            ["app", ["const", "h.page"], ["const", "h.person"]]],
+            ["app", ["const", "n.page"], ["const", "n.person"]]],
+            ["fst", ["var", 0]]], ["fst", ["var", 0]]]],
+        ["app", ["app", ["app", ["app", ["const", "page.proof"], ["const", "h.person"]], ["const", "n.person"]], ["const", "member.person"]], ["const", "rep.person"]]],
+      "policy": {"dependencies": ["fixture.mapping-meaning", "fixture.native-model", "fixture.source-data-kind", "fixture.source-model", "go.page-fields-and-helper", "horos.page-body", "horos.page-constructor-kind", "horos.person-kind", "mapping.list-slice-law", "mapping.named-family-law", "mapping.optional-presence-law", "mapping.person", "mapping.record-fields-law", "mapping.text"]},
+      "limits": {"work": 20000000},
+      "expect": {"status": "invalid", "code": "type-mismatch"}
+    },
+    {
+      "id": "page-changed-helper-invalidates-old-proof-with-same-family",
+      "statement": {"declarations": "pageChangedHelper", "context": [], "expected": ["const", "PageStatement"]},
+      "candidate": ["const", "page.proof"],
+      "policy": {"dependencies": ["fixture.mapping-meaning", "fixture.native-model", "fixture.source-data-kind", "fixture.source-model", "go.page-fields-and-helper", "horos.page-body", "horos.page-constructor-kind", "mapping.list-slice-law", "mapping.named-family-law", "mapping.optional-presence-law", "mapping.record-fields-law", "mapping.text"]},
+      "limits": {"work": 20000000},
+      "expect": {"status": "invalid", "code": "type-mismatch"}
+    },
+    {
+      "id": "page-changed-helper-changes-expected-native-family",
+      "statement": {"declarations": "page", "context": [], "expected": ["sigma",
+        ["app", ["const", "Member"], ["app", ["const", "h.page"], ["const", "h.person"]]],
+        ["app", ["app", ["const", "Rep"], ["app", ["const", "h.page"], ["const", "h.person"]]], ["app", ["const", "n.page.other-helper"], ["const", "n.person"]]]]},
+      "candidate": ["app", ["app", ["app", ["app", ["const", "page.proof"], ["const", "h.person"]], ["const", "n.person"]], ["const", "member.person"]], ["const", "rep.person"]],
+      "policy": {"dependencies": ["fixture.mapping-meaning", "fixture.native-model", "fixture.source-data-kind", "fixture.source-model", "go.page-fields-and-helper", "horos.page-body", "horos.page-constructor-kind", "horos.person-kind", "mapping.list-slice-law", "mapping.named-family-law", "mapping.optional-presence-law", "mapping.person", "mapping.record-fields-law", "mapping.text"]},
+      "limits": {"work": 20000000},
+      "expect": {"status": "invalid", "code": "type-mismatch"}
+    },
+    {
+      "id": "page-removed-next-field-changes-expected-native-family",
+      "statement": {"declarations": "page", "context": [], "expected": ["sigma",
+        ["app", ["const", "Member"], ["app", ["const", "h.page"], ["const", "h.person"]]],
+        ["app", ["app", ["const", "Rep"], ["app", ["const", "h.page"], ["const", "h.person"]]], ["app", ["const", "n.page.missing-next"], ["const", "n.person"]]]]},
+      "candidate": ["app", ["app", ["app", ["app", ["const", "page.proof"], ["const", "h.person"]], ["const", "n.person"]], ["const", "member.person"]], ["const", "rep.person"]],
+      "policy": {"dependencies": ["fixture.mapping-meaning", "fixture.native-model", "fixture.source-data-kind", "fixture.source-model", "go.page-fields-and-helper", "horos.page-body", "horos.page-constructor-kind", "horos.person-kind", "mapping.list-slice-law", "mapping.named-family-law", "mapping.optional-presence-law", "mapping.person", "mapping.record-fields-law", "mapping.text"]},
+      "limits": {"work": 20000000},
+      "expect": {"status": "invalid", "code": "type-mismatch"}
+    },
+    {
+      "id": "page-other-source-is-not-bound-by-same-native-payload",
+      "statement": {"declarations": "page", "context": [], "expected": ["sigma",
+        ["app", ["const", "Member"], ["app", ["const", "h.page.other-source"], ["const", "h.person"]]],
+        ["app", ["app", ["const", "Rep"], ["app", ["const", "h.page.other-source"], ["const", "h.person"]]], ["app", ["const", "n.page"], ["const", "n.person"]]]]},
+      "candidate": ["app", ["app", ["app", ["app", ["const", "page.proof"], ["const", "h.person"]], ["const", "n.person"]], ["const", "member.person"]], ["const", "rep.person"]],
+      "policy": {"dependencies": ["fixture.mapping-meaning", "fixture.native-model", "fixture.source-data-kind", "fixture.source-model", "go.page-fields-and-helper", "horos.page-body", "horos.page-constructor-kind", "horos.person-kind", "mapping.list-slice-law", "mapping.named-family-law", "mapping.optional-presence-law", "mapping.person", "mapping.record-fields-law", "mapping.text"]},
+      "limits": {"work": 20000000},
+      "expect": {"status": "invalid", "code": "type-mismatch"}
+    },
+    {
+      "id": "page-mapping-is-fixed-between-applications",
+      "statement": {"declarations": "page", "context": [], "expected": ["sigma",
+        ["app", ["const", "Member"], ["app", ["const", "h.page"], ["const", "h.person"]]],
+        ["app", ["app", ["const", "Rep.other"], ["app", ["const", "h.page"], ["const", "h.person"]]], ["app", ["const", "n.page"], ["const", "n.person"]]]]},
+      "candidate": ["app", ["app", ["app", ["app", ["const", "page.proof"], ["const", "h.person"]], ["const", "n.person"]], ["const", "member.person"]], ["const", "rep.person"]],
+      "policy": {"dependencies": ["fixture.mapping-meaning", "fixture.native-model", "fixture.other-mapping-meaning", "fixture.source-data-kind", "fixture.source-model", "go.page-fields-and-helper", "horos.page-body", "horos.page-constructor-kind", "horos.person-kind", "mapping.list-slice-law", "mapping.named-family-law", "mapping.optional-presence-law", "mapping.person", "mapping.record-fields-law", "mapping.text"]},
+      "limits": {"work": 20000000},
+      "expect": {"status": "invalid", "code": "type-mismatch"}
+    },
+    {
+      "id": "page-actual-native-body-basis-is-required",
+      "statement": {"declarations": "page", "context": [], "expected": ["const", "PageStatement"]},
+      "candidate": ["const", "page.proof"],
+      "policy": {"dependencies": ["fixture.mapping-meaning", "fixture.native-model", "fixture.source-data-kind", "fixture.source-model", "horos.page-body", "horos.page-constructor-kind", "mapping.list-slice-law", "mapping.named-family-law", "mapping.optional-presence-law", "mapping.record-fields-law", "mapping.text"]},
+      "limits": {"work": 20000000},
+      "expect": {"status": "unsupported", "code": "unadmitted-dependency"}
+    },
+    {
+      "id": "page-native-domain-cannot-fill-source-binder",
+      "statement": {"declarations": "page", "context": [], "expected": ["app", ["app", ["const", "PageResult"], ["const", "h.person"]], ["const", "n.person"]]},
+      "candidate": ["app", ["const", "page.proof"], ["const", "n.person"]],
+      "policy": {"dependencies": ["fixture.mapping-meaning", "fixture.native-model", "fixture.source-data-kind", "fixture.source-model", "go.page-fields-and-helper", "horos.page-body", "horos.page-constructor-kind", "horos.person-kind", "mapping.list-slice-law", "mapping.named-family-law", "mapping.optional-presence-law", "mapping.person", "mapping.record-fields-law", "mapping.text"]},
+      "limits": {"work": 20000000},
+      "expect": {"status": "invalid", "code": "type-mismatch"}
+    }
+  ]
+}

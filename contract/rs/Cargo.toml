@@ -15,9 +15,8 @@ path = "src/lib.rs"
 # utf8-text, …) the checkable ArithmeticTheory reads its operands through — ADR 0014
 # moves the standard Theory impls into contract tri-core, amending ADR 0004 D4 so the
 # firewall is "contract = ontos-core + ontos-codec + ontos-data" (all frozen, minimal
-# ontos-core-only siblings). All via a git dependency on the private Bitspark/ontos
-# repo, pinned to the release tag named below (Cargo.lock also pins the exact commit); CI
-# auth per ADR 0005.
+# ontos-core-only siblings). These are public crates.io packages; the contract
+# requires no private Ontos or Logos source dependency.
 [dependencies]
 ontos-core = { package = "bitspark-ontos-core", version = "0.13.0" }
 ontos-codec = { package = "bitspark-ontos-codec", version = "0.13.0" }

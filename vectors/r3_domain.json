@@ -213,6 +213,32 @@
     },
     {
       "cases": [
+        "universe-successor",
+        "polymorphic-identity",
+        "identity-application",
+        "capture-avoiding-substitution",
+        "dependent-pair",
+        "pair-first-projection",
+        "dependent-second-projection",
+        "natural-elimination",
+        "boolean-elimination",
+        "identity-transport",
+        "unused-declaration-not-in-actual-basis",
+        "dependency-identities-use-utf8-order-and-set-semantics",
+        "erased-argument-remains-in-basis",
+        "expected-type-erased-argument-remains-in-basis",
+        "unused-context-entry-remains-in-basis",
+        "definition-retains-erased-dependency",
+        "textbox-explicit-counterexample",
+        "page-symbolic-theorem",
+        "page-checked-theorem-reuse",
+        "page-person-application",
+        "page-nested-application-consumes-both-projections"
+      ],
+      "file": "typed_check.json"
+    },
+    {
+      "cases": [
         "guest_below",
         "guest_at",
         "ts-core_below",
