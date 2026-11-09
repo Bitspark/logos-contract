@@ -32,7 +32,7 @@ import {
   clauseValue,
   Goal,
   MapProgram,
-  PROGRAM_SERDE_VERSION,
+  programFormatTag,
   ProgramSerdeDecodeError,
   ProgramSerdeEncodeError,
   programBytes,
@@ -213,7 +213,7 @@ test("programFromValue rejects all five malformed decode modes", () => {
   assert.throws(() => programFromValue(valueTuple([valueAtom(enc("wrong"))])), isDecode("bad_version"));
   // bad_entry (a non-tuple entry).
   assert.throws(
-    () => programFromValue(valueTuple([valueAtom(PROGRAM_SERDE_VERSION), valueAtom(enc("bad"))])),
+    () => programFromValue(valueTuple([valueAtom(programFormatTag()), valueAtom(enc("bad"))])),
     isDecode("bad_entry"),
   );
   // bad_clause (an entry whose clause value is not a quoted clause term).
@@ -221,7 +221,7 @@ test("programFromValue rejects all five malformed decode modes", () => {
     () =>
       programFromValue(
         valueTuple([
-          valueAtom(PROGRAM_SERDE_VERSION),
+          valueAtom(programFormatTag()),
           valueTuple([valueAtom(enc("id")), valueAtom(enc("not-a-clause"))]),
         ]),
       ),
@@ -233,7 +233,7 @@ test("programFromValue rejects all five malformed decode modes", () => {
     () =>
       programFromValue(
         valueTuple([
-          valueAtom(PROGRAM_SERDE_VERSION),
+          valueAtom(programFormatTag()),
           valueTuple([valueAtom(enc("same")), one]),
           valueTuple([valueAtom(enc("same")), one]),
         ]),

@@ -57,7 +57,7 @@ func TestEachStoredVerdictCaseIsTheAccountItsPreFixBytesName3094(t *testing.T) {
 		} else {
 			deriv = NewDerivationWithClosedWorld(nodes, uint64(found.Derivation.Root), world)
 		}
-		got := hex.EncodeToString(EncodeDerivationWireV1(deriv))
+		got := hex.EncodeToString(mustWire(EncodeDerivationWireV1(deriv)))
 		if got != row.prefixHex {
 			t.Errorf("%s: the case encodes to\n  %s\nnot the pre-fix bytes it must be the account of\n  %s", row.name, got, row.prefixHex)
 		}

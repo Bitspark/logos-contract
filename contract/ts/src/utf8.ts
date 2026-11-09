@@ -1,24 +1,24 @@
-/**
- * The ONE place ts turns bytes into text (#2682).
- *
- * A `TextDecoder` does work the contract never named: by default it STRIPS a leading UTF-8 BOM
- * (`EF BB BF`). So ts read `BOM rule` as the tag `rule`, keyed two subst variables `X` and `BOM X`
- * as one, and gave a BOM-prefixed atom a different text from rs and go, which read exact bytes.
- * Both decoders here keep the BOM (`ignoreBOM: true`), so a text is exactly its bytes, as in rs
- * (`std::str::from_utf8` / `String::from_utf8_lossy`) and go (`string(b)`).
- *
- * Every ts source file decodes through these two. A structural guard
- * (`contract/ts/test/utf8_one_decoder.test.ts`) fails on a decoder constructed anywhere else, so a
- * platform default cannot come back unobserved.
- *
- * Neither decoder is used in streaming mode, so one shared instance each is stateless.
- */
+/** One-shot UTF-8 decoding for Logos text fields. Both readings preserve a leading BOM. */
+const strict = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
+const lossy = new TextDecoder("utf-8", { fatal: false, ignoreBOM: true });
 
-/** Exact bytes to text; throws a `TypeError` on ill-formed UTF-8 (a fatal decoder). */
-export const UTF8_STRICT: TextDecoder = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
+const encoder = new TextEncoder();
 
-/** Exact bytes to text; an ill-formed sequence becomes U+FFFD, per the WHATWG decoder. */
-export const UTF8_LOSSY: TextDecoder = new TextDecoder("utf-8", { fatal: false, ignoreBOM: true });
+/** Encode one complete Unicode scalar sequence, preserving a leading BOM. */
+export function encodeUtf8(text: string): Uint8Array {
+  if (typeof text !== "string" || !wellFormedUtf16(text)) throw new TypeError("text must be well-formed UTF-16");
+  return encoder.encode(text);
+}
+
+/** Decode a complete field, throwing TypeError on ill-formed UTF-8. */
+export function decodeUtf8(bytes: Uint8Array): string {
+  return strict.decode(bytes);
+}
+
+/** Decode a complete field, replacing each ill-formed sequence with U+FFFD. */
+export function decodeUtf8Lossy(bytes: Uint8Array): string {
+  return lossy.decode(bytes);
+}
 
 /**
  * Whether `s` is well-formed UTF-16: every surrogate is half of a high+low pair. A well-formed string

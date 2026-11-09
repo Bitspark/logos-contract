@@ -6,7 +6,7 @@
 // the canonical encoding the account codec (account.ts) hashes. Changing a tag is a
 // breaking change shipped as a new version, never an edit.
 
-import { UTF8_STRICT } from "./utf8.js";
+import { decodeUtf8 } from "./utf8.js";
 import { Atom, Tuple, atom as valueAtom, tuple as valueTuple, type Value } from "@bitspark/ontos-core";
 import { type Term, TermAtom, TermTuple, TermVar, VarId } from "./term.js";
 
@@ -127,7 +127,7 @@ function reifyStep(value: Value): Term | readonly Value[] | undefined {
     }
     case TAG_VAR: {
       if (!(payload instanceof Atom)) return undefined;
-      const name = decodeUtf8(payload.bytes());
+      const name = tryDecodeUtf8(payload.bytes());
       if (name === undefined) return undefined;
       return new TermVar(new VarId(name));
     }
@@ -140,9 +140,9 @@ function reifyStep(value: Value): Term | readonly Value[] | undefined {
   }
 }
 
-function decodeUtf8(bytes: Uint8Array): string | undefined {
+function tryDecodeUtf8(bytes: Uint8Array): string | undefined {
   try {
-    return UTF8_STRICT.decode(bytes);
+    return decodeUtf8(bytes);
   } catch {
     return undefined;
   }

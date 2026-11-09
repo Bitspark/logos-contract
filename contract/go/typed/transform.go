@@ -1,7 +1,5 @@
 package typed
 
-const maxNatural = ^uint32(0)
-
 func (m *machine) copy(e Expr, depth uint32) Expr { return m.shift(e, 0, depth) }
 
 func (m *machine) shift(e Expr, amount, depth uint32) Expr {
@@ -12,7 +10,7 @@ func (m *machine) shift(e Expr, amount, depth uint32) Expr {
 		if index < bound {
 			return Var(index)
 		}
-		if amount > maxNatural-index {
+		if amount > MaxNatural-index {
 			m.budget.fail(incomplete(IndexCapacity))
 			return Expr{}
 		}
@@ -64,7 +62,7 @@ func (m *machine) walk(e Expr, bound, depth uint32, variable func(uint32, uint32
 	for i, arg := range e.node.args {
 		inside := bound
 		if i == 1 && (e.Kind() == PiKind || e.Kind() == LamKind || e.Kind() == SigmaKind) {
-			if bound == maxNatural {
+			if bound == MaxNatural {
 				m.budget.fail(incomplete(IndexCapacity))
 				return Expr{}
 			}

@@ -3,6 +3,7 @@
 // its reader. The domain's computation is rs's replay_manifest::relational_cases, drift-guarded there;
 // ts reads the list and never re-derives it.
 import assert from "node:assert/strict";
+import { CHECK_BUDGETS, captureCheckLimits, proofBudgetError, type CheckLimits } from "../../src/index.js";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -41,4 +42,27 @@ export function r3Raised(): number {
   const table = JSON.parse(fs.readFileSync(vectorsFile("allowances.json"), "utf8")) as { raised: number };
   assert.ok(table.raised > 0, "vectors/allowances.json has no raised value");
   return table.raised;
+}
+
+/**
+ * R3's variants at the checker (#2733; seat:caa's C2 on 3b): each budget raised to at least `to`
+ * alone, labelled by its name, then every budget together (`every`). A budget already at or above `to`
+ * is left alone, and a variant equal to `limits` is dropped, so a raise is never a no-op and never a
+ * lowering.
+ */
+export function eachBudgetRaised(limits: CheckLimits, to: number): { name: string; limits: CheckLimits }[] {
+  const error = proofBudgetError("raised", to);
+  if (error !== undefined) throw error;
+  const captured = captureCheckLimits(limits);
+  if (!captured.ok) throw captured.error;
+  limits = captured.value;
+  const out: { name: string; limits: CheckLimits }[] = [];
+  let every: CheckLimits = limits;
+  for (const [name, key] of CHECK_BUDGETS) {
+    if (limits[key] >= to) continue;
+    out.push({ name, limits: { ...limits, [key]: to } });
+    every = { ...every, [key]: to };
+  }
+  if (out.length > 1) out.push({ name: "every", limits: every });
+  return out;
 }

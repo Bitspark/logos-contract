@@ -259,7 +259,7 @@ pub fn program_from_value(value: &Value) -> Result<MapProgram, ProgramSerdeError
 mod tests {
     use super::*;
     use crate::literal::Goal;
-    use crate::program::{Clause, Program};
+    use crate::program::{Clause, CompleteProgram, Program};
     use crate::term::Term;
 
     fn clause(head_pred: &str, head_args: Vec<Term>, body: Vec<Goal>) -> Clause {

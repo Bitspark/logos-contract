@@ -38,6 +38,7 @@
  */
 
 import { bundleDigest, canonicalClauseId } from "./account.js";
+import { decodeHexPairs } from "./hex.js";
 import { Goal, Symbol } from "./literal.js";
 import { BodyLit, Clause, ClauseId, MapProgram } from "./program.js";
 import { reservedPredicateOf } from "./program_serde.js";
@@ -349,7 +350,7 @@ function parseTerm(index: number, raw: unknown): Term {
     if (typeof raw["atom"] !== "string") {
       throw badClause(index, "`atom` is not a string");
     }
-    return Term.atom(decodeHex(index, raw["atom"]));
+    return Term.atom(decodeAtomHex(index, raw["atom"]));
   }
   if ("atom_str" in raw) {
     if (typeof raw["atom_str"] !== "string") {
@@ -372,17 +373,13 @@ function parseTerm(index: number, raw: unknown): Term {
   throw badClause(index, `unrecognized term shape: ${JSON.stringify(raw)}`);
 }
 
-function decodeHex(index: number, hex: string): Uint8Array {
+function decodeAtomHex(index: number, hex: string): Uint8Array {
   if (hex.length % 2 !== 0) {
     throw badClause(index, `odd-length hex string: ${JSON.stringify(hex)}`);
   }
-  const out = new Uint8Array(hex.length / 2);
-  for (let i = 0; i < out.length; i += 1) {
-    const byte = Number.parseInt(hex.slice(i * 2, i * 2 + 2), 16);
-    if (Number.isNaN(byte)) {
-      throw badClause(index, `non-hex characters in ${JSON.stringify(hex)}`);
-    }
-    out[i] = byte;
+  const bytes = decodeHexPairs(hex, "mixed");
+  if (bytes === undefined) {
+    throw badClause(index, `non-hex characters in ${JSON.stringify(hex)}`);
   }
-  return out;
+  return bytes;
 }

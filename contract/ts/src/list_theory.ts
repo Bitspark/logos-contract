@@ -37,7 +37,7 @@
 //   - the relation is false          -> Fails{list_does_not_hold}
 //     (non-list argument, out-of-range index, count/element mismatch, empty list for last)
 
-import { UTF8_STRICT } from "./utf8.js";
+import { decodeUtf8 } from "./utf8.js";
 import { equals, type Value } from "@bitspark/ontos-core";
 import { encodeInt, readInt, readList } from "@bitspark/ontos-data";
 
@@ -45,9 +45,6 @@ import { Symbol, type GroundLiteral } from "./literal.js";
 import { ComponentIdentity, DecisionCompletion, type Theory, TheoryOutcome } from "./spi.js";
 
 const utf8Encoder = new TextEncoder();
-// `fatal: true` makes decode throw on any byte sequence that is not valid UTF-8 —
-// the non-UTF-8 defensive arm (mirrors Rust's std::str::from_utf8 guard).
-const utf8FatalDecoder = UTF8_STRICT;
 
 /** Lower-case hex of a byte string — a byte-exact, UTF-8-agnostic map/set key. */
 function hexKey(bytes: Uint8Array): string {
@@ -92,7 +89,7 @@ export class ListTheory implements Theory {
     }
     let name: string;
     try {
-      name = utf8FatalDecoder.decode(atom.pred.bytes());
+      name = decodeUtf8(atom.pred.bytes());
     } catch {
       return TheoryOutcome.Fails("list_unknown_predicate");
     }

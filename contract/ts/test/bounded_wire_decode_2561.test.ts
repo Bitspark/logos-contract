@@ -20,7 +20,7 @@ import {
   certWireSpans,
   decodeDerivationWireV1Bounded,
   defaultLimits,
-  DERIVATION_WIRE_V1_CERT_PATH,
+  derivationWireV1CertPath,
 } from "../src/index.js";
 
 function wire(name: string): Uint8Array {
@@ -56,7 +56,7 @@ const kindOf = (f: () => unknown): string | undefined => {
 test("#2561: a certificate over the caller's budget is refused before decoding", () => {
   for (const name of ["permit_one_certificate", "stacked_two_certificates"]) {
     const bytes = wire(name);
-    const spans = certWireSpans(bytes, DERIVATION_WIRE_V1_CERT_PATH);
+    const spans = certWireSpans(bytes, derivationWireV1CertPath());
     assert.ok(spans.length > 0, `${name}: the wire carries certificates`);
     const largest = Math.max(...spans);
     const at = largest - certBytesSlack();

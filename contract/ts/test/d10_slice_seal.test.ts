@@ -8,15 +8,8 @@
 // `npm test` passing therefore proved only that nothing REGRESSED; without this file the D10
 // branch would ship unexercised. Silence is the alarm, not the all-clear.
 //
-// WHERE THEY AIM, and why it differs from the Go arm. Go's twins call `checkCertContext`
-// directly because its tests live in the same package. Every ts test here imports from
-// `../src/index.js` (27 of 27 do), so these drive the PUBLIC `verifyCert`, whose gate 2 is
-// exactly the function D10 changed. The consequence is stated rather than hidden: a cert that
-// PASSES gate 2 goes on to the partition/scope/domain/support gates, which this deliberately
-// minimal fixture does not satisfy. So the green twin asserts the verdict is NOT
-// `cert_context_mismatch` — it got past the context gate — while every refusal case asserts
-// that exact code. A test that asserted plain success here would be asserting something the
-// fixture was never built to give.
+// The public whole-chain check evaluates the slice context before its later obligations.
+// These fixtures isolate that stage by inspecting the specific context-mismatch code.
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -40,7 +33,7 @@ import {
   type LeafVerifier,
   MapProgram,
   PredicateSet,
-  type Program,
+  type CompleteProgram,
   StratumPrefix,
   Symbol as LogosSymbol,
   Term,
@@ -49,10 +42,9 @@ import {
   derivationAsValue,
   derivationFromValue,
   programDigestOf,
-  programDigestOverScope,
-  STANDALONE_CERT,
-  verifyCert,
+  checkClosedModelChain,
 } from "../src/index.js";
+import { programDigestOverScope } from "../src/cert_check.js";
 
 // The two-clause program the rs and go twins use: `denied` is the sealed component, `permit` is
 // the upper stratum and outside it. `revoked` is a pure EDB leaf and contributes no clause, so
@@ -77,14 +69,14 @@ const WITNESS_A = hashOf(0xd1);
 const WITNESS_B = hashOf(0xd2);
 
 /** Every clause of the program, via the same enumeration the checker uses. */
-function clausesOf(program: Program): Clause[] {
+function clausesOf(program: CompleteProgram): Clause[] {
   const out: Clause[] = [];
-  program.forEachClause?.((_id, clause) => out.push(clause));
+  program.forEachClause((_id, clause) => out.push(clause));
   return out;
 }
 
 /** A cert whose four pins are honest for `program`, sealed over whichever clause set `sliced` says. */
-function d10Cert(program: Program, sliced: boolean, witness?: Hash): ClosedModelCert {
+function d10Cert(program: CompleteProgram, sliced: boolean, witness?: Hash): ClosedModelCert {
   const scope = d10Scope();
   const base = new ClosedModelCert({
     scope,
@@ -115,7 +107,7 @@ function d10Cert(program: Program, sliced: boolean, witness?: Hash): ClosedModel
   });
 }
 
-function d10Context(program: Program, witness?: Hash): CertContextT {
+function d10Context(program: CompleteProgram, witness?: Hash): CertContextT {
   const base = CertContext.of(programDigestOf(program), hashOf(0x01), hashOf(0x02), hashOf(0x03));
   return witness === undefined ? base : CertContext.withDecomposition(base, witness);
 }
@@ -131,13 +123,9 @@ function d10Profile(): CheckProfile<void> {
 }
 
 /** The verdict of gate 2 only: `undefined` when the context gate passed, else its code. */
-function contextVerdict(cert: ClosedModelCert, program: Program, cx: CertContextT): string | undefined {
-  const st = verifyCert(cert, program, d10Profile(), undefined, cx, defaultLimits(), STANDALONE_CERT, {
-    certs: [cert],
-    status: [undefined],
-  });
-  if (st.kind === "valid") return undefined;
-  return st.code === "cert_context_mismatch" ? "cert_context_mismatch" : undefined;
+function contextVerdict(cert: ClosedModelCert, program: CompleteProgram, cx: CertContextT): string | undefined {
+  const result = checkClosedModelChain(program, [cert], undefined, d10Profile(), cx);
+  return result.kind === "reject" && result.code === "cert_context_mismatch" ? result.code : undefined;
 }
 
 // ANTI-VACUITY. Every case below is meaningless unless the slice and the complete program digest

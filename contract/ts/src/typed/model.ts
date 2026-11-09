@@ -98,8 +98,8 @@ export function limits(input: LimitsInput): Limits {
 }
 
 export function defaultLimits(): Limits {
-  return limits({ inputNodes: 100_000, inputDepth: 128, collectionEntries: 4_096,
-    nameBytes: 256, work: 1_000_000, depth: 512 });
+  return limits({ inputNodes: 100_000, inputDepth: MAX_INPUT_DEPTH, collectionEntries: 4_096,
+    nameBytes: 256, work: 1_000_000, depth: MAX_DEPTH });
 }
 
 export function isLimits(value: unknown): value is Limits {

@@ -13,7 +13,7 @@
  * `check/cert_stack.rs`.
  */
 
-import { UTF8_LOSSY } from "./utf8.js";
+import { decodeUtf8Lossy } from "./utf8.js";
 import { type ClosedModelCert, type RelationTable } from "./cert.js";
 import { type CertStatus } from "./cert_check.js";
 import { type RejectionCode } from "./check.js";
@@ -108,7 +108,7 @@ export function resolveLowerSeals(
   theory: Theory,
 ): { readonly view: CertView } | { readonly err: readonly [RejectionCode, string] } {
   const lower = new Map<string, { readonly index: number; readonly cert: ClosedModelCert }>();
-  const name = (pred: Symbol): string => JSON.stringify(UTF8_LOSSY.decode(pred.bytes()));
+  const name = (pred: Symbol): string => JSON.stringify(decodeUtf8Lossy(pred.bytes()));
   for (const clause of clauses) {
     if (!cert.scope.seals(clause.head.pred)) continue;
     for (const bl of clause.body) {

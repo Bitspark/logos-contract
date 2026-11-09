@@ -113,7 +113,7 @@ func (p *preflight) expression(root Expr) bool {
 	}
 	stack := []frame{{expr: root, depth: 1}}
 	active := make(map[*expression]bool)
-	maxDepth := min(p.limits.InputDepth, uint32(128))
+	maxDepth := min(p.limits.InputDepth, MaxInputDepth)
 	for len(stack) != 0 && p.budget.err == nil {
 		at := len(stack) - 1
 		f := stack[at]

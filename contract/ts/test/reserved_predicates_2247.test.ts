@@ -18,7 +18,7 @@ import {
   programBytes,
   programToValue,
   ProgramSerdeEncodeError,
-  RESERVED_PREDICATE_SYMBOLS,
+  reservedProgramPredicateSymbols,
   reservedPredicateOf,
   Symbol,
   Term,
@@ -45,7 +45,7 @@ function k2D(): Clause {
 
 test("#2247: both tag bytes are reserved, and the shared check finds them", () => {
   assert.deepEqual(
-    RESERVED_PREDICATE_SYMBOLS.map((s) => [...s]),
+    reservedProgramPredicateSymbols().map((s) => [...s]),
     [[0x00], [0x01]],
   );
   assert.deepEqual([...(reservedPredicateOf(k1B()) ?? [])], [0x00]);

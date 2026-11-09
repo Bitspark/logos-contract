@@ -24,8 +24,8 @@ func rpK2D() Clause {
 }
 
 func TestReservedPredicates2247BothTagBytes(t *testing.T) {
-	if len(ReservedPredicateSymbols) != 2 || string(ReservedPredicateSymbols[0]) != "\x00" || string(ReservedPredicateSymbols[1]) != "\x01" {
-		t.Fatalf("ReservedPredicateSymbols = %v, want [0x00 0x01]", ReservedPredicateSymbols)
+	if len(ReservedProgramPredicateSymbols()) != 2 || string(ReservedProgramPredicateSymbols()[0]) != "\x00" || string(ReservedProgramPredicateSymbols()[1]) != "\x01" {
+		t.Fatalf("ReservedProgramPredicateSymbols() = %v, want [0x00 0x01]", ReservedProgramPredicateSymbols())
 	}
 	for name, c := range map[string]struct {
 		clause Clause

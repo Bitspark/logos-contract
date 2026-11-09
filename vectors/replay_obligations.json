@@ -2474,7 +2474,6 @@
         "projection_kind.cores",
         "bindings_key.rule",
         "bindings_key.cores",
-        "bindings_key.not_reachable_in",
         "param_names.rule",
         "param_names.base_ref",
         "param_names.base_expect",
@@ -2592,6 +2591,17 @@
           "path": "host_builtin_arity.cases",
           "id": "name",
           "class": "interface"
+        },
+        {
+          "path": "proof_budget.cases",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "proof_budget.guest_cases",
+          "id": "name",
+          "class": "integration",
+          "targets": { "rs": { "not_applicable": "host-embedding" }, "go": "replays", "ts": "replays" }
         }
       ],
       "metadata": [
@@ -2604,16 +2614,21 @@
         "host_builtin_arity.base",
         "host_builtin_arity.decoders",
         "host_builtin_arity.encoders",
-        "host_builtin_arity.not_decoded_by"
+        "host_builtin_arity.not_decoded_by",
+        "proof_budget.domain"
       ],
       "assertions": [
         "expect",
         "refusal",
-        "wire"
+        "wire",
+        "scalar_wire",
+        "guest_result"
       ],
       "inputs": [
         "arity",
-        "why"
+        "why",
+        "count",
+        "count_case"
       ],
       "targets": {
         "rs": "replays",
@@ -3832,6 +3847,11 @@
     "request_origin.json": {
       "cases": [
         {
+          "path": "run_round_trip",
+          "id": "request",
+          "class": "interface"
+        },
+        {
           "path": "bound_origin",
           "id": "name",
           "class": "interface"
@@ -3867,6 +3887,7 @@
         "note"
       ],
       "assertions": [
+        "terminal_binding",
         "wire_hex",
         {
           "name": "reached_by",
@@ -4311,9 +4332,7 @@
         "rs": {
           "unreplayed": "#1820"
         },
-        "go": {
-          "unreplayed": "#1820"
-        },
+        "go": "replays",
         "ts": "replays"
       },
       "relational": {

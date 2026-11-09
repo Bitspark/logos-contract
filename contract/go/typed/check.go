@@ -5,7 +5,7 @@ package typed
 // not concurrently mutate their slices. Expr and Declaration are immutable.
 // No parsing, search, semantic extraction or asynchronous cancellation is done.
 func Check(statement Statement, candidate Expr, policy Policy, limits Limits) Outcome {
-	b := &budget{remaining: limits.Work, depth: min(limits.Depth, uint32(512)), location: Location{Phase: PreflightPhase}}
+	b := &budget{remaining: limits.Work, depth: min(limits.Depth, MaxDepth), location: Location{Phase: PreflightPhase}}
 	p := preflight{budget: b, limits: limits}
 	if !p.all(statement, candidate, policy) {
 		return failed(b)
@@ -122,8 +122,8 @@ func sortedKeys(set map[string]struct{}, b *budget) []string {
 	reserve := count
 	if count > 1 {
 		for _, factor := range []uint64{4, height, 1 + longest} {
-			if reserve > uint64(maxNatural)/factor {
-				reserve = uint64(maxNatural) + 1
+			if reserve > uint64(MaxNatural)/factor {
+				reserve = uint64(MaxNatural) + 1
 				break
 			}
 			reserve *= factor

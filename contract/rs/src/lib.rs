@@ -177,7 +177,8 @@ pub use derivation_wire::{
 };
 pub use literal::{escaped_name, Goal, GroundLiteral, Literal, Symbol};
 pub use program::{
-    BodyLit, Clause, ClauseId, CountLit, MapProgram, PredicateRef, Program, ProjectSpec,
+    BodyLit, Clause, ClauseId, CompleteProgram, CountLit, MapProgram, PredicateRef, Program,
+    ProjectSpec,
 };
 pub use reify::{quote, reify};
 pub use term::{
@@ -196,8 +197,8 @@ pub use program_serde::{
 };
 // ---- closed-model certificates (ADR 0007, additive FIRM amendment) ----
 pub use cert::{
-    CertId, CertSizeDecl, ClosedModelCert, ClosureWitness, FiniteDomain, Hash, NonMemberProof,
-    RelationTable, StratumPrefix, SupportEdge, SupportRef, SupportWitness,
+    parse_hash_hex, CertId, CertSizeDecl, ClosedModelCert, ClosureWitness, FiniteDomain, Hash,
+    NonMemberProof, RelationTable, StratumPrefix, SupportEdge, SupportRef, SupportWitness,
 };
 
 // ---- the checker-facing SPI (STABLE v1) ----
@@ -206,8 +207,8 @@ pub use check::{
     check_with_cert_memo, closure_join_cost, closure_join_cost_in_world, incoherent_builtin_atoms,
     profile_decides_all_builtins, profile_is_fully_identified, program_digest,
     unidentified_profile_slots, unidentified_profile_slots_allowing, unowned_builtin_predicates,
-    CertContext, CheckLimits, CheckProfile, Outcome, ProfileSlot, RejectionCode, TermIdentity,
-    WorldMemo,
+    CertContext, CheckLimitError, CheckLimits, CheckProfile, Outcome, ProfileSlot,
+    ProofBudgetCount, RejectionCode, TermIdentity, WorldMemo,
 };
 pub use spi::{
     compound_identity_of, edb_table_hash, ground_from_legacy, legacy_outcome, standard_theory,

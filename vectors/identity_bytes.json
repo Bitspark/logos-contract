@@ -181,14 +181,12 @@
     ]
   },
   "bindings_key": {
-    "rule": "A Bindings' canonical encoding (the input a SnapshotId digests) keys each bound relation by an Atom holding the predicate's exact BYTES, then '/' (2F), then the arity in decimal ASCII: Tuple[ Tuple[Atom(key), Tuple[fact...]] ... ]. EXPECTED: bind pred_hex at `arity` with NO facts into empty Bindings (rs bind_symbol, go Bind on the byte string pred/arity); its encoding is EXACTLY Tuple[ Tuple[Atom(key_hex), Tuple[]] ]; a row naming collides_with encodes differently from that row.",
+    "rule": "A bound relation is identified by its predicate bytes and unsigned 32-bit arity. Bind pred_hex at arity with zero facts. The encoding is Tuple[Tuple[Atom(key_hex), Tuple[]]], where the key is the exact predicate bytes, slash, then minimal decimal ASCII. Distinct raw symbols produce distinct encodings.",
     "cores": [
       "rs",
-      "go"
+      "go",
+      "ts"
     ],
-    "not_reachable_in": {
-      "ts": "ts binds only through a string key (Bindings.bind(key: string)), and a string cannot carry a predicate name that is not UTF-8. A lone surrogate in that string is the UTF-16 half, #2763 C."
-    },
     "cases": [
       {
         "name": "well_formed_edge_2",

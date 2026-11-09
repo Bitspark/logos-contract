@@ -10,8 +10,8 @@
 use logos_contract::{
     check, check_with_cert_context, edb_table_hash, program_digest, CertContext, CertId,
     CertSizeDecl, CheckLimits, CheckProfile, Clause, ClauseId, ClosedModelCert, ClosureWitness,
-    Derivation, Evidence, FiniteDomain, Goal, GroundLiteral, Hash, LeafOutcome, LeafVerifier,
-    MapProgram, Node, NodeMeta, NonMemberProof, Outcome, PredicateSet, Premise, Program,
+    CompleteProgram, Derivation, Evidence, FiniteDomain, Goal, GroundLiteral, Hash, LeafOutcome,
+    LeafVerifier, MapProgram, Node, NodeMeta, NonMemberProof, Outcome, PredicateSet, Premise,
     RelationTable, StratumPrefix, Subst, SupportEdge, SupportRef, SupportWitness, Symbol, Term,
     Theory, TheoryOutcome,
 };
@@ -110,13 +110,13 @@ fn subst2(a: (&str, &str), b: (&str, &str)) -> Subst {
 /// Derive the bound [`CertContext`] for `program`: a recomputed `program_hash` (so
 /// the cert binds to the live program) and fixed non-zero profile/ctx/theory pins
 /// (so the context is not the all-zero *unbound* sentinel).
-fn bound_context(program: &dyn Program) -> CertContext {
+fn bound_context(program: &dyn CompleteProgram) -> CertContext {
     CertContext::new(program_digest(program), [1u8; 32], [2u8; 32], [3u8; 32])
 }
 
 /// Set a cert's pins to match `bound_context(program)` — the canonical "honest"
 /// binding a valid cert carries.
-fn bind_cert(cert: &mut ClosedModelCert, program: &dyn Program) {
+fn bind_cert(cert: &mut ClosedModelCert, program: &dyn CompleteProgram) {
     let cx = bound_context(program);
     cert.program_hash = cx.program_hash;
     cert.profile_hash = cx.profile_hash;

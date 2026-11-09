@@ -35,6 +35,7 @@ package contract
 import (
 	"fmt"
 	"sort"
+	"sync"
 
 	"github.com/Bitspark/logos-contract/contract/go/completion"
 	core "github.com/bitspark/ontos/core/go"
@@ -75,6 +76,34 @@ type certErr struct {
 	detail string
 }
 
+// A certificate world shares one inventory, read after its first certificate passes
+// the size and canonical-form gates. Keep the application's lookup for cited handles
+// (a projection may also recognize aliases). Own the values before the visitor returns.
+type checkedProgram struct {
+	Program
+	clauses []ClauseEntry
+}
+
+func (p *checkedProgram) ForEachClause(visit func(ClauseId, Clause)) {
+	for _, entry := range p.clauses {
+		visit(entry.ID, entry.Clause)
+	}
+}
+
+func worldProgram(program Program) func() CompleteProgram {
+	return sync.OnceValue(func() CompleteProgram {
+		complete, ok := program.(CompleteProgram)
+		if !ok {
+			return nil
+		}
+		view := &checkedProgram{Program: program}
+		complete.ForEachClause(func(id ClauseId, clause Clause) {
+			view.clauses = append(view.clauses, ClauseEntry{ID: id, Clause: CloneClause(clause)})
+		})
+		return view
+	})
+}
+
 // verifyCert verifies one certificate fully, ONCE, in the normative order
 // budget → context → scope-closure → domain → support → closure → EDB (ADR 0007 §3),
 // with a canonical-form precheck (1b, issue #839) between budget and context — not a
@@ -87,7 +116,7 @@ type certErr struct {
 // world is the derivation's ClosedWorld and status/verified the statuses computed so far, in
 // verificationOrder: every certificate at a lower level is final, so a predicate this cert reads
 // from one is read only once that cert is known Valid (#2258 (a)).
-func verifyCert[C any](cert ClosedModelCert, place certPlace, world []ClosedModelCert, status []certStatus, verified []bool, program Program, profile *CheckProfile[C], ctx C, certContext CertContext, limits CheckLimits) certStatus {
+func verifyCert[C any](cert ClosedModelCert, place certPlace, world []ClosedModelCert, status []certStatus, verified []bool, readProgram func() CompleteProgram, profile *CheckProfile[C], ctx C, certContext CertContext, limits CheckLimits) certStatus {
 	theory := profile.Theory
 	// 1. BUDGET GATE — first, before any scan.
 	if e := checkCertBudget(cert, limits); e != nil {
@@ -103,6 +132,10 @@ func verifyCert[C any](cert ClosedModelCert, place certPlace, world []ClosedMode
 	//     gate consults a lookup.
 	if e := checkCertCanonicalForm(cert); e != nil {
 		return invalidCert(e.code, e.detail)
+	}
+	program := readProgram()
+	if program == nil {
+		return invalidCert(CertScopeIncomplete, "program does not supply complete clause enumeration")
 	}
 	// 1c. PARTIAL SUB-SCOPE (ADR 0030 D1) — before any table is consulted: PartialScope is the
 	//     one field a malicious producer would most like the checker to trust, so its three
@@ -178,7 +211,7 @@ func verifyCert[C any](cert ClosedModelCert, place certPlace, world []ClosedMode
 // read (positively, or under a count) a predicate marked partial, or its closure proof would
 // be closed over E and vacuous for the rows the lower bound is missing; (3) an extensional
 // table is never partial (snapshot-bound, complete by definition). Mirrors rs.
-func checkCertPartialScope(cert ClosedModelCert, program Program, extensional *PredicateSet) *certErr {
+func checkCertPartialScope(cert ClosedModelCert, program CompleteProgram, extensional *PredicateSet) *certErr {
 	p := cert.PartialScope
 	if p == nil {
 		return nil
@@ -254,7 +287,7 @@ func checkCertCanonicalForm(cert ClosedModelCert) *certErr {
 // Identical construction to ProgramDigestOf over a SUBSET of the clauses, so the two digests are
 // directly comparable. A predicate that is a dependency-edge target but not a stratum member (an
 // EDB predicate) contributes no clause, exactly as it contributes none to the component.
-func programDigestOverScope(program Program, cert ClosedModelCert) Hash {
+func programDigestOverScope(program CompleteProgram, cert ClosedModelCert) Hash {
 	var clauses []Clause
 	program.ForEachClause(func(_ ClauseId, clause Clause) {
 		if cert.Scope.Seals(clause.Head.Pred) {
@@ -264,7 +297,7 @@ func programDigestOverScope(program Program, cert ClosedModelCert) Hash {
 	return ProgramDigest(clauses)
 }
 
-func checkCertContext(cert ClosedModelCert, program Program, certContext CertContext) *certErr {
+func checkCertContext(cert ClosedModelCert, program CompleteProgram, certContext CertContext) *certErr {
 	// ADR 0029 D10 — WHICH CLAUSE SET DOES ProgramHash PIN? See the rs twin in
 	// contract/rs/src/check/cert.rs for the full argument; the four cases are identical.
 	//
@@ -375,7 +408,7 @@ func checkCertBudget(cert ClosedModelCert, limits CheckLimits) *certErr {
 // scope, every body literal's predicate must be sealed-by-scope OR theory-owned — else
 // cert_scope_incomplete. Also enforces the constructor-acyclic gate (#2759), the
 // intra-prefix negation ban, and the safety / range-restriction gate.
-func checkScopeDownwardClosed(view certView, program Program, theory Theory) *certErr {
+func checkScopeDownwardClosed(view certView, program CompleteProgram, theory Theory) *certErr {
 	cert := view.cert
 	// #3067 (research 0028 row A15): every gate below is the contract tier's ONE classification,
 	// ClassifySealedClause, which the seal plan calls too. check builds the clause's context from
@@ -823,7 +856,7 @@ func checkSupportRefCert(k int, cited CertId, pred Symbol, view certView, place 
 // own space. A grounding the enumeration would have found satisfied has, for each positive
 // sealed literal, a row of that literal's table matching it — exactly a tuple the join
 // emits. Neither direction under-fires. Mirrors Rust's check_cert_closure.
-func checkCertClosure(view certView, program Program, theory Theory, limits CheckLimits) *certErr {
+func checkCertClosure(view certView, program CompleteProgram, theory Theory, limits CheckLimits) *certErr {
 	cert := view.cert
 	groundings := 0
 	joins := 0

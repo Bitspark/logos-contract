@@ -71,14 +71,14 @@ func aggObs(o, p string, val core.Value) GroundLiteral {
 
 func aggSym(s string) Symbol { return SymbolFromString(s) }
 
-func aggBoundContext(program Program) CertContext {
+func aggBoundContext(program CompleteProgram) CertContext {
 	return NewCertContext(ProgramDigestOf(program),
 		Hash{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
 		Hash{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
 		Hash{3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3})
 }
 
-func aggBindCert(cert *ClosedModelCert, program Program) {
+func aggBindCert(cert *ClosedModelCert, program CompleteProgram) {
 	cx := aggBoundContext(program)
 	cert.ProgramHash = cx.ProgramHash
 	cert.ProfileHash = cx.ProfileHash
@@ -532,7 +532,7 @@ func scoreProfile(edb []GroundLiteral) *CheckProfile[struct{}] {
 // scoreCert is the valid sealed cert over {score} = edb. score is a pure EDB leaf bound by
 // the §3.6 gate. The domain carries every object + every integer value used (so a count
 // filter value is in-domain) plus empty_grp (an object with no rows).
-func scoreCert(program Program, edb []GroundLiteral) ClosedModelCert {
+func scoreCert(program CompleteProgram, edb []GroundLiteral) ClosedModelCert {
 	domain := NewFiniteDomain(aggSym("u"), []core.Value{
 		aggV("g1"), aggV("g2_unused"), aggV("empty_grp"),
 		intV(1), intV(3), intV(7), intV(99),

@@ -24,15 +24,15 @@ export class ClauseId {
     return this.#handle;
   }
 }
+Object.freeze(ClauseId.prototype);
+Object.freeze(ClauseId);
 
 /** Polarity of a body literal (ADR 0007 / ADR 0023): positive, negated, or a count. */
 export type Polarity = "pos" | "neg" | "count";
 
 /**
- * An ARITY-SENSITIVE reference to the sealed relation a certifiable aggregate counts
- * over (ADR 0023, #581). A counted relation is matched by name AND arity — `obs/3` and
- * `obs/2` are different relations — so a wrong-arity count cannot slip past name agreement
- * alone (a mismatch is `count_attr_out_of_range`). TS sibling of Rust's `PredicateRef`.
+ * A relation's exact predicate bytes and unsigned arity. Finite dataset bindings capture
+ * this identity. A count premise (ADR 0023) selects a sealed table of the same arity.
  */
 export class PredicateRef {
   readonly pred: Symbol;
@@ -129,8 +129,8 @@ export class CountLit {
 
   constructor(pred: PredicateRef, filter: readonly CountFilterEntry[], project: ProjectSpec, count: Term) {
     this.pred = pred;
-    this.filter = Object.freeze(Array.from(filter));
-    this.project = project;
+    this.filter = Object.freeze(filter.map(({ pos, term }) => Object.freeze({ pos, term })));
+    this.project = Object.freeze({ ...project });
     this.count = count;
     Object.freeze(this);
   }
@@ -385,26 +385,33 @@ export class Clause {
 }
 
 /**
- * The capabilities `check` requires of a program: look a cited clause up by id, and —
- * for the ADR-0007 closed-model cert verification (scope downward-closure, the program
- * digest, and the trusted whole-program closure self-enumeration) — enumerate the
- * COMPLETE clause set.
- *
- * `forEachClause` is OPTIONAL for backward compat: a positive (`closedWorld`-empty)
- * `check` never enumerates, so a `Program` that only implements `clause` keeps working
- * exactly as before. A program cited by a `Neg`-bearing derivation MUST implement it
- * (else the cert's whole-program obligations cannot be discharged → `cert_scope_incomplete`).
- * `MapProgram` implements it in canonical clause-id order. Mirrors Rust's
- * `Program::for_each_clause`.
+ * The application's trusted lookup of clauses by handle. Positive proofs need only
+ * this lookup. Closed-model checks also require the complete inventory of that program.
  */
 export interface Program {
   clause(id: ClauseId): Clause | undefined;
-  /** Visit every `[id, clause]` of the COMPLETE clause set (canonical order on `MapProgram`). */
   forEachClause?(visit: (id: ClauseId, clause: Clause) => void): void;
 }
 
+/** Visit each clause once in canonical clause-id order. An empty visit declares a complete empty program. */
+export interface CompleteProgram extends Program {
+  forEachClause(visit: (id: ClauseId, clause: Clause) => void): void;
+}
+
+/** Select the complete capability of this program, preserving its receiver and the selected operations. */
+export function asCompleteProgram(program: Program): CompleteProgram | undefined {
+  const enumerate = program.forEachClause;
+  if (typeof enumerate !== "function") return undefined;
+  const lookup = program.clause;
+  const selected: CompleteProgram = {
+    clause: id => Reflect.apply(lookup, program, [id]),
+    forEachClause: visit => Reflect.apply(enumerate, program, [visit]),
+  };
+  return Object.freeze(selected);
+}
+
 /** A straightforward in-memory `Program` (a `ClauseId → Clause` map). */
-export class MapProgram implements Program {
+export class MapProgram implements CompleteProgram {
   readonly #clauses = new Map<string, Clause>();
 
   with(id: ClauseId | string, clause: Clause): this {
@@ -470,6 +477,10 @@ export class MapProgram implements Program {
     }
   }
 }
+// A program owner can supply a different Program or edit its own table. Its
+// changes cannot replace lookup for somebody else's captured table.
+Object.freeze(MapProgram.prototype);
+Object.freeze(MapProgram);
 
 /** Lexicographic byte ordering — the total order Rust's slice `Ord` / Go's `bytes.Compare` uses. */
 function compareIdBytes(a: Uint8Array, b: Uint8Array): number {
@@ -481,3 +492,15 @@ function compareIdBytes(a: Uint8Array, b: Uint8Array): number {
   }
   return a.length - b.length;
 }
+
+// These types represent the native clause algebra. A Program implementation
+// supplies clauses; it does not replace their shared logical operations.
+Object.freeze(PredicateRef.prototype);
+Object.freeze(PredicateRef);
+Object.freeze(CountLit.prototype);
+Object.freeze(CountLit);
+Object.freeze(BodyLit.prototype);
+Object.freeze(BodyLit);
+Object.freeze(Clause.prototype);
+Object.freeze(Clause);
+Object.freeze(ProjectSpec);

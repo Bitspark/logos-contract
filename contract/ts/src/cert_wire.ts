@@ -22,11 +22,12 @@
 import { decode, encode } from "@bitspark/ontos-codec";
 import { type Value } from "@bitspark/ontos-core";
 import { encodeInt } from "@bitspark/ontos-data";
-import { type CheckLimits } from "./check.js";
+import { captureProofBudgets, proofBudgetError, type CheckLimits } from "./check.js";
 import { type Derivation } from "./derivation.js";
 import { derivationWireV1FromValue } from "./derivation_wire.js";
+import { nativeOctetView } from "./octets.js";
 
-/** Why a frame could not be walked: it refuses the frame, never a verdict about a certificate. */
+/** Why a requested walk could not proceed: invalid configuration or unreadable frame, never a certificate verdict. */
 export class CertWireError extends Error {
   /** The stable name every core reports, pinned by the shared vector. */
   readonly wireName: string;
@@ -43,7 +44,9 @@ class Cursor {
   pos = 0;
   readonly bytes: Uint8Array;
   constructor(bytes: Uint8Array) {
-    this.bytes = bytes;
+    const frame = nativeOctetView(bytes);
+    if (frame === undefined) throw new TypeError("a wire frame must be a valid Uint8Array");
+    this.bytes = frame;
   }
 
   remaining(): bigint {
@@ -103,7 +106,8 @@ class Cursor {
  * The byte span of every element of the tuple reached by following `path` from the frame's root
  * value, each step an index into the tuple at that point. A step at or past a tuple's arity means the
  * slot is ABSENT (an optional trailing element, an option's `none`): no certificates, an empty result.
- * Throws `CertWireError` when the frame cannot be walked.
+ * Throws `CertWireError` for an invalid selector or unreadable frame.
+ * Each index must be a nonnegative safe integer. The entire selector is captured before reading bytes.
  *
  * The WHOLE frame is walked, not only the path (seat:caa's fail-closed condition): every sibling
  * after the target and the rest of an absent slot's tuple are skipped too, and bytes after the one
@@ -113,10 +117,10 @@ class Cursor {
  * The index-only case of {@link certWireSpansAt}, which it runs.
  */
 export function certWireSpans(frame: Uint8Array, path: readonly number[]): number[] {
-  return certWireSpansAt(
-    frame,
-    path.map((i) => pathIndex(i)),
-  ).map((c) => c.span);
+  const length = selectorLength(path);
+  const steps: PathStep[] = [];
+  for (let i = 0; i < length; i++) steps.push({ kind: "index", index: selectorIndex(path[i]) });
+  return selectedSpans(frame, steps).map((c) => c.span);
 }
 
 /**
@@ -157,17 +161,47 @@ export interface CertSpan {
  * The byte span of every certificate the `steps` reach, with its concrete path: each path the steps
  * expand to (every `each` over every element) leads to a tuple, and each element of that tuple is a
  * certificate. A path through an absent slot reaches none. Throws `CertWireError` when the frame
- * cannot be walked.
+ * cannot be walked. Malformed configuration reports `invalid_path` before any frame traversal.
  *
  * Fail closed exactly as {@link certWireSpans}: the WHOLE frame is walked and bytes after the one
  * value are refused. The walk recurses only along the steps, so its depth is the path's length, which
  * the host chooses, never the frame's nesting; skipping stays iterative.
  */
 export function certWireSpansAt(frame: Uint8Array, steps: readonly PathStep[]): CertSpan[] {
+  const length = selectorLength(steps);
+  const owned: PathStep[] = [];
+  for (let i = 0; i < length; i++) {
+    const step = steps[i];
+    if (step === null || (typeof step !== "object" && typeof step !== "function")) {
+      throw new CertWireError("invalid_path");
+    }
+    const kind = step.kind;
+    if (kind === "each") owned.push({ kind });
+    else if (kind === "index") owned.push({ kind, index: selectorIndex(step.index) });
+    else throw new CertWireError("invalid_path");
+  }
+  return selectedSpans(frame, owned);
+}
+
+/** Capture the declared indexed sequence without invoking collection methods. */
+function selectorLength(steps: readonly unknown[]): number {
+  if (!Array.isArray(steps)) throw new CertWireError("invalid_path");
+  const length = steps.length;
+  if (!Number.isInteger(length) || length < 0 || length > 0xffff_ffff) throw new CertWireError("invalid_path");
+  return length;
+}
+
+function selectorIndex(index: unknown): number {
+  if (typeof index !== "number" || !Number.isSafeInteger(index) || index < 0) throw new CertWireError("invalid_path");
+  return index === 0 ? 0 : index;
+}
+
+/** Only captured, validated selector instructions reach the frame. */
+function selectedSpans(frame: Uint8Array, steps: readonly PathStep[]): CertSpan[] {
   const c = new Cursor(frame);
   const out: CertSpan[] = [];
   spansAt(c, steps, 0, [], out);
-  if (c.pos !== frame.length) throw new CertWireError("trailing_bytes");
+  if (c.pos !== c.bytes.length) throw new CertWireError("trailing_bytes");
   return out;
 }
 
@@ -179,7 +213,7 @@ export function certWireSpansAt(frame: Uint8Array, steps: readonly PathStep[]): 
 export function certWireWalk(frame: Uint8Array): void {
   const c = new Cursor(frame);
   c.skip();
-  if (c.pos !== frame.length) throw new CertWireError("trailing_bytes");
+  if (c.pos !== c.bytes.length) throw new CertWireError("trailing_bytes");
 }
 
 /** Walk one whole value, following `steps` from `at`; `path` is the concrete path to it. */
@@ -227,7 +261,7 @@ export function certWireTag(frame: Uint8Array): Uint8Array | undefined {
   if (tag !== TAG_TUPLE || arity === 0n) return undefined;
   const [inner, n] = c.header();
   if (inner !== TAG_ATOM) return undefined;
-  return frame.subarray(c.pos, c.pos + Number(n));
+  return c.bytes.subarray(c.pos, c.pos + Number(n));
 }
 
 /**
@@ -241,7 +275,10 @@ export function certBytesSlack(): number {
 
 /** Whether a certificate whose wire span is `span` measures over `maxCertBytes` for certain. */
 export function certSpanOverBudget(span: number, maxCertBytes: number): boolean {
-  return span > maxCertBytes + certBytesSlack();
+  if (!Number.isSafeInteger(span) || span < 0) throw new RangeError("a wire span must be a nonnegative safe integer");
+  const invalid = proofBudgetError("max_cert_bytes", maxCertBytes);
+  if (invalid !== undefined) throw invalid;
+  return span - maxCertBytes > certBytesSlack();
 }
 
 /** The refusal a host reports for a certificate wire whose span exceeds its budget. */
@@ -252,7 +289,9 @@ export function certWireOverBudget(index: number, span: number, maxCertBytes: nu
 }
 
 /** The path to a v1 derivation wire's certificates: the tagged payload, then the derivation's trailing closed_world slot. */
-export const DERIVATION_WIRE_V1_CERT_PATH: readonly number[] = [1, 2];
+export function derivationWireV1CertPath(): readonly number[] {
+  return [1, 2];
+}
 
 /**
  * The kinds of `BoundedWireError`. The set is OPEN (seat:caa, #2561): a future decode-time bound adds a
@@ -260,6 +299,7 @@ export const DERIVATION_WIRE_V1_CERT_PATH: readonly number[] = [1, 2];
  */
 export const BOUNDED_WIRE_UNREADABLE = "cert_wire_unreadable";
 export const BOUNDED_WIRE_OVER_BUDGET = "cert_wire_over_budget";
+export const BOUNDED_WIRE_INVALID_LIMITS = "invalid_check_limits";
 /**
  * The bytes walked within budget, and the codec STOPPED before they were a value (#2734 3c, seat:caa's
  * ruling C). `detail` is the codec's own `DecodeError`, unfolded: a capacity stop (its decode depth, an
@@ -273,7 +313,7 @@ export const BOUNDED_WIRE_DECODE = "decode";
 /**
  * Why `decodeDerivationWireV1Bounded` refused its bytes. `kind` is one of the BOUNDED_WIRE_* kinds, an
  * open set. `cert`, `span` and `maxCertBytes` are set for an over-budget refusal; `detail` carries the
- * walk's `CertWireError`, the codec's `DecodeError`, or the shape decoder's error.
+ * caller's `CheckLimitError`, the walk's `CertWireError`, the codec's `DecodeError`, or the shape decoder's error.
  */
 export class BoundedWireError extends Error {
   readonly kind: string;
@@ -300,28 +340,25 @@ export class BoundedWireError extends Error {
  * `CheckLimits` so a future decode bound joins by construction. Throws `BoundedWireError`.
  */
 export function decodeDerivationWireV1Bounded(bytes: Uint8Array, limits: CheckLimits): Derivation {
-  let spans: number[];
-  try {
-    spans = certWireSpans(bytes, DERIVATION_WIRE_V1_CERT_PATH);
-  } catch (e) {
-    if (e instanceof CertWireError) throw new BoundedWireError(BOUNDED_WIRE_UNREADABLE, `${BOUNDED_WIRE_UNREADABLE}: ${e.wireName}`, e);
-    throw e;
+  const counts = captureProofBudgets(limits);
+  if (!counts.ok) {
+    throw new BoundedWireError(BOUNDED_WIRE_INVALID_LIMITS, `${BOUNDED_WIRE_INVALID_LIMITS}: ${counts.error.message}`, counts.error);
   }
-  spans.forEach((span, cert) => {
-    if (certSpanOverBudget(span, limits.maxCertBytes)) {
-      throw new BoundedWireError(
-        BOUNDED_WIRE_OVER_BUDGET,
-        `${BOUNDED_WIRE_OVER_BUDGET}: certificate ${cert} spans ${span} bytes, over max_cert_bytes ${limits.maxCertBytes} + slack ${certBytesSlack()}`,
-        undefined,
-        { cert, span, maxCertBytes: limits.maxCertBytes },
-      );
-    }
-  });
+  const maxCertBytes = counts.value.maxCertBytes;
+  let frame = nativeOctetView(bytes);
+  if (frame === undefined) throw new TypeError("a proof frame must be a valid Uint8Array");
+  checkCertificateSpans(frame, maxCertBytes);
+  if (isSharedBuffer(frame.buffer)) {
+    // Refuse an oversized frame before copying it. A concurrent writer may
+    // have changed the shared bytes; check the private image that is decoded.
+    frame = new Uint8Array(frame);
+    checkCertificateSpans(frame, maxCertBytes);
+  }
   // The codec's own stop, never folded into the value's shape (#2734 3c): the trusted
   // decodeDerivationWireV1 still folds it, which ADR 0036's v2 list records as a fault.
   let value: Value;
   try {
-    value = decode(bytes);
+    value = decode(frame);
   } catch (e) {
     throw new BoundedWireError(BOUNDED_WIRE_STOPPED, `${BOUNDED_WIRE_STOPPED}: ${(e as Error).message}`, e);
   }
@@ -330,4 +367,34 @@ export function decodeDerivationWireV1Bounded(bytes: Uint8Array, limits: CheckLi
   } catch (e) {
     throw new BoundedWireError(BOUNDED_WIRE_DECODE, `${BOUNDED_WIRE_DECODE}: ${(e as Error).message}`, e);
   }
+}
+
+function isSharedBuffer(buffer: ArrayBufferLike): boolean {
+  try {
+    Reflect.get(ArrayBuffer.prototype, "byteLength", buffer);
+    return false;
+  } catch {
+    // Only ordinary and shared buffers can back a genuine native view.
+    return true;
+  }
+}
+
+function checkCertificateSpans(frame: Uint8Array, maxCertBytes: number): void {
+  let spans: number[];
+  try {
+    spans = certWireSpans(frame, derivationWireV1CertPath());
+  } catch (e) {
+    if (e instanceof CertWireError) throw new BoundedWireError(BOUNDED_WIRE_UNREADABLE, `${BOUNDED_WIRE_UNREADABLE}: ${e.wireName}`, e);
+    throw e;
+  }
+  spans.forEach((span, cert) => {
+    if (certSpanOverBudget(span, maxCertBytes)) {
+      throw new BoundedWireError(
+        BOUNDED_WIRE_OVER_BUDGET,
+        `${BOUNDED_WIRE_OVER_BUDGET}: certificate ${cert} spans ${span} bytes, over max_cert_bytes ${maxCertBytes} + slack ${certBytesSlack()}`,
+        undefined,
+        { cert, span, maxCertBytes },
+      );
+    }
+  });
 }

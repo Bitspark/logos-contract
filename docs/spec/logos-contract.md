@@ -250,7 +250,8 @@ the changes are the `Literal` rename, the `Vec<Term>` recursive args, and the
 
 ```rust
 struct Clause { head: Goal, body: Vec<Goal> }    // head :- body₀, …, bodyₙ ;  body empty = a rule-fact
-trait Program { fn clause(&self, id: &ClauseId) -> Option<&Clause>; }
+// Positive-checking excerpt of the Rust SPI.
+trait Program { fn clause(&self, id: &ClauseId) -> Option<&Clause>; /* optional complete view below */ }
 ```
 
 - A `Clause`'s head and body are `Goal`s (`Literal<Term>`) — they contain
@@ -265,10 +266,74 @@ trait Program { fn clause(&self, id: &ClauseId) -> Option<&Clause>; }
 - A consumer's whole policy is a `Program`. **arche's authorization theory
   (`authorized`, `grant`, `covers_*`, sealing helpers) is a `Program` — data, not
   code** — so swapping the engine never touches the policy.
-- **Local checking.** `check` validates only the clauses a derivation *cites*
-  (via `program.clause(id)`); whole-program predicate-partition hygiene (§4.4) is a
-  consumer/program-loading responsibility, not a per-`check` obligation. So
-  `clause(id)` is the only method the checker requires of `Program`.
+- **Local checking.** For positive derivations the application need only look up cited clause
+  handles. Whole-program predicate-partition hygiene (§4.4) belongs to program loading.
+
+### Whole-program evidence for closed-model checking
+
+The application's clause store supplies lookup. For a closed-model certificate it must also
+declare that it can enumerate the complete inventory of that same program. The standalone
+checker uses the trusted inventory for program identity, scope dependencies and closure.
+The support witness can name clauses by handle. Those citations provide no inventory.
+
+| Contract | TypeScript | Go | Rust |
+| --- | --- | --- | --- |
+| Look up a cited clause | `clause(id: ClauseId): Clause \| undefined` | `Clause(id ClauseId) (Clause, bool)` | `fn clause(&self, id: &ClauseId) -> Option<&Clause>` |
+| Select the complete capability | `asCompleteProgram(program: Program): CompleteProgram \| undefined` | `complete, ok := program.(contract.CompleteProgram)` | `fn as_complete(&self) -> Option<&dyn CompleteProgram>` |
+| Visit every clause | `forEachClause(visit: (id: ClauseId, clause: Clause) => void): void` | `ForEachClause(visit func(id ClauseId, clause Clause))` | `fn for_each_clause(&self, visit: &mut dyn FnMut(&ClauseId, &Clause))` |
+| Digest a complete program | `programDigestOf(program: CompleteProgram): Hash` | `func ProgramDigestOf(program CompleteProgram) [32]byte` | `pub fn program_digest(program: &dyn CompleteProgram) -> Hash` |
+
+`CompleteProgram` includes the lookup capability. The host keeps the interpretation stable
+for the check or verifier binding. A complete enumeration visits every clause once with its stable
+handle in canonical clause-id order. Additional lookup aliases do not duplicate clauses.
+Its empty traversal establishes the canonical empty program. A lookup-only
+store omits the visitor in TypeScript or Go. In Rust its default `as_complete` returns `None`.
+A bound closure check with no complete capability returns `cert_scope_incomplete`.
+The ordinary all-zero certificate context separately remains `cert_context_unbound`.
+
+Custom lookup-only program excerpts for a positive check follow. The application supplies
+the underlying lookup. `check` / `Check` invokes it when the derivation cites a rule.
+
+```ts
+const program: Program = { clause: id => store.findClause(id) };
+```
+
+```go
+type clauseLookup func(contract.ClauseId) (contract.Clause, bool)
+
+func (lookup clauseLookup) Clause(id contract.ClauseId) (contract.Clause, bool) {
+	return lookup(id)
+}
+```
+
+For a certificate world, the checker reads the inventory after the size and canonical-form
+gates and shares that reading across certificates. It captures each emitted clause before
+returning to the visitor's caller. The store can compute a handle or reuse a row buffer.
+Cited-rule lookup still recognizes the application's own handles, including valid projection
+aliases. A new independent check can read a later program. A retained verifier continues to
+require its original interpretation. [Program inventory case](../architecture/cases/0026-complete-program-inventory.md).
+
+**Program format and hash inspection.** The standalone contract supplies the following
+operations to program authors and independent readers. Each call returns caller-owned
+bytes, including each element of the reserved-predicate result. The program codec owns
+the tag `logos/program/v1` and the two one-byte reserved predicates `00` and `01`.
+The hash operations use the exact prefixes below, including their final LF.
+
+| Meaning | TypeScript signature | Go signature |
+| --- | --- | --- |
+| Program format tag | `programFormatTag(): Uint8Array` | `func ProgramFormatTag() []byte` |
+| Negation and count tags in wire order | `reservedProgramPredicateSymbols(): readonly Uint8Array[]` | `func ReservedProgramPredicateSymbols() [][]byte` |
+| `logos/account/clause/v1\n` | `clauseHashPrefix(): Uint8Array` | `func ClauseHashPrefix() []byte` |
+| `logos/account/program/v1\n` | `programHashPrefix(): Uint8Array` | `func ProgramHashPrefix() []byte` |
+| `logos/account/edb-snapshot/v1\n` | `edbSnapshotHashPrefix(): Uint8Array` | `func EDBSnapshotHashPrefix() []byte` |
+
+A TypeScript reader decodes a complete textual field with
+`decodeUtf8(bytes: Uint8Array): string` or `decodeUtf8Lossy(bytes: Uint8Array): string`.
+Both preserve a leading BOM. The strict operation throws `TypeError` on ill-formed UTF-8.
+The lossy operation emits replacement characters for ill-formed input. Each read has
+its own field boundary. In Go, the program codec's named errors are comparable constants.
+`errors.Is(err, contract.ErrProgramReservedPredicate)` also matches the wrapped refusal
+that supplies the offending clause and predicate.
 
 ## 2a. Reification: `quote` / `reify`  [STABLE v1 shape · byte form FROZEN v1]
 
@@ -408,6 +473,66 @@ enum Premise {
   neither satisfy nor sink the check (it is still subject to the eager term-depth gate, like any
   carried data). **Do not read a carried certificate as a dependency; read the citations.**
 
+A holder that retains an in-process proof can detach its mutable model data with
+`cloneDerivation(proof)` in TypeScript or `contract.CloneDerivation(proof)` in Go.
+Both preserve opaque clause handles, node order, substitutions and closed-world
+support. Immutable logical values can be shared. Opaque evidence keeps the
+meaning supplied by the verifier under its fixed-input obligation. Copying a
+proof performs no verification and confers no certificate authority.
+
+An issuer captures a proposal **before** checking it. In Go and TypeScript,
+`CaptureSubst` / `captureSubst` capture every answer binding, including a
+binding the requested goal does not use. Each image must be a native term
+within the active term-depth limit. Rust checks the same bound on its owned
+substitution. `CaptureDerivation` / `captureDerivation` detach the native proof
+that the issuer will check and retain. They apply the ordinary empty, node-count
+and root refusals before visiting nodes. Successful capture is a data operation.
+Only an accepting check against the goal grounded with that answer authorizes
+issuance. In Go, a verifier receives its own argument slice or clause containers
+when the checker delegates a logical decision.
+
+A world memo binds the certificate-context pins at construction. For each check
+the world used for verification, the key stored with that decision and the world
+consulted by a negative or counted premise must agree. In-process lookup uses
+the exact support clause handles. Altering the producer's data in a verifier
+callback or altering a previous inspection cannot supply a cached decision for
+different evidence. Only the checker can fill the memo's verification statuses.
+
+The standalone Go checker captures the requested native fact and proposed proof
+before calling the program or a verifier. The direct, explicit-context and
+memoized entry points check the same owned inputs. A standalone certificate
+chain is captured in full before verifying its first member. A memo hit reuses
+the matching owned world and its statuses. Empty, node-count, root and malformed
+shape refusals precede application callbacks.
+
+The application supplies its extensional predicate set and its decision about
+the actual ground fact. The checker invokes the Go SPI with a detached argument
+slice, then compares the checked root with its captured claim. The SPI is
+
+```go
+type LeafVerifier[C any] interface {
+	Extensional() *PredicateSet
+	Verify(atom GroundLiteral, evidence Evidence, ctx C) LeafOutcome
+}
+```
+
+The verifier owns the interpretation of opaque evidence under its fixed-context
+contract. [Standalone proof ownership](../architecture/cases/0003-retained-proof-ownership.md).
+
+The JavaScript checker's public direct and whole-chain entry points read the
+producer's native account as data. The checker owns structural comparison and
+canonical table interpretation. Node order, duplicate rows, and exact native
+clause handles survive capture. An application's `LeafVerifier` still decides
+whether to attest a particular ground fact. The checker compares that fact
+with the caller's claim under its own equality.
+
+The public native model's operations have fixed runtime definitions. Constructing
+or importing a model value does not grant authority to replace another caller's
+structural equality, grounding, resource accounting, predicate membership or
+closed-model interpretation. Logos supplies those operations; applications supply
+the independent verification SPI and retain ownership of their own data.
+[Native operation ownership and implemented method signatures](../architecture/cases/0006-direct-checker-account.md#shared-native-operations).
+
 ### 3.0 Proof-interchange wire for `Derivation`  [FIRM]
 
 `Derivation` is the proof-interchange artifact that lets a producer emit once and a
@@ -472,14 +597,34 @@ The payload reuses the FIRM account readings already used by this contract:
 consumer-specific vocabulary is introduced by the wire. Clause coordinates are the
 clause handle string (`Atom(clause_handle)`), not a hash substitution.
 
-The contract bindings MUST provide these operations, with idiomatic casing per
-language but equivalent semantics:
+Both a rule node's clause handle and a closed-model support edge's clause handle
+MUST denote a Unicode scalar sequence in portable v1 evidence. Writers encode
+that sequence as UTF-8, preserving U+FFFD, supplementary characters and an
+initial U+FEFF exactly. For a native handle outside this domain, every enclosing
+portable proof, certificate, byte or digest operation must report the original
+handle in `ClauseIdEncodingError`. An application can still use that handle for
+exact native lookup and checking. A memo compares the complete native evidence,
+including each original handle. Certificate size accounting remains available
+for native checks. For a portable handle its charge is its UTF-8 byte length.
+Go charges the original byte length of a native string. JavaScript charges three
+bytes for each unpaired surrogate in its length-only reading.
 
-- `derivation_wire_payload_v1_to_value(Derivation) -> Value`
+The contract bindings provide the following public writers. The application
+supplies native evidence and the writer owns the portable representation. Go
+returns the named error, JavaScript throws it, and a Rust `ClauseId` already
+contains valid UTF-8.
+
+| Operation | TypeScript | Go | Rust |
+| --- | --- | --- | --- |
+| Payload | `derivationWirePayloadV1ToValue(deriv: Derivation): Value` | `func DerivationWirePayloadV1ToValue(d Derivation) (core.Value, error)` | `pub fn derivation_wire_payload_v1_to_value(deriv: &Derivation) -> Value` |
+| Tagged value | `derivationWireV1ToValue(deriv: Derivation): Value` | `func DerivationWireV1ToValue(d Derivation) (core.Value, error)` | `pub fn derivation_wire_v1_to_value(deriv: &Derivation) -> Value` |
+| Tagged bytes | `encodeDerivationWireV1(deriv: Derivation): Uint8Array` | `func EncodeDerivationWireV1(d Derivation) ([]byte, error)` | `pub fn encode_derivation_wire_v1(deriv: &Derivation) -> Vec<u8>` |
+| Support certificate | `closedModelCertAsValue(cert: ClosedModelCert): Value` | `func ClosedModelCertAsValue(cert ClosedModelCert) (core.Value, error)` | `pub fn closed_model_cert_as_value(cert: &ClosedModelCert) -> Value` |
+
+The bindings must also provide the following readings, with idiomatic casing:
+
 - `derivation_wire_payload_v1_from_value(Value) -> Result<Derivation>`
-- `derivation_wire_v1_to_value(Derivation) -> Value`
 - `derivation_wire_v1_from_value(Value) -> Result<Derivation>`
-- `encode_derivation_wire_v1(Derivation) -> bytes`
 - `decode_derivation_wire_v1(bytes) -> Result<Derivation>`
 - `ground_literal_as_value(GroundLiteral) -> Value` and its strict inverse
   `ground_literal_from_value_v1(Value) -> Result<GroundLiteral>` (#1914) — the standalone
@@ -541,8 +686,8 @@ refused by name, never narrowed and never bounded by a platform's integer width 
   builtin's arity, §5), stratum ids, stack-reference ordinals, variants and ranks, and Wasm
   session and admission handles (design 0012's `Admitted` selection).
 - **index and count fields**, `0..=INDEX_MAX`: the fields above, and the seam's indices.
-- **`u64` fields**, `0..=2^64 - 1`: a duration in nanoseconds, a search budget (`RunLimits`), an
-  epoch, a counter.
+- **`u64` fields**, `0..=2^64 - 1`: a duration in nanoseconds, a search budget (`RunLimits`),
+  an epoch, a counter. Proof budgets (§4.3) and certificate declarations use the index range.
 - **`int` values**: every integer. A term's integer VALUE (an argument a theory evaluates, an
   aggregate's column, a count premise's claimed result) is unbounded (ADR 0022 §5: an integer is
   unbounded, like `BigInt`), so its size is never a decode refusal; the theory decides what it
@@ -794,6 +939,22 @@ struct CheckProfile<C> {
 
 enum Outcome { Accept, Reject { code: RejectionCode, detail: String } }
 ```
+
+An application verifies a complete closed-model chain through
+`checkClosedModelChain<C>(program: Program, chain: readonly ClosedModelCert[], ctx: C, profile: CheckProfile<C>, certContext: CertContext): Outcome`
+in TypeScript or
+`func CheckClosedModelChain[C any](program Program, certs []ClosedModelCert, ctx C, profile *CheckProfile[C], certContext CertContext) Outcome`
+in Go. The checker owns certificate positions, verification order and intermediate premise decisions.
+The standalone identity advisory captures the three selected component handles and the caller's
+allowed slots before consulting their identities. Reconfiguration takes effect on the next call.
+Applications can use the advisory without a proof or a kernel through
+`unidentifiedProfileSlotsAllowing<C>(profile: CheckProfile<C>, allowUnidentified: readonly ProfileSlot[]): ProfileSlot[]`
+or `func UnidentifiedProfileSlotsAllowing[C any](profile *CheckProfile[C], allowUnidentified []ProfileSlot) []ProfileSlot`.
+
+The checker owns the meaning of its verdicts. A component owns the theory,
+leaf or admission decision it supplies through the SPI. Reading a verdict or
+using a public decision constructor must preserve what other invocations of
+the same checker and components decide.
 
 `check` is **total** and performs **no search**. It verifies, in one pass over the
 DAG, that every node is locally valid and that the root concludes `claim`. The
@@ -1054,14 +1215,17 @@ account contract:
       join's count of groundings or join steps, exceeds the cert's OWN declaration. The kernel
       classifies it as malformed (engine inconformance), never as a budget.
 
-    **`cert_bytes` is MEASURED since #2524 (`CHECKER_VERSION` 13).** A cert's actual size is
-    the length of its canonical wire encoding (`closed_model_cert_as_value` through the ontos
-    codec) **with `limits_decl.cert_bytes` set to 0**: the encoding contains the declaration,
-    so a cert declaring its own literal size would be circular. One definition in all three
-    cores (`cert_encoded_bytes` / `CertEncodedBytes` / `certEncodedBytes`), pinned by the
-    generated `vectors/cert_encoded_bytes.json`. Before 13 `cert_bytes` was a declaration only,
-    so `max_cert_bytes` bounded what a cert declared, not what it was. Bounding the bytes a host
-    reads BEFORE decoding is the transport's (#2528).
+    **`cert_bytes` is measured since #2524 (`CHECKER_VERSION` 13).** The producer's
+    declaration and the checker's measurement use the byte charge of the certificate
+    shape with `limits_decl.cert_bytes` set to zero. This avoids counting the
+    declaration in its own size. For portable evidence the charge equals the exact
+    length of the resulting canonical encoding. When a native support handle falls
+    outside UTF-8, Go charges its original string bytes and JavaScript charges the
+    UTF-8 width of each scalar and three bytes per unpaired surrogate. The measurement
+    can therefore bound native checking without making a claim about portability.
+    The operations are `cert_encoded_bytes` / `CertEncodedBytes` / `certEncodedBytes`.
+    [Canonical size vectors](../../vectors/cert_encoded_bytes.json). The transport
+    bounds the bytes it reads before decoding (#2528).
 
     ⚠ **Until `CHECKER_VERSION` 10, `cert_budget_exceeded` covered all three**, so a
     verdict stored under an older version meant something wider than the closure budget.
@@ -1272,6 +1436,101 @@ DAG depth (→ `too_deep`), and **single-term nesting depth** (→ `term_too_dee
 This reproduces arche-core's `MAX_NODES` guard and adds the two depth bounds.
 Distinct from §7 `Limits`, which bounds *search effort*; this bounds *proof size on
 verify*.
+
+The caller owns nine nonnegative proof-budget counts. The verifier captures them
+before examining a proposal or calling component identity, leaf, theory or rule
+implementations. The shared index domain is `0..=2^53 − 1`. Zero is a real cap.
+The negotiated profile and producer floor encode node and proof depth. The
+search request can carry all nine counts. Every core refuses a count outside the
+domain as malformed. An in-domain request count that exceeds a host's native
+width gives `capability_unavailable(host, decode, proof_budget_width)`. A wasm32
+guest accepts `2^32 − 1` and reports that capacity at `2^32`. A 64-bit host can
+accept both. JavaScript refuses fractions, NaN and infinity at construction.
+Representable caps keep their existing wire bytes. [Request ruling](https://github.com/Bitspark/logos/issues/3262#issuecomment-5854550185)
+and [floor ruling](https://github.com/Bitspark/logos/issues/3267#issuecomment-5854641522).
+
+Go's `SearchRequest.CheckLimits` stores fixed-width counts. A caller can forward
+a decoded request with every count intact. `RequestCheckLimitsFromNative` copies
+the host settings for a request. `IntoNative` checks their range before handing
+them to a Go checker. A program session captures the chosen counts and can retain
+a typed malformed admission before it starts a guest.
+
+The public Rust, Go and TypeScript checkers return `invalid_check_limits` when caller
+configuration is invalid. This is a nonstructural refusal with no assessed proof.
+A kernel operation deriving a profile, verdict key or certificate reports a
+`CheckLimitError` to its caller. In Rust, `SearchRequest::with_check_limits` and
+`derive_check_profile_spec` return this error directly. `certify` reports it as
+`CertifyError::Verifier(VerifierError::InvalidLimits(_))`. The negotiated runtime returns
+`Malformed(InconsistentProfile)`. A valid zero-node cap on a nonempty proof
+continues to yield `too_many_nodes`. The one-call embedding API interprets
+omitted proof limits or the pair `(0, 0)` as a request for the producer's floor.
+See [LOGOS-ACX-011](../architecture/cases/0011-proof-budget-domain.md).
+
+**Bounded proof-wire decoding.** The standalone contract reads certificates in
+the trailing `closed_world` slot of a v1 proof frame. It admits the complete
+numeric checking policy before reading the frame. The preflight enforces the
+encoded certificate byte cap, including the v1 size-declaration slack. The
+verifier applies the other resource limits when it checks the decoded proof.
+
+| Host | Bounded reader | Format path for an independent inspector |
+| --- | --- | --- |
+| TypeScript | `decodeDerivationWireV1Bounded(bytes: Uint8Array, limits: CheckLimits): Derivation` | `derivationWireV1CertPath(): readonly number[]` |
+| Go | `func DecodeDerivationWireV1Bounded(bytes []byte, limits CheckLimits) (Derivation, error)` | `func DerivationWireV1CertPath() []uint64` |
+| Rust | `pub fn decode_derivation_wire_v1_bounded(bytes: &[u8], limits: &CheckLimits) -> Result<Derivation, BoundedWireError>` | `pub const DERIVATION_WIRE_V1_CERT_PATH: [u64; 2]` |
+
+The schema owns the path `[1, 2]`. Editing an inspected path cannot affect a
+later read. Invalid policy yields `invalid_check_limits` with a `CheckLimitError`
+naming the field. A valid zero byte cap admits a positive proof with no
+certificates. The encoded span boundary itself is inclusive. Malformed wire,
+an over-budget span, a codec capacity stop and a decoded value outside the proof
+schema retain distinct refusals. [LOGOS-ACX-016](../architecture/cases/0016-bounded-proof-reader.md).
+
+**Generic certificate selectors.** Applications supply their own tuple layouts.
+The standalone contract owns traversal and the byte spans and concrete coordinates
+it reports. The following public declarations are excerpts with bodies omitted.
+
+| Host | Selector declaration | Inspect a supplied layout |
+| --- | --- | --- |
+| TypeScript | `PathStep = { readonly kind: "index"; readonly index: number } \| { readonly kind: "each" }` | `certWireSpansAt(frame: Uint8Array, steps: readonly PathStep[]): CertSpan[]` |
+| Go | `func PathIndex(index uint64) PathStep`; `func PathEach() PathStep`; `func (s PathStep) Index() (uint64, bool)` | `func CertWireSpansAt(frame []byte, steps []PathStep) ([]CertSpan, error)` |
+| Rust | `pub enum PathStep { Index(u64), Each }` | `pub fn cert_wire_spans_at(frame: &[u8], steps: &[PathStep]) -> Result<Vec<CertSpan>, CertWireError>` |
+
+An index is a protocol coordinate in `0..2^53-1`. An in-domain index beyond a
+tuple's arity denotes an absent slot even on a 32-bit host. Its declaration
+does not require that coordinate to address existing host storage. The walker
+converts only a selected, existing element into a native output coordinate.
+Malformed configuration reports `invalid_path` before any frame is inspected,
+including invalid later instructions after an empty or absent selection.
+TypeScript captures each declared field once before traversal and uses the
+input view's native byte extent. Its walk, span and tag inspection do not invoke
+application-owned view or collection methods.
+
+The index-only declarations are `certWireSpans(frame: Uint8Array, path: readonly number[]): number[]`,
+`func CertWireSpans(frame []byte, path []uint64) ([]int, error)` and
+`pub fn cert_wire_spans(frame: &[u8], path: &[u64]) -> Result<Vec<usize>, CertWireError>`.
+An `each` step can be composed at any depth without adding a layout-specific
+walker. The complete frame is checked, including unselected siblings and
+trailing bytes. Choosing a generic selector cannot redirect the bounded v1
+reader's schema path. See [LOGOS-ACX-018](../architecture/cases/0018-certificate-wire-selectors.md).
+
+TypeScript applications can supply the declared verifier and limit properties
+as record fields or accessors. The following standalone contract declarations
+have their bodies omitted.
+
+```ts
+export type CheckPolicyResult<T> = { readonly ok: true; readonly value: T }
+  | { readonly ok: false; readonly error: CheckLimitError };
+export function captureCheckLimits(limits: CheckLimits, overrides?: Partial<CheckLimits>): CheckPolicyResult<CheckLimits>
+export function captureCheckProfile<C>(profile: CheckProfile<C>): CheckPolicyResult<CheckProfile<C>>
+```
+
+The checker and the kernel consume these operations to bind one native
+reading. Limit capture reads each effective declared property once and returns
+the first invalid budget in declaration order. A supplied replacement takes
+precedence over the corresponding base field. Profile capture retains the
+three application-owned verifier handles and the captured limits. A missing
+component raises a `TypeError`. The portable request contains only the nine
+budget numbers. See [LOGOS-ACX-014](../architecture/cases/0014-structural-check-policy.md).
 
 The cap is a **hard, deterministic rejection** (G9): the bound is checked **before
 any node delegation** to a Theory/Leaf/RuleAdmissibility, and exceeding it rejects
@@ -1548,24 +1807,37 @@ invariant a `Theory` (and its search-side dual `BuiltinSolver`) MUST satisfy:
 > live oracle**. Equivalently: `decide(atom)` is a mathematical function of `(atom,
 > config)` alone, where `config` is fixed at construction.
 
-This is exactly what the realized seam encodes — and it is enforced *structurally*,
-not by convention:
+The realized seam restricts which inputs Logos passes to a theory; the
+implementation remains responsible for purity and fixed configuration. Relevant
+implemented Rust signatures (trait excerpt; other methods and bodies omitted):
 
-- **`Theory::decide(&self, atom: &GroundLiteral) -> TheoryOutcome`** takes **only**
-  the ground atom; it is **not generic over `Context`** and is **never handed the
-  live verification `ctx`** (the leak vector §5 / ADR 0003 name). The theory's
-  configuration is **closed over at construction** (e.g. `IsRoot::new(pubkey)`,
-  `ArithmeticTheory::new()`), so a caller cannot vary it between two `decide` calls
-  on the same boxed theory. *Source of truth:*
-  [`contract/rs/src/spi.rs`](https://github.com/Bitspark/logos/blob/main/contract/rs/src/spi.rs)
-  — the `Theory` trait (`owns` + `decide` + the additive `identity`), whose
-  doc-comment states "a verdict MUST be a pure, total, deterministic function of the
-  ground arguments alone, reproducible from configuration, with no I/O, clock, or
-  ledger access."
-- **The `config_digest` of [`ComponentIdentity`]** (the `(id, version,
-  config_digest)` triple `Theory::identity()` returns) is what lets the certifying
-  kernel *attest* the config a derivation was checked under — so "config-pinned" is
-  itself a checkable fact, not an honor-system claim.
+```rust
+pub trait Theory {
+    fn decide(&self, atom: &GroundLiteral) -> TheoryOutcome;
+    fn decide_ground(&self, atom: &GroundLiteral) -> Completion<TheoryDecision, NoCallerLimit>;
+    fn identity(&self) -> ComponentIdentity;
+}
+```
+
+The application implements this trait, and Logos invokes it during native
+predicate checking and verification binding. `decide` is the legacy decision
+surface; Logos's checking paths use `decide_ground`, which can also report
+non-completion. Neither operation receives the verification context.
+
+- The component MUST hold its semantic configuration fixed for the verification
+  lifetime. The absence of a `Context` argument does not prevent interior
+  mutation or other hidden inputs, including in Rust. This is a semantic
+  obligation of the independently supplied implementation, not a property
+  established by `&self`.
+- `identity()` returns the `(id, version, config_digest)` report that the kernel
+  captures and commits to in its check-profile digest. The binding guards refuse
+  an observed change. The report does not prove that opaque implementation state
+  matches its digest or that a verdict is pure. Rechecking requires the matching
+  implementation and configuration.
+- [Case 008](../architecture/cases/0008-session-binding-identity.md) records the
+  identity-lifetime correction and its limits. The
+  [large-config guide](../guides/large-theory-configs.md) separates repeated
+  identity reads from component-owned configuration hashing.
 - **`CompoundTheory`'s identity byte layout is FROZEN tri-core** (logos#767, pinned by
   [`vectors/identity_audit.json`](https://github.com/Bitspark/logos/blob/main/vectors/identity_audit.json)):
   the prefix `logos-core/compound-theory/v1\n`, then per member `u64-BE len(id) ‖ id ‖
@@ -1714,12 +1986,81 @@ length nth0 last` (the unification relations and control constants since `term-t
 never hold — the checker's `Builtin` arm needs an OWNER, and the account grammar leaves no
 engine-native form). A
 tri-core **sync-guard test** pins this helper's owned set EQUAL to the guest's, so the two
-cannot silently diverge. Crucially, **the advertised `CheckProfileDigest` must be derived
-from the same components** the gate runs — the kernel's `DeriveCheckProfileDigest` over the
-live `CheckProfile` (whose `theory` is the standard helper) is the single source of that
-digest, so the digest a certificate stamps is, by construction, the digest of the very
-verification path that ran. Binding the helper and deriving the digest from the same profile
-is the whole gate wiring; doing either by hand is the #574 footgun.
+cannot silently diverge. **The advertised `CheckProfileDigest` must be derived from the
+same components the gate runs.** A live profile supplies a theory, a leaf verifier, a
+rule-admission implementation and valid host limits. The kernel captures these inputs
+before consulting a component's optional identity method. Each component owns its
+identity reading. Hashing the resulting `CheckProfileSpec` reads only that captured
+description. A fresh live derivation can observe a changed identity. The gate derives
+its own stamp from the captured verifier inputs.
+[Kernel operations](../architecture/kernel.md) · [Profile binding](../architecture/cases/0008-session-binding-identity.md#live-profile-derivation).
+
+The application supplies the live profile. Its TypeScript and Go data declarations
+are reproduced below. The kernel consumes the four fields when it describes the
+selected verifier for negotiation or binds it for checking.
+
+```ts
+export interface CheckProfile<C> {
+  readonly theory: Theory;
+  readonly leaves: LeafVerifier<C>;
+  readonly admit: RuleAdmissibility<C>;
+  readonly limits: CheckLimits;
+}
+```
+
+```go
+type CheckProfile[C any] struct {
+	Theory Theory
+	Leaves LeafVerifier[C]
+	Admit  RuleAdmissibility[C]
+	Limits CheckLimits
+}
+```
+
+The identity member on the TypeScript component SPIs is
+`identity?(): ComponentIdentity`. The corresponding optional Go SPI is
+`type Identified interface { Identity() ComponentIdentity }`.
+The component supplies its ID bytes, version bytes and 32-byte configuration
+digest when the kernel invokes that method. [TypeScript SPI](../../contract/ts/src/spi.ts)
+and [Go SPI](../../contract/go/spi.go). A completed report is captured before
+another independently supplied component is invoked. The ordered compound
+fold owns each member's ID, version and configuration digest before visiting
+the next member; a later operation may observe a newly reported identity.
+[Identity report ownership](../architecture/cases/0008-session-binding-identity.md#completed-identity-reports-and-certificate-pins).
+
+A portable hash is 32 octets. Its text and digest-atom spelling consists of
+exactly 64 lowercase ASCII hexadecimal digits. The proof decoder, kernel wire
+readers and applications consume the same standalone parsing operation. These
+are its public declarations with bodies omitted.
+
+| Host | Canonical hash to owned bytes |
+| --- | --- |
+| TypeScript | `export function parseHashHex(text: string \| Uint8Array): Hash \| undefined` |
+| Go | `func ParseHashHex(text string) (Hash, bool)` |
+| Rust | `pub fn parse_hash_hex(text: &[u8]) -> Option<Hash>` |
+
+Malformed input produces no successful hash. Sixty-four zero digits produce
+the all-zero hash successfully. The protocol reader supplies the field-specific
+refusal. [LOGOS-ACX-012](../architecture/cases/0012-replay-digest-grammar.md).
+
+A native binary name accepts any byte string. Its optional text spelling accepts
+Unicode scalar values encoded as UTF-8, preserving an initial BOM. A native
+hash accepts exactly 32 supplied octets. The standalone contract implements
+these operations and applications and kernel constructors invoke them.
+
+| Host | Exact raw inputs and results |
+| --- | --- |
+| TypeScript | `type OctetSource = Uint8Array \| readonly number[]`, `copyOctets(source: OctetSource): Uint8Array`, `hashFromBytes(source: OctetSource): Hash`, `encodeUtf8(text: string): Uint8Array` |
+| Go | `func HashFromBytes(b []byte) (Hash, bool)`. The kernel provides `func DigestFromBytes(b []byte) (Digest, bool)`. Both return false for any width other than 32. |
+| Rust | `pub type Hash = [u8; 32]` and kernel `pub fn new(bytes: [u8; 32]) -> Self` on `Digest`. The standard conversion `<[u8; 32]>::try_from(bytes)` checks a slice's width. |
+
+TypeScript reads a genuine octet view at its native offset and length, including
+another realm’s view. An authored numeric array supplies one explicit integer
+from 0 through 255 at every index. Each element is read once, and a digest’s
+width is checked first. An unrepresentable spelling or invalid octet throws
+a `TypeError`. An otherwise admissible byte sequence with the wrong hash width
+throws a `RangeError`. Named component fields and pins retain owned bytes.
+[LOGOS-ACX-017](../architecture/cases/0017-native-octet-identities.md).
 
 **What a matching `CheckProfileDigest` implies — and what it does not (issue #955).**
 The digest folds the theory / leaves / admit component bindings and **two** of the ten
@@ -1775,6 +2116,55 @@ policy; the pair `(check_profile_digest, checker_version)` pins semantics.
 > deliberately NOT folded into the digest: that would fail every stored certificate's context
 > check at every checker bump, exactly when the newer checker should re-check it.
 
+**Ground verdict erratum for checker 23 (family 0.26.0).** For the same account,
+claim, program, application context and live verification policy, a version-22
+outcome can disagree with a fresh check. The host that retained the outcome
+compares both fields of the key before reusing it. On a mismatch it rechecks
+the original proposal. The checker derives this key on the public direct path.
+
+```ts
+export function checkWithDerivedContext<C>(
+  program: Program, claim: GroundLiteral, deriv: Derivation, ctx: C,
+  profile: CheckProfile<C>,
+): CheckedOutcome
+export interface VerdictKey {
+  readonly checkProfileDigest: CheckProfileDigest;
+  readonly checkerVersion: CheckerVersion;
+}
+```
+
+The proof header requires an integer root. A native JavaScript proposal carrying
+a text root receives `root_out_of_range`. A proposal for another claim receives
+`root_conclusion_mismatch` when its checked root differs. The checker captures
+proof and claim data before application callbacks. Whole-program evidence
+requires an explicit complete inventory. An invalid unused proof budget such as
+a negative `max_join_steps` fails at configuration binding, before the direct
+kernel call can issue a key. A valid structural policy supplies its declared
+values through ordinary fields, inherited properties or accessors. The profile
+digest and accepted variants retain their wire meanings. The typed judgment
+uses the separate identity in [ADR 0039](../architecture/decisions/0039-typed-check-only.md).
+
+The published 0.25.0 kernel and its public contract accepted a one-node fact
+with a text root and keyed it under version 22. Checker 23 rechecked that
+same record as `root_out_of_range`. Both derived the profile digest
+`6589b73d036b1a05ae6e5a80848551cc2238deef2f1d51afd05d392111d41030` and
+accepted the numeric-root control. The inherited-limit policy also worked on
+both versions in this direct check. The released reader issued a key for the
+negative unused budget. The corrected reader named the invalid field and issued
+no key. [Released npm comparison](https://github.com/Bitspark/logos/actions/runs/42557179957/job/128965531144).
+
+The published Go 0.25.0 direct, explicit-context and memoized routes each
+rejected a matching claim when a verifier's callback reused the caller's claim
+storage. Their matching and different-predicate controls passed. Independent
+source regressions also measured incorrect acceptances involving retained Go
+inputs and writable JavaScript model or verdict operations. Recheck stored
+records at the reader's normal failure boundary and surface the checker's named
+refusal there. The measured census covers those cases. Production cache
+incidence is unknown. [Released Go comparison](https://github.com/Bitspark/logos/actions/runs/42557426556/job/128966170946)
+· [Account binding](../architecture/cases/0006-direct-checker-account.md)
+· [Issued and retained proof](../architecture/cases/0003-retained-proof-ownership.md)
+· [Verdict authority](../architecture/cases/0010-verdict-ownership.md).
+
 **The digest folds the checker's accepted-variant surface (#708 leg b).** The profile
 record is `[theories, leaves, admit, limits, feature_set]`, where `feature_set` is
 `[premise, project_spec, non_member_proof]` — three order-preserving lists of the
@@ -1790,7 +2180,7 @@ landed; a pre-fold pin re-derives once and is otherwise unchanged.
 
 **The determinants, as data (#2727).** The rules above, restated as the one table the tri-core
 identity-sensitivity tests read (`kernel/rs/tests/identity_sensitivity_2727.rs`,
-`kernel/go/certify/identity_sensitivity_2727_test.go`,
+`kernel/go/internal/certification/identity_sensitivity_2727_test.go`,
 `kernel/ts/test/identity_sensitivity_2727.test.ts`). Each test varies every row ONE AT A TIME
 through the production path — `DeriveCheckProfileDigest` over a live `CheckProfile`, and the
 `VerdictKey` a plain check returns — and requires a `moves` row to change its identity and a
@@ -1943,16 +2333,19 @@ serves the same verdict to every later derivation citing an equal world under th
 program, profile and `ctx` objects, the same `CertContext` and the same `CheckLimits`. It is
 exact only because every component it consulted answers the same question the same way.
 
-**The inputs a memo is bound to MUST NOT change while it is in use (#2569).** Go and TS have no
-borrow checker, so their `WorldMemo` (`NewWorldMemo` / `new WorldMemo`, used through
-`CheckWithWorldMemo` / `checkWithWorldMemo`) binds the program, profile, `ctx` and `CertContext`
-at construction and runs every check under them. The caller MUST NOT mutate the program, the
-profile's components or `ctx` while the memo is in use: a mutated program leaves the bound
-`CertContext` stale, and the memo would then serve a **wrong verdict, not a slow one**. The kernel
-gate meets this by construction, because its drive loop holds all three fixed for the run.
-`CheckLimits` are the one input checked rather than assumed: they are snapshotted when a world is
-verified and compared on every call. In Rust the same holds by construction, because the memo
-borrows all three immutably for its lifetime.
+**The inputs a memo is bound to MUST NOT change while it is in use (#2569).**
+Go and TypeScript `WorldMemo` (`NewWorldMemo` / `new WorldMemo`, used through
+`CheckWithWorldMemo` / `checkWithWorldMemo`) binds the chosen program, component
+handles, `ctx` and owned `CertContext` at construction. Direct and whole-chain
+checking also capture native certificate pins before callbacks, including the
+optional decomposition witness. This does not copy opaque application state.
+The caller must keep the program, component meanings and `ctx` fixed while a
+memo is in use. Rust's immutable borrows preserve references; implementations
+with interior mutability still owe the same semantic obligation.
+The session certifier guards its captured component identities.
+[LOGOS-ACX-008](../architecture/cases/0008-session-binding-identity.md) separates
+that implemented guard from the pending negotiated-runtime obligation.
+A kernel must not present a changed binding as the one it negotiated.
 
 **The additive `identity()` / `edb_snapshot` seams (STABLE v1, additive per ADR 0003).**
 Three checker components — `Theory` (§5), `RuleAdmissibility` (§5a), and `LeafVerifier`

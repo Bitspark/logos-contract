@@ -72,7 +72,7 @@ func boundedKind(err error) string {
 func TestACertificateOverTheCallersBudgetIsRefusedBeforeDecoding2561(t *testing.T) {
 	for _, name := range []string{"permit_one_certificate", "stacked_two_certificates"} {
 		b := boundedWire(t, name)
-		spans, err := CertWireSpans(b, DerivationWireV1CertPath)
+		spans, err := CertWireSpans(b, DerivationWireV1CertPath())
 		if err != nil || len(spans) == 0 {
 			t.Fatalf("%s: the wire carries certificates: %v %v", name, spans, err)
 		}
@@ -100,8 +100,8 @@ func TestBytesTheWalkCannotReadAreRefusedAndAPositiveWireNeedsNoBudget2561(t *te
 	}
 	trailing := append(append([]byte{}, b...), 0x00)
 	_, err := DecodeDerivationWireV1Bounded(trailing, DefaultLimits())
-	var we *CertWireError
-	if boundedKind(err) != BoundedWireUnreadable || !errors.As(err, &we) || we.Name != "trailing_bytes" {
+	var we CertWireError
+	if boundedKind(err) != BoundedWireUnreadable || !errors.As(err, &we) || we.Name() != "trailing_bytes" {
 		t.Fatalf("trailing bytes are unreadable, got %v", err)
 	}
 	notAWire := []byte{0x01, 0x02, 0x00, 0x01, 'x', 0x01, 0x00}

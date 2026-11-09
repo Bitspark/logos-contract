@@ -194,7 +194,7 @@ func TestLengthReadingEqualsTheEncodingOfEveryShape2605(t *testing.T) {
 	for trailing, arity := range []int{10, 11, 12, 12} {
 		cert := cert2605(40, trailing)
 		assertLengthReading2605(t, "synthetic", cert)
-		if got := ClosedModelCertAsValue(cert).(core.Tuple).Len(); got != arity {
+		if got := mustWire(ClosedModelCertAsValue(cert)).(core.Tuple).Len(); got != arity {
 			t.Errorf("trailing shape %d reads as %d elements, want %d", trailing, got, arity)
 		}
 	}
@@ -213,7 +213,7 @@ func assertLengthReading2605(t *testing.T, where string, cert ClosedModelCert) {
 	t.Helper()
 	zeroed := cert
 	zeroed.LimitsDecl.CertBytes = 0
-	if got, want := CertEncodedBytes(cert), encLen2605(ClosedModelCertAsValue(zeroed)); got != want {
+	if got, want := CertEncodedBytes(cert), encLen2605(mustWire(ClosedModelCertAsValue(zeroed))); got != want {
 		t.Errorf("%s: the length reading measures %d, the encoding it restates is %d bytes", where, got, want)
 	}
 }
@@ -246,7 +246,7 @@ func TestLengthReadingDoesNotBuildTheTree2605(t *testing.T) {
 	zeroed := cert
 	zeroed.LimitsDecl.CertBytes = 0
 	var sink uint64
-	tree := allocated2605(func() { sink += uint64(len(codec.Encode(ClosedModelCertAsValue(zeroed)))) })
+	tree := allocated2605(func() { sink += uint64(len(codec.Encode(mustWire(ClosedModelCertAsValue(zeroed))))) })
 	length := allocated2605(func() { sink += CertEncodedBytes(cert) })
 	var ints uint64
 	for _, e := range cert.Supports.Edges {

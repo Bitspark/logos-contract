@@ -61,7 +61,7 @@ func encodes3088(d Derivation) (ok bool) {
 			ok = false
 		}
 	}()
-	EncodeDerivationWireV1(d)
+	mustWire(EncodeDerivationWireV1(d))
 	return true
 }
 
@@ -192,6 +192,25 @@ func TestAnUntrustedCertificateComponentOfUnknownKindIsRefusedByName3088(t *test
 	runShapes3088(t, shapes, func(d Derivation) Outcome {
 		return CheckWithWorldMemo(NewWorldMemo[unitCtx](program, profile, unitCtx{}, derived), claim, d)
 	})
+
+	t.Run("a retained world cannot alias a lower-stratum support reference", func(t *testing.T) {
+		d := derivation(lower, domain)
+		memo := NewWorldMemo(program, profile, unitCtx{}, derived)
+		if first := CheckWithWorldMemo(memo, claim, d); !first.IsAccept() {
+			t.Fatalf("valid lower-stratum support refused: %s", first)
+		}
+		d.ClosedWorld[0].Supports.Edges[0].BodyRefs[0].(LowerStratumRef).Atom.Args[0] = z
+		fresh := CheckWithCertContext(program, claim, d, unitCtx{}, profile, derived)
+		if fresh.IsAccept() {
+			t.Fatal("a fresh check accepted the altered support")
+		}
+		if got := CheckWithWorldMemo(memo, claim, d); got.IsAccept() || got.Code() != fresh.Code() {
+			t.Fatalf("altered support: memo returned %s, fresh check returned %s", got, fresh)
+		}
+		if memo.CertificatesVerified() != 2 {
+			t.Fatal("the changed world must be verified again")
+		}
+	})
 }
 
 // The encoder once lifted a nil value to the empty tuple (FromValue's nil sentinel collided with a nil
@@ -209,7 +228,7 @@ func TestANilValueIsNotEncodedAsTheEmptyTuple3088(t *testing.T) {
 	}
 }
 
-// CheckClosedModelChain reads certificates without derivationPrechecks, so it runs the same walk.
+// CheckClosedModelChain reads a standalone certificate chain and applies the same shape check.
 func TestTheCertificateChainEntryRefusesAnUnknownComponentByName3088(t *testing.T) {
 	x := atom3088("x")
 	program := NewMapProgram()

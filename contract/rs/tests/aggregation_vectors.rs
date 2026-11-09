@@ -16,6 +16,9 @@
 //! `tamper_wrong_k_over_valid_cert`: a derivation claiming a wrong `k` over an otherwise
 //! VALID cert MUST be rejected `count_mismatch` — the dual-conformance law for count.
 
+#[path = "support/proof_budgets.rs"]
+mod proof_budgets;
+
 use logos_contract::{
     check_with_cert_context, check_with_cert_memo, edb_table_hash, intval::BigInt, program_digest,
     CertContext, CertId, CertSizeDecl, CheckLimits, CheckProfile, Clause, ClauseId,
@@ -416,13 +419,6 @@ fn load_doc() -> Json {
     serde_json::from_str(&raw).expect("parse vector")
 }
 
-/// The value R3 raises a budget to, from the declared carrier table (#2733).
-fn r3_raised() -> usize {
-    let table: Json = serde_json::from_str(include_str!("../../../vectors/allowances.json"))
-        .expect("vectors/allowances.json parses");
-    table["raised"].as_u64().expect("the table's raised value") as usize
-}
-
 #[test]
 fn aggregation_vectors_replay() {
     let doc = load_doc();
@@ -478,7 +474,7 @@ fn aggregation_vectors_replay() {
 
     // #2565: cases whose world went through the memo, so its cross-check is not vacuous.
     let mut memoized_worlds = 0usize;
-    let r3_raised = r3_raised();
+    let r3_raised = proof_budgets::r3_raised();
     let mut raised_cases = 0usize;
     for case in cases {
         let name = case.get("name").and_then(Json::as_str).unwrap();
@@ -581,7 +577,7 @@ fn aggregation_vectors_replay() {
         // alone and together. The raise value is the declared table's (vectors/allowances.json).
         if want == "accept" {
             raised_cases += 1;
-            for (budget, raised) in limits.each_budget_raised(r3_raised) {
+            for (budget, raised) in proof_budgets::each_budget_raised(limits, r3_raised) {
                 let outcome = check_with_cert_context(
                     &program,
                     &claim,

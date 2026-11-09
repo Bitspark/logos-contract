@@ -39,7 +39,7 @@ var (
 )
 
 // A cert whose four pins are honest for `program`, sealed over whichever clause set `sliced` says.
-func d10Cert(program Program, sliced bool, witness *Hash) ClosedModelCert {
+func d10Cert(program CompleteProgram, sliced bool, witness *Hash) ClosedModelCert {
 	cert := ClosedModelCert{
 		Scope:            d10Scope(),
 		ProgramHash:      ProgramDigestOf(program),
@@ -54,7 +54,7 @@ func d10Cert(program Program, sliced bool, witness *Hash) ClosedModelCert {
 	return cert
 }
 
-func d10Context(program Program, witness *Hash) CertContext {
+func d10Context(program CompleteProgram, witness *Hash) CertContext {
 	cx := NewCertContext(ProgramDigestOf(program), Hash{0x01}, Hash{0x02}, Hash{0x03})
 	cx.DecompositionWitness = witness
 	return cx
@@ -132,7 +132,7 @@ func TestD10PreExistingBehaviourIsUnchanged(t *testing.T) {
 func TestD10WireIsTrailingOptional(t *testing.T) {
 	program := d10Program()
 
-	plain := ClosedModelCertAsValue(d10Cert(program, false, nil))
+	plain := mustWire(ClosedModelCertAsValue(d10Cert(program, false, nil)))
 	pt, err := decItems(plain, "plain")
 	if err != nil {
 		t.Fatalf("plain cert did not encode as a tuple: %v", err)
@@ -141,7 +141,7 @@ func TestD10WireIsTrailingOptional(t *testing.T) {
 		t.Fatalf("a cert with no slice seal must encode to TEN elements, got %d", len(pt))
 	}
 
-	sealed := ClosedModelCertAsValue(d10Cert(program, true, &d10WitnessA))
+	sealed := mustWire(ClosedModelCertAsValue(d10Cert(program, true, &d10WitnessA)))
 	st, err := decItems(sealed, "sealed")
 	if err != nil {
 		t.Fatalf("sealed cert did not encode as a tuple: %v", err)

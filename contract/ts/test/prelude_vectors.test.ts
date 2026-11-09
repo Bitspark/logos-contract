@@ -29,8 +29,8 @@ import {
   Clause,
   Goal,
   loadPrelude,
-  PROGRAM_PREFIX,
-  CLAUSE_PREFIX,
+  programHashPrefix,
+  clauseHashPrefix,
   PreludeError,
   type PreludeBundle,
   Term,
@@ -118,8 +118,8 @@ test("loadPrelude reproduces every pinned vector outcome byte-for-byte", () => {
 
 test("the vector's program/clause prefix bytes equal the hashing constants", () => {
   const vf = loadVectors();
-  assert.equal(toHex(PROGRAM_PREFIX), vf.program_prefix_hex, "PROGRAM_PREFIX hex");
-  assert.equal(toHex(CLAUSE_PREFIX), vf.clause_prefix_hex, "CLAUSE_PREFIX hex");
+  assert.equal(toHex(programHashPrefix()), vf.program_prefix_hex, "programHashPrefix() hex");
+  assert.equal(toHex(clauseHashPrefix()), vf.clause_prefix_hex, "clauseHashPrefix() hex");
 });
 
 test("programDigest reproduces the Rust-pinned digest for the sample clause set", () => {

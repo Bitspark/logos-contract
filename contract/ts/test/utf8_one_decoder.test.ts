@@ -3,7 +3,7 @@
 // A platform `TextDecoder` strips a leading UTF-8 BOM by default, so ts read different text from rs
 // and go wherever a site built its own decoder: a BOM-prefixed tag matched a known tag, two subst
 // keys collided, a BOM-prefixed atom had a shorter name. The fix routes every site through
-// UTF8_STRICT / UTF8_LOSSY. This test fails on any `new TextDecoder(` elsewhere in contract/ts/src or
+// decodeUtf8 / decodeUtf8Lossy. This test fails on any `new TextDecoder(` elsewhere in contract/ts/src or
 // kernel/ts/src, so a new site cannot bring the platform default back unobserved.
 //
 // ⛔ NO EXCLUSION. #2682 shipped this guard with exactly one, `kernel/ts/src/wasm/` (the #2361
@@ -17,7 +17,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { UTF8_LOSSY, UTF8_STRICT } from "../src/utf8.js";
+import { decodeUtf8Lossy, decodeUtf8 } from "../src/utf8.js";
 
 function repoRoot(): string {
   let dir = path.dirname(fileURLToPath(import.meta.url));
@@ -80,15 +80,15 @@ test("#2682: no `new TextDecoder(` outside src/utf8.ts, save ONE excluded direct
     );
   }
   const offenders = all.filter((s) => !s.startsWith(`${HOME}:`) && !EXCLUSIONS.some((ex) => s.startsWith(ex.dir)));
-  assert.deepEqual(offenders, [], "decode through UTF8_STRICT / UTF8_LOSSY (src/utf8.ts), never a new TextDecoder");
+  assert.deepEqual(offenders, [], "decode through decodeUtf8 / decodeUtf8Lossy (src/utf8.ts), never a new TextDecoder");
 });
 
 test("#2682: the shared decoders KEEP a leading BOM, as rs and go read exact bytes", () => {
   const bomA = Uint8Array.of(0xef, 0xbb, 0xbf, 0x61);
   // Control: the platform default strips it, which is the behaviour this module exists to refuse.
   assert.equal([...new TextDecoder().decode(bomA)].length, 1, "control: a default TextDecoder strips the BOM");
-  assert.equal(UTF8_STRICT.decode(bomA), "﻿a");
-  assert.equal(UTF8_LOSSY.decode(bomA), "﻿a");
-  assert.throws(() => UTF8_STRICT.decode(Uint8Array.of(0xff)), TypeError, "strict refuses ill-formed UTF-8");
-  assert.equal(UTF8_LOSSY.decode(Uint8Array.of(0xff)), "�", "lossy replaces ill-formed UTF-8 with U+FFFD");
+  assert.equal(decodeUtf8(bomA), "﻿a");
+  assert.equal(decodeUtf8Lossy(bomA), "﻿a");
+  assert.throws(() => decodeUtf8(Uint8Array.of(0xff)), TypeError, "strict refuses ill-formed UTF-8");
+  assert.equal(decodeUtf8Lossy(Uint8Array.of(0xff)), "�", "lossy replaces ill-formed UTF-8 with U+FFFD");
 });

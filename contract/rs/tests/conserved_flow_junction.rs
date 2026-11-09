@@ -41,9 +41,9 @@
 use logos_contract::{
     check_with_cert_context, edb_table_hash, intval::BigInt, program_digest, ArithmeticTheory,
     BodyLit, CertContext, CertId, CertSizeDecl, CheckLimits, CheckProfile, Clause, ClauseId,
-    ClosedModelCert, ClosureWitness, CountLit, Derivation, Evidence, FiniteDomain, Goal,
-    GroundLiteral, Hash, LeafOutcome, LeafVerifier, Literal, MapProgram, Node, NodeMeta, Outcome,
-    PredicateRef, PredicateSet, Premise, Program, ProjectSpec, RelationTable, StratumPrefix, Subst,
+    ClosedModelCert, ClosureWitness, CompleteProgram, CountLit, Derivation, Evidence, FiniteDomain,
+    Goal, GroundLiteral, Hash, LeafOutcome, LeafVerifier, Literal, MapProgram, Node, NodeMeta,
+    Outcome, PredicateRef, PredicateSet, Premise, ProjectSpec, RelationTable, StratumPrefix, Subst,
     SupportWitness, Symbol, Term,
 };
 use ontos_core::Value;
@@ -90,7 +90,7 @@ fn flow(c: &str, cite: i128, side: &str, kind: &str, origin: &str, qty: i128) ->
     )
 }
 
-fn bound_context(program: &dyn Program) -> CertContext {
+fn bound_context(program: &dyn CompleteProgram) -> CertContext {
     CertContext::new(program_digest(program), [1u8; 32], [2u8; 32], [3u8; 32])
 }
 

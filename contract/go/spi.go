@@ -14,13 +14,13 @@ import (
 	core "github.com/bitspark/ontos/core/go"
 )
 
-// EdbPrefix is the domain separator for the canonical EDB-table snapshot hash (ADR
+// EDBSnapshotHashPrefix is the domain separator for the canonical EDB-table snapshot hash (ADR
 // 0007 §3.6), so an EDB-snapshot digest can never collide with a clause id or any
 // other hash. Mirrors Rust's EDB_PREFIX.
-var EdbPrefix = []byte("logos/account/edb-snapshot/v1\n")
+func EDBSnapshotHashPrefix() []byte { return []byte("logos/account/edb-snapshot/v1\n") }
 
 // EdbTableHash is the canonical snapshot hash of one extensional predicate's table,
-// read as a SET — SHA-256(EdbPrefix ‖ pred-bytes ‖ ontos-codec(Tuple[rows…])), with the
+// read as a SET — SHA-256(EDBSnapshotHashPrefix ‖ pred-bytes ‖ ontos-codec(Tuple[rows…])), with the
 // rows sorted by GroundKey and a repeated row ignored (#2279): order and multiplicity
 // never change the hash. This is the value an EdbSnapshotProvider returns for pred over
 // its trusted EDB, and the value Check recomputes over a cert's sealed extension table
@@ -39,7 +39,7 @@ func EdbTableHash(pred Symbol, rows []GroundLiteral) Hash {
 		rowValues[i] = core.NewTuple(items...)
 	}
 	h := sha256.New()
-	h.Write(EdbPrefix)
+	h.Write(EDBSnapshotHashPrefix())
 	h.Write(pred.Bytes())
 	h.Write(codec.Encode(core.NewTuple(rowValues...)))
 	var out Hash
@@ -115,6 +115,7 @@ type GroundDecider interface {
 // DecideGround when it implements GroundDecider, else the default derived from Decide
 // (GroundFromLegacy). Every logos reader calls it, never Decide.
 func DecideGround(t Theory, atom GroundLiteral) completion.TheoryGround {
+	atom = atom.detached()
 	if g, ok := t.(GroundDecider); ok {
 		return g.DecideGround(atom)
 	}
@@ -310,9 +311,8 @@ func (AlwaysAdmit[C]) Identity() ComponentIdentity {
 // ConfigDigest) triple a certificate's meaning depends on (ADR 0004 D4 · parity with
 // the Rust binding's ComponentIdentity).
 //
-// A check-only consumer EXPOSES this identity so it can be attested. There is NO
-// check-profile-digest derivation in the go/ts bindings — that lives only in the
-// Rust kernel/seam; these bindings carry the identity, nothing more.
+// A check-only consumer exposes its component's identity through this contract.
+// The kernel derives a negotiated profile and its digest from the live components.
 type ComponentIdentity struct {
 	// Id is the component's identifier (e.g. []byte("core/always-admit")).
 	Id []byte
@@ -325,7 +325,7 @@ type ComponentIdentity struct {
 
 // NewComponentIdentity builds a ComponentIdentity from its parts.
 func NewComponentIdentity(id, version []byte, configDigest [32]byte) ComponentIdentity {
-	return ComponentIdentity{Id: id, Version: version, ConfigDigest: configDigest}
+	return ComponentIdentity{Id: bytes.Clone(id), Version: bytes.Clone(version), ConfigDigest: configDigest}
 }
 
 // UnidentifiedComponent is the canonical placeholder identity: Id "unidentified",

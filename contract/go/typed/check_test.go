@@ -61,7 +61,7 @@ func TestCaptureAvoidingSubstitution(t *testing.T) {
 func TestWrongEndpointsAndUniverseCapacity(t *testing.T) {
 	proof := Transport(Nat(), Zero(), Succ(Zero()), Refl(Nat(), Zero()), Lam(Nat(), Nat()), Zero())
 	require(t, Check(statement(Nat()), proof, trusted(), DefaultLimits()), InvalidStatus, TypeMismatch)
-	require(t, Check(statement(Sort(maxNatural)), Sort(maxNatural-1), trusted(), DefaultLimits()), IncompleteStatus, UniverseCapacity)
+	require(t, Check(statement(Sort(MaxNatural)), Sort(MaxNatural-1), trusted(), DefaultLimits()), IncompleteStatus, UniverseCapacity)
 	require(t, Check(statement(Sort(0)), Sort(0), trusted(), DefaultLimits()), InvalidStatus, TypeMismatch)
 }
 
@@ -180,7 +180,7 @@ func TestMalformedAndResourceOutcomes(t *testing.T) {
 		deep = Pi(Nat(), deep)
 	}
 	limits = DefaultLimits()
-	limits.InputDepth = maxNatural
+	limits.InputDepth = MaxNatural
 	require(t, Check(statement(deep), Zero(), trusted(), limits), IncompleteStatus, InputDepth)
 	require(t, Check(statement(Nat(), Assume("a", Nat())), Zero(), trusted(), DefaultLimits()), InvalidStatus, MissingAssumptions)
 }
@@ -227,7 +227,7 @@ func TestIdentitiesUseExactUTF8AndDependenciesUseByteOrder(t *testing.T) {
 	require(t, Check(s, proof, policy, limits), IncompleteStatus, CollectionEntries)
 	invalidName := string([]byte{0xff})
 	require(t, Check(statement(Nat(), Assume(invalidName, Nat(), "basis")), Zero(), trusted("basis"), DefaultLimits()), InvalidStatus, MalformedInput)
-	require(t, Check(statement(Nat()), Var(maxNatural), trusted(), DefaultLimits()), InvalidStatus, EscapedVariable)
+	require(t, Check(statement(Nat()), Var(MaxNatural), trusted(), DefaultLimits()), InvalidStatus, EscapedVariable)
 }
 
 func TestRepeatedChecksHaveDeterministicWorkAtAcceptanceBoundary(t *testing.T) {

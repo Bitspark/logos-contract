@@ -4,7 +4,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { atom as valueAtom } from "@bitspark/ontos-core";
+import { Tuple, atom as valueAtom, tuple } from "@bitspark/ontos-core";
 import { encodeInt } from "@bitspark/ontos-data";
 
 import {
@@ -24,6 +24,8 @@ import {
   RuleNode,
   StratumPrefix,
   Symbol,
+  closedModelCertAsValue,
+  closedModelCertFromValue,
   decodeDerivationWireV1,
   encodeDerivationWireV1,
 } from "../src/index.js";
@@ -187,6 +189,20 @@ test("DerivationWireV1 positive vectors match and round-trip", () => {
     const deriv = fixture(c.name);
     assert.equal(toHex(encodeDerivationWireV1(deriv)), c.wire_hex, `${c.name} wire bytes`);
     assert.equal(toHex(encodeDerivationWireV1(decodeDerivationWireV1(encodeDerivationWireV1(deriv)))), c.wire_hex, `${c.name} round-trip`);
+  }
+});
+
+test("a certificate digest requires exactly 64 lowercase hex digits", () => {
+  const record = closedModelCertAsValue(closedCert());
+  assert.ok(record instanceof Tuple);
+  const read = (text: string) => {
+    const fields = [...record.items()];
+    fields[1] = atom(text);
+    return closedModelCertFromValue(tuple(fields)).programHash;
+  };
+  assert.deepEqual(read("0f".repeat(32)), new Uint8Array(32).fill(15));
+  for (const text of ["0F".repeat(32), "fg".repeat(32), "0f".repeat(31)]) {
+    assert.throws(() => read(text), /decode closed_world\.cert\.program_hash: expected a different value shape/);
   }
 });
 

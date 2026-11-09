@@ -9,15 +9,17 @@ package contract
 
 import (
 	"fmt"
+	"slices"
 )
 
-// RejectionCode is a rejection code (§4). Two bands:
+// RejectionCode identifies a checker refusal (§4).
 //
 //   - structural band (FIRM, closed, frozen tri-core) — the codes the kernel itself
 //     emits. Branch on these, not on detail.
 //   - host-extension band (STABLE v1 *mechanism*; sub-code set open) — the three
 //     wrappers a delegated extension point raises; the seam's own sub-code is
 //     carried in Outcome.Detail.
+//   - configuration: the supplied profile cannot run a check.
 type RejectionCode int
 
 const (
@@ -133,6 +135,9 @@ const (
 	// in detail is the stop's kind tag (work_cap, ...), as builtin_failed carries the theory's own
 	// code. Listed last so the numbering of the codes before it does not move.
 	BuiltinNotDecided
+
+	// InvalidCheckLimits is a caller configuration failure before proof checking.
+	InvalidCheckLimits
 )
 
 // Code returns the stable, cross-language rejection-code string — the *normative*
@@ -219,6 +224,8 @@ func (c RejectionCode) Code() string {
 		return "rule_inadmissible"
 	case BuiltinNotDecided:
 		return "builtin_not_decided"
+	case InvalidCheckLimits:
+		return "invalid_check_limits"
 	default:
 		panic(fmt.Sprintf("contract: unknown RejectionCode %d", int(c)))
 	}
@@ -234,7 +241,7 @@ func (c RejectionCode) Code() string {
 // code must be placed here, and one this switch does not know panics by name.
 func (c RejectionCode) IsStructural() bool {
 	switch c {
-	case BuiltinFailed, BuiltinNotDecided, LeafRejected, RuleInadmissible:
+	case InvalidCheckLimits, BuiltinFailed, BuiltinNotDecided, LeafRejected, RuleInadmissible:
 		return false
 	case EmptyDerivation, TooManyNodes, TooDeep, TermTooDeep, RootOutOfRange, NonGroundConclusion,
 		UnknownClause, InstantiationMismatch, BadDependencyOrder, RootConclusionMismatch, SealedViolation,
@@ -402,32 +409,54 @@ func (l *CheckLimits) Budgets() []Budget {
 	}
 }
 
-// RaisedBudget is one of R3's checker variants: the budget raised (or "every"), and the limits.
-type RaisedBudget struct {
-	Name   string
-	Limits CheckLimits
+// CheckLimitError names a caller budget outside the shared proof-count domain.
+type CheckLimitError struct {
+	Field string
+	Value string
 }
 
-// EachBudgetRaised is R3's variants at the checker (#2733; seat:caa's C2 on 3b): each budget raised
-// to at least `to` alone, then every budget together. A budget already at or above `to` is left
-// alone, and a variant equal to l is dropped, so a raise is never a no-op and never a lowering.
-func (l CheckLimits) EachBudgetRaised(to int) []RaisedBudget {
-	var out []RaisedBudget
-	every := l
-	everyBudgets := every.Budgets()
-	for i, b := range l.Budgets() {
-		if *b.Value >= to {
-			continue
+func (e *CheckLimitError) Error() string {
+	return fmt.Sprintf("check limits: %s=%s is outside the index range 0..%d", e.Field, e.Value, IndexMax)
+}
+
+// ProofBudgetCount is an exact count in the portable index domain. Its zero value is valid.
+type ProofBudgetCount struct {
+	value uint64
+}
+
+// NewProofBudgetCount validates a count and identifies the caller's field on refusal.
+func NewProofBudgetCount(field string, count uint64) (ProofBudgetCount, error) {
+	if count > IndexMax {
+		return ProofBudgetCount{}, &CheckLimitError{Field: field, Value: fmt.Sprint(count)}
+	}
+	return ProofBudgetCount{value: count}, nil
+}
+
+// ProofBudgetCountFromInt64 validates a signed native or transport input.
+func ProofBudgetCountFromInt64(field string, count int64) (ProofBudgetCount, error) {
+	if count < 0 {
+		return ProofBudgetCount{}, &CheckLimitError{Field: field, Value: fmt.Sprint(count)}
+	}
+	return NewProofBudgetCount(field, uint64(count))
+}
+
+// ProofBudgetCountFromUint32 widens a count which already fits the protocol.
+func ProofBudgetCountFromUint32(count uint32) ProofBudgetCount {
+	return ProofBudgetCount{value: uint64(count)}
+}
+
+// Uint64 returns the exact portable value, including on 32-bit hosts.
+func (n ProofBudgetCount) Uint64() uint64 { return n.value }
+
+// Validate checks the caller's proof budgets before any account or verifier is read.
+// A zero count is a valid cap.
+func (l CheckLimits) Validate() error {
+	for _, budget := range l.Budgets() {
+		if _, err := ProofBudgetCountFromInt64(budget.Name, int64(*budget.Value)); err != nil {
+			return err
 		}
-		one := l
-		*one.Budgets()[i].Value = to
-		*everyBudgets[i].Value = to
-		out = append(out, RaisedBudget{Name: b.Name, Limits: one})
 	}
-	if len(out) > 1 {
-		out = append(out, RaisedBudget{Name: "every", Limits: every})
-	}
-	return out
+	return nil
 }
 
 // CheckProfile is the bound extension points + config + limits check verifies
@@ -512,26 +541,20 @@ func UnidentifiedProfileSlotsAllowing[C any](
 	profile *CheckProfile[C],
 	allowUnidentified []ProfileSlot,
 ) []ProfileSlot {
-	allowed := func(s ProfileSlot) bool {
-		for _, a := range allowUnidentified {
-			if a == s {
-				return true
-			}
-		}
-		return false
-	}
-	var out []ProfileSlot
-	// Fold order is identity-bearing: theory ‖ leaves ‖ admit, unchanged by the allowance.
-	for _, c := range []struct {
-		slot      ProfileSlot
-		anonymous bool
+	components := [...]struct {
+		slot   ProfileSlot
+		handle any
 	}{
-		{ProfileSlotTheory, profileComponentIdentity(profile.Theory).IsUnidentified()},
-		{ProfileSlotLeaves, profileComponentIdentity(profile.Leaves).IsUnidentified()},
-		{ProfileSlotAdmit, profileComponentIdentity(profile.Admit).IsUnidentified()},
-	} {
-		if c.anonymous && !allowed(c.slot) {
-			out = append(out, c.slot)
+		{ProfileSlotTheory, profile.Theory},
+		{ProfileSlotLeaves, profile.Leaves},
+		{ProfileSlotAdmit, profile.Admit},
+	}
+	allowed := slices.Clone(allowUnidentified)
+	var out []ProfileSlot
+	for _, component := range components {
+		identity := profileComponentIdentity(component.handle)
+		if identity.IsUnidentified() && !slices.Contains(allowed, component.slot) {
+			out = append(out, component.slot)
 		}
 	}
 	return out
@@ -581,6 +604,14 @@ func NewCertContext(programHash, profileHash, ctxHash, theoryConfigHash Hash) Ce
 	}
 }
 
+// captureCertContext owns the optional pin before program or verifier callbacks.
+func captureCertContext(c CertContext) CertContext {
+	if c.DecompositionWitness != nil {
+		c = c.WithDecomposition(*c.DecompositionWitness)
+	}
+	return c
+}
+
 // ZeroCertContext is the all-zero context. Supplied by the plain Check wrapper and
 // never consulted for an all-positive (ClosedWorld-empty) derivation; for a certifying
 // check it is the *unbound* sentinel (see IsUnbound).
@@ -626,10 +657,16 @@ func Check[C any](program Program, claim GroundLiteral, deriv Derivation, ctx C,
 // chain rejects as cert_out_of_range, because it has no cert to seal anything. A vacuous accept
 // would certify a completeness claim that nothing backs. Mirrors rs check_closed_model_chain.
 func CheckClosedModelChain[C any](program Program, certs []ClosedModelCert, ctx C, profile *CheckProfile[C], certContext CertContext) Outcome {
+	captured := *profile
+	profile = &captured
+	if err := profile.Limits.Validate(); err != nil {
+		return reject(InvalidCheckLimits, err.Error())
+	}
 	if len(certs) == 0 {
 		return reject(CertOutOfRange, "empty certificate chain: no closed-model certificate to verify")
 	}
-	// #3088: the same boundary as derivationPrechecks, before any certificate is read.
+	certContext = captureCertContext(certContext)
+	// #3088: the same native shape boundary as CaptureDerivation, before any certificate is read.
 	for own, cert := range certs {
 		if d := wellFormedCert(cert, profile.Limits.MaxTermDepth); d != "" {
 			return reject(UnknownNodeKind, fmt.Sprintf("chain cert %d: %s", own, d))
@@ -643,14 +680,17 @@ func CheckClosedModelChain[C any](program Program, certs []ClosedModelCert, ctx 
 	if certContext.IsUnbound() {
 		return reject(CertContextUnbound, "certifying check supplied an all-zero (unbound) cert context")
 	}
+	// Keep every proposed certificate fixed before verifying the first one.
+	certs = cloneWorld(certs)
 	// STACKED certificates (#2258 (a)): the chain is the world, verified in ascending scope level
 	// exactly as a derivation's closed world is, so a cert that reads a lower cert's seal does so
 	// only once that cert's status is final. The first invalid cert in that order rejects.
 	status := make([]certStatus, len(certs))
 	verified := make([]bool, len(certs))
+	readProgram := worldProgram(program)
 	for _, own := range verificationOrder(certs) {
 		place := certPlace{own: own, worldLen: len(certs)}
-		st := verifyCert(certs[own], place, certs, status, verified, program, profile, ctx, certContext, profile.Limits)
+		st := verifyCert(certs[own], place, certs, status, verified, readProgram, profile, ctx, certContext, profile.Limits)
 		if !st.valid {
 			return reject(st.code, fmt.Sprintf("chain cert %d: %s", own, st.detail))
 		}
@@ -669,48 +709,47 @@ func CheckClosedModelChain[C any](program Program, certs []ClosedModelCert, ctx 
 // certificates must have been sealed against. It is consulted only when a cert is
 // actually verified (i.e. only for a Neg-bearing derivation).
 func CheckWithCertContext[C any](program Program, claim GroundLiteral, deriv Derivation, ctx C, profile *CheckProfile[C], certContext CertContext) Outcome {
-	if out, ok := derivationPrechecks(program, claim, deriv, profile); !ok {
-		return out
-	}
-	status := verifyWorld(deriv.ClosedWorld, program, profile, ctx, certContext)
-	return checkNodes(program, claim, deriv, ctx, profile, status)
+	return checkNative(program, claim, deriv, ctx, *profile, certContext, nil)
 }
 
-// derivationPrechecks is steps 1 to 3b of CheckWithCertContext: the checks that run before any
-// certificate or node is inspected. ok = false carries the rejection.
-func derivationPrechecks[C any](program Program, claim GroundLiteral, deriv Derivation, profile *CheckProfile[C]) (Outcome, bool) {
-	// 1. non-empty.
-	if len(deriv.Nodes) == 0 {
-		return reject(EmptyDerivation, "derivation has no nodes"), false
+// checkNative binds the proposed account and requested fact before program
+// lookup or verification. A memo can provide the already owned world and its
+// statuses. The forward pass always reads the same world that was verified.
+func checkNative[C any](
+	program Program, claim GroundLiteral, proof Derivation, ctx C,
+	profile CheckProfile[C], certContext CertContext, memo *WorldMemo[C],
+) Outcome {
+	if out := checkDerivationShape(proof, profile.Limits); !out.IsAccept() {
+		return out
 	}
-	// 2. node cap — BEFORE any delegation, strict > (§4.3). An oversized untrusted
-	//    proof is refused without inspecting (delegating) a single node.
-	if len(deriv.Nodes) > profile.Limits.MaxNodes {
-		return reject(TooManyNodes, fmt.Sprintf("%d nodes exceeds max_nodes %d", len(deriv.Nodes), profile.Limits.MaxNodes)), false
+	if why := wellFormedLiteral(claim, profile.Limits.MaxTermDepth, "claim"); why != "" {
+		return reject(UnknownNodeKind, why)
 	}
-	// 3. root in range.
-	if _, ok := deriv.RootOffset(); !ok {
-		return reject(RootOutOfRange, fmt.Sprintf("root %d out of range (len %d)", deriv.Root, len(deriv.Nodes))), false
+	claim = claim.detached()
+	world := proof.ClosedWorld
+	proof.ClosedWorld = nil
+	proof = CloneDerivation(proof)
+	var status []certStatus
+	if len(world) != 0 {
+		certContext = captureCertContext(certContext)
+		if memo == nil {
+			proof.ClosedWorld = cloneWorld(world)
+		} else {
+			proof.ClosedWorld, status = memo.captureWorld(world, profile.Limits)
+		}
 	}
-	// 3a. WELL-FORMED (#3088) — BEFORE any node or certificate is inspected: every interface
-	//     value of the untrusted derivation (a node, premise, term, value or support ref, in a node
-	//     or a certificate) is one of the known kinds, or the derivation is refused
-	//     unknown_node_kind. Nothing below then calls a method on nil or on a foreign type.
-	if out := checkWellFormed(deriv, profile.Limits); !out.IsAccept() {
-		return out, false
+	// This depth pass may call Program.Clause. All subsequent comparisons
+	// and verifier calls use the captured data even if that lookup reenters.
+	if out := checkTermDepths(program, claim, proof, profile.Limits); !out.IsAccept() {
+		return out
 	}
-	// 3b. TERM-NESTING DEPTH CAP (issue #253) — BEFORE any recursive term traversal
-	//     (cert verification in 3a, the forward pass in 4, the root Equal in 5). A
-	//     single term can nest arbitrarily deep within one node, which neither the node
-	//     cap nor the DAG-depth cap bounds; a pathologically deep term would overflow the
-	//     goroutine stack in Substitute/EraseGround/structural Equal/the account quote.
-	//     The measurement is iterative with an early cutoff (TermDepthLE / ValueDepthLE),
-	//     so checking the depth of a deep term does not itself overflow. Over →
-	//     term_too_deep (graceful rejection, never a crash).
-	if out := checkTermDepths(program, claim, deriv, profile.Limits); !out.IsAccept() {
-		return out, false
+	if len(proof.ClosedWorld) != 0 && status == nil {
+		status = verifyWorld(proof.ClosedWorld, program, &profile, ctx, certContext)
+		if memo != nil {
+			memo.rememberWorld(proof.ClosedWorld, status, profile.Limits)
+		}
 	}
-	return Accept(), true
+	return checkNodes(program, claim, proof, ctx, &profile, status)
 }
 
 // verifyWorld is step 3a of CheckWithCertContext: every certificate of world verified, into the
@@ -733,12 +772,13 @@ func verifyWorld[C any](world []ClosedModelCert, program Program, profile *Check
 	contextUnbound := len(world) > 0 && certContext.IsUnbound()
 	certStatus := make([]certStatus, len(world))
 	verified := make([]bool, len(world))
+	readProgram := worldProgram(program)
 	for _, i := range verificationOrder(world) {
 		if contextUnbound {
 			certStatus[i] = invalidCert(CertContextUnbound, "certifying check supplied an all-zero (unbound) cert context")
 		} else {
 			place := certPlace{own: i, worldLen: len(world)}
-			certStatus[i] = verifyCert(world[i], place, world, certStatus, verified, program, profile, ctx, certContext, profile.Limits)
+			certStatus[i] = verifyCert(world[i], place, world, certStatus, verified, readProgram, profile, ctx, certContext, profile.Limits)
 		}
 		verified[i] = true
 	}
@@ -1098,7 +1138,7 @@ func checkNode[C any](i int, node Node, program Program, deriv Derivation, ctx C
 			return reject(PredicatePartitionViolation, "rule head predicate is owned by a theory")
 		}
 		// (h) THEN delegate metadata admissibility (§4 ob.2: structural-then-delegate).
-		switch out := profile.Admit.Admissible(clause, n.Meta, ctx).(type) {
+		switch out := profile.Admit.Admissible(CloneClause(clause), n.Meta, ctx).(type) {
 		case RuleAdmit:
 			return Accept()
 		case RuleReject:
@@ -1157,7 +1197,7 @@ func checkNode[C any](i int, node Node, program Program, deriv Derivation, ctx C
 			// concluding an intensional predicate is the sealing error.
 			return reject(SealedViolation, "leaf concludes a non-extensional (intensional) predicate")
 		}
-		switch out := profile.Leaves.Verify(n.Conc, n.Evidence, ctx).(type) {
+		switch out := profile.Leaves.Verify(n.Conc.detached(), n.Evidence, ctx).(type) {
 		case LeafAdmit:
 			return Accept()
 		case LeafReject:

@@ -47,7 +47,7 @@
 // relation names, it is unreachable on a routed call but preserved here for a
 // byte-identical code on that defensive path.)
 
-import { UTF8_STRICT } from "./utf8.js";
+import { decodeUtf8 } from "./utf8.js";
 import { Atom, Tuple, equals, type Value } from "@bitspark/ontos-core";
 import { encodeInt, readInt } from "@bitspark/ontos-data";
 
@@ -104,9 +104,6 @@ function numAbs(n: Num): Num {
 }
 
 const utf8Encoder = new TextEncoder();
-// `fatal: true` makes decode throw on any byte sequence that is not valid UTF-8 —
-// the non-UTF-8 defensive arm (mirrors Rust's std::str::from_utf8 guard).
-const utf8FatalDecoder = UTF8_STRICT;
 
 /** Lower-case hex of a byte string — a byte-exact, UTF-8-agnostic map/set key. */
 function hexKey(bytes: Uint8Array): string {
@@ -164,7 +161,7 @@ export class ArithmeticTheory implements Theory {
     // identical code on every path.
     let name: string;
     try {
-      name = utf8FatalDecoder.decode(atom.pred.bytes());
+      name = decodeUtf8(atom.pred.bytes());
     } catch {
       return arithFails("arith_unknown_predicate");
     }
@@ -441,7 +438,7 @@ function evalArith(root: Value): Evaluation {
         }
         let operator: string;
         try {
-          operator = utf8FatalDecoder.decode(head.bytes());
+          operator = decodeUtf8(head.bytes());
         } catch {
           // A non-UTF-8 operator atom is an unknown operator (Go: string(bytes) never
           // matches a known op; Rust: from_utf8 err -> unknown).

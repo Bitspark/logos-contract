@@ -96,7 +96,7 @@ func (v certView) lowerIndex(pred Symbol) (int, bool) {
 //
 // status/verified hold the statuses computed so far; verificationOrder makes every lower one
 // final first. Mirrors rs resolve_lower_seals.
-func resolveLowerSeals(cert ClosedModelCert, own int, world []ClosedModelCert, status []certStatus, verified []bool, program Program, theory Theory) (certView, *certErr) {
+func resolveLowerSeals(cert ClosedModelCert, own int, world []ClosedModelCert, status []certStatus, verified []bool, program CompleteProgram, theory Theory) (certView, *certErr) {
 	view := certView{cert: cert, lower: map[Symbol]lowerSeal{}}
 	var err *certErr
 	program.ForEachClause(func(_ ClauseId, clause Clause) {

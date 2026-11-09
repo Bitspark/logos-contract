@@ -19,9 +19,9 @@
 
 use logos_contract::{
     check_with_cert_context, edb_table_hash, program_digest, CertContext, CertId, CertSizeDecl,
-    CheckLimits, CheckProfile, Clause, ClauseId, ClosedModelCert, ClosureWitness, Derivation,
-    Evidence, FiniteDomain, Goal, GroundLiteral, Hash, LeafOutcome, LeafVerifier, MapProgram, Node,
-    NodeMeta, NonMemberProof, Outcome, PredicateSet, Premise, Program, RelationTable,
+    CheckLimits, CheckProfile, Clause, ClauseId, ClosedModelCert, ClosureWitness, CompleteProgram,
+    Derivation, Evidence, FiniteDomain, Goal, GroundLiteral, Hash, LeafOutcome, LeafVerifier,
+    MapProgram, Node, NodeMeta, NonMemberProof, Outcome, PredicateSet, Premise, RelationTable,
     StratumPrefix, Subst, SupportEdge, SupportRef, SupportWitness, Symbol, Term, Theory,
     TheoryOutcome,
 };
@@ -115,7 +115,7 @@ fn profile() -> CheckProfile<()> {
     }
 }
 
-fn bound_context(program: &dyn Program) -> CertContext {
+fn bound_context(program: &dyn CompleteProgram) -> CertContext {
     CertContext::new(program_digest(program), [1u8; 32], [2u8; 32], [3u8; 32])
 }
 

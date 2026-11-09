@@ -30,7 +30,8 @@
 //   7. Identifiers/digests — bare Atom(bytes) (bytesAtom / digestAtom).
 //   8. Reused FIRM sub-values read via the frozen account/quote readings.
 
-import { UTF8_LOSSY, UTF8_STRICT } from "./utf8.js";
+import { decodeUtf8Lossy, decodeUtf8 } from "./utf8.js";
+import { portableClauseIdBytes } from "./clause_id_encoding.js";
 import { Atom, Tuple, atom as valueAtom, tuple as valueTuple, type Value } from "@bitspark/ontos-core";
 import { encode, decode } from "@bitspark/ontos-codec";
 import { encodeBool, readInt } from "@bitspark/ontos-data";
@@ -39,6 +40,7 @@ import { ClauseId, PredicateRef, ProjectSpec, type Clause } from "./program.js";
 import {
   type CertSizeDecl,
   ClosedModelCert,
+  parseHashHex,
   FiniteDomain,
   RelationTable,
   StratumPrefix,
@@ -280,7 +282,7 @@ function nodeAsValue(node: Node): Value {
       return tagged(
         "rule",
         groundLiteralAsValue(node.conclusion),
-        bytesAtom(enc.encode(node.clause.asStr())),
+        bytesAtom(portableClauseIdBytes(node.clause.asStr())),
         substAsValue(node.subst),
         valueTuple(node.premises.map(premiseAsValue)),
         nodeMetaAsValue(node.meta),
@@ -320,12 +322,9 @@ export function closedModelCertAsValue(cert: ClosedModelCert): Value {
 }
 
 /**
- * #2524 (seat:caa's ruling): a certificate's size in BYTES, the one definition a producer
- * declares and the checker measures: the length of its canonical wire encoding
- * (`closedModelCertAsValue` through the ontos codec) with `limitsDecl.certBytes` set to 0. The
- * encoding CONTAINS the declaration, so declaring your own encoded size would be circular;
- * zeroing the field makes it well defined. Mirrors rs `cert_encoded_bytes` and go
- * `CertEncodedBytes`, and a generated vector pins their agreement (`vectors/cert_encoded_bytes.json`).
+ * The byte charge a producer declares and the checker measures, with certBytes zeroed.
+ * For a portable certificate this equals the exact canonical encoded length. A native-only
+ * handle charges three bytes per unpaired surrogate. The length reading emits no proof.
  */
 export function certEncodedBytes(cert: ClosedModelCert): number {
   // #2605: measured through the length reading of the one wire shape, so no value tree and no
@@ -340,11 +339,6 @@ export class DecodeError extends Error {
     this.name = "DecodeError";
   }
 }
-
-// Exact-bytes decoders (utf8.ts, #2682): a leading BOM is KEPT, so `BOM rule` is not the tag `rule`
-// and the subst keys `X` and `BOM X` stay two variables, as in rs and go.
-const decUtf8 = UTF8_LOSSY;
-const strictUtf8 = UTF8_STRICT;
 
 // ------------------------- the one rendering per class ----------------------
 //
@@ -432,7 +426,7 @@ function splitTag(v: Value, ctx: string): [Uint8Array, readonly Value[]] {
 }
 
 function tagText(tag: Uint8Array): string {
-  return decUtf8.decode(tag);
+  return decodeUtf8Lossy(tag);
 }
 
 /**
@@ -487,7 +481,7 @@ function readOpt(v: Value, ctx: string): Value | undefined {
 
 function strictText(bytes: Uint8Array, ctx: string): string {
   try {
-    return strictUtf8.decode(bytes);
+    return decodeUtf8(bytes);
   } catch {
     throw refuse.badUtf8(ctx);
   }
@@ -678,22 +672,9 @@ export function derivationFromValue(v: Value): Derivation {
 
 /** A digest atom (64 lowercase-hex chars) into its 32 bytes, the inverse of digestAtom. */
 function readHash(v: Value, ctx: string): Uint8Array {
-  const hex = atomBytes(v, ctx);
-  if (hex.length !== 64) throw refuse.shape(ctx);
-  const out = new Uint8Array(32);
-  for (let i = 0; i < 32; i += 1) {
-    const hi = hexNibble(hex[2 * i]!);
-    const lo = hexNibble(hex[2 * i + 1]!);
-    if (hi === undefined || lo === undefined) throw refuse.shape(ctx);
-    out[i] = (hi << 4) | lo;
-  }
-  return out;
-}
-
-function hexNibble(c: number): number | undefined {
-  if (c >= 0x30 && c <= 0x39) return c - 0x30;
-  if (c >= 0x61 && c <= 0x66) return c - 0x61 + 10;
-  return undefined;
+  const bytes = parseHashHex(atomBytes(v, ctx));
+  if (bytes === undefined) throw refuse.shape(ctx);
+  return bytes;
 }
 
 function symbolFromValue(v: Value, ctx: string): Symbol {

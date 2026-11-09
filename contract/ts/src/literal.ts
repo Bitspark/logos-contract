@@ -5,34 +5,41 @@
 // Atom(bytes). Ground-ness is a type: Goal (args are Term) vs GroundLiteral
 // (args are ontos Value, always ground).
 
-import { bytesEqual, copyBytes, equals as valueEquals, type Value } from "@bitspark/ontos-core";
+import { bytesEqual, equals as valueEquals, type Value } from "@bitspark/ontos-core";
 import { Term, type Subst } from "./term.js";
-import { UTF8_STRICT } from "./utf8.js";
+import { copyOctets, type OctetSource } from "./octets.js";
+import { decodeUtf8, encodeUtf8 } from "./utf8.js";
 
 /** A predicate symbol — an ontos `Atom(bytes)`, by convention a name. */
 export class Symbol {
   readonly #bytes: Uint8Array;
 
-  constructor(bytes: Uint8Array | readonly number[]) {
-    this.#bytes = copyBytes(bytes);
+  static [globalThis.Symbol.hasInstance](value: unknown): boolean {
+    return typeof value === "object" && value !== null && #bytes in value;
+  }
+
+  constructor(bytes: OctetSource) {
+    this.#bytes = copyOctets(bytes);
     Object.freeze(this);
   }
 
-  static of(bytes: Uint8Array | readonly number[] | string): Symbol {
+  static of(bytes: OctetSource | string): Symbol {
     if (typeof bytes === "string") {
-      return new Symbol(new TextEncoder().encode(bytes));
+      return new Symbol(encodeUtf8(bytes));
     }
     return new Symbol(bytes);
   }
 
   bytes(): Uint8Array {
-    return this.#bytes;
+    return this.#bytes.slice();
   }
 
   equals(other: Symbol): boolean {
     return bytesEqual(this.#bytes, other.#bytes);
   }
 }
+Object.freeze(Symbol.prototype);
+Object.freeze(Symbol);
 
 /**
  * THE injective rendering of a name's bytes as text (#1961's ruling; shared by #2763, and moved
@@ -66,7 +73,7 @@ export function escapedName(bytes: Uint8Array): string {
       out += `%${b.toString(16).toUpperCase().padStart(2, "0")}`;
       i += 1;
     } else {
-      const text = UTF8_STRICT.decode(bytes.subarray(i, i + len));
+      const text = decodeUtf8(bytes.subarray(i, i + len));
       out += text === "%" ? "%25" : text;
       i += len;
     }
@@ -142,3 +149,10 @@ export class GroundLiteral {
     return true;
   }
 }
+
+// Native logical data has one algebra. These operations are not application
+// extension points; verification implementations are supplied through the SPI.
+Object.freeze(Goal.prototype);
+Object.freeze(Goal);
+Object.freeze(GroundLiteral.prototype);
+Object.freeze(GroundLiteral);

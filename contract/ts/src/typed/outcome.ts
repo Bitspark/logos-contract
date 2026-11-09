@@ -47,8 +47,8 @@ class AcceptedValue {
 }
 
 /** A checker-issued result; its statement, policy and proof are immutable snapshots. */
-export type Accepted = AcceptedValue;
-export type Outcome = { readonly kind: "accepted"; readonly accepted: Accepted } | Rejection;
+export type Acceptance = AcceptedValue;
+export type Outcome = { readonly kind: "accepted"; readonly accepted: Acceptance } | Rejection;
 
 /** Internal mint; deliberately not exported by the public typed namespace. */
 export function accepted(statement: Statement, candidate: Expr, policy: Policy,

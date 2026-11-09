@@ -301,3 +301,22 @@ export class Derivation {
     return this.closedWorld.length === 0;
   }
 }
+
+// The account's data accessors and constructors have fixed meanings. Evidence
+// and metadata interpretation remain the receiving implementation's concern.
+Object.freeze(NodeMeta.prototype);
+Object.freeze(NodeMeta);
+Object.freeze(Evidence.prototype);
+Object.freeze(Evidence);
+Object.freeze(NegPremise.prototype);
+Object.freeze(NegPremise);
+Object.freeze(CountPremise.prototype);
+Object.freeze(CountPremise);
+Object.freeze(RuleNode.prototype);
+Object.freeze(RuleNode);
+Object.freeze(BuiltinNode.prototype);
+Object.freeze(BuiltinNode);
+Object.freeze(LeafNode.prototype);
+Object.freeze(LeafNode);
+Object.freeze(Derivation.prototype);
+Object.freeze(Derivation);

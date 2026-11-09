@@ -9,7 +9,7 @@ function statement(expected: t.Expr, declarations: readonly t.Declaration[] = []
 function policy(dependencies: readonly string[] = []): t.Policy {
   return t.policy({ foundation: t.FOUNDATION, checker: t.CHECKER, dependencies });
 }
-function requireAccepted(result: t.Outcome): t.Accepted {
+function requireAccepted(result: t.Outcome): t.Acceptance {
   assert.equal(result.kind, "accepted", JSON.stringify(result));
   if (result.kind !== "accepted") throw new Error("expected accepted proof");
   return result.accepted;

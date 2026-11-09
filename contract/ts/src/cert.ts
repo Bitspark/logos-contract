@@ -14,15 +14,21 @@
 import { encode } from "@bitspark/ontos-codec";
 import { atom as valueAtom, tuple as valueTuple, type Value } from "@bitspark/ontos-core";
 
-import { GroundLiteral, Symbol } from "./literal.js";
+import { nativeOctetView, type Hash } from "./octets.js";
+import { decodeHexPairs } from "./hex.js";
+import { GroundLiteral, type Symbol as PredicateSymbol } from "./literal.js";
+import { copyArray, nativeLiteral, nativeSymbol, nativeValue } from "./native_copy.js";
 import { type Subst } from "./term.js";
 
-/**
- * A 32-byte pin (e.g. a SHA-256 digest). The contract carries the raw bytes; how a
- * hash is computed is a consumer/kernel concern (the contract never learns the
- * scheme — it only compares pins for equality). Mirrors Rust's `Hash = [u8; 32]`.
- */
-export type Hash = Uint8Array;
+const copyRaw = Symbol("copy exact certificate data");
+
+export { hashFromBytes, type Hash } from "./octets.js";
+
+/** Parse the canonical 64 lowercase ASCII hex digits of a pin. The returned
+ * bytes are owned. Invalid text has no hash and all zeroes are a valid pin. */
+export function parseHashHex(text: string | Uint8Array): Hash | undefined {
+  return decodeHexPairs(text, "lowercase", 32);
+}
 
 /** The all-zero 32-byte hash (a fresh, never-aliased buffer per call). */
 export function zeroHash(): Hash {
@@ -31,8 +37,10 @@ export function zeroHash(): Hash {
 
 /** Byte-equality on two `Hash`es (32-byte pins). */
 export function hashEquals(a: Hash, b: Hash): boolean {
-  if (a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i += 1) if (a[i] !== b[i]) return false;
+  const left = nativeOctetView(a);
+  const right = nativeOctetView(b);
+  if (left?.length !== 32 || right?.length !== 32) return false;
+  for (let i = 0; i < 32; i++) if (left[i] !== right[i]) return false;
   return true;
 }
 
@@ -61,18 +69,22 @@ export class StratumPrefix {
   /** The stratification level this prefix seals (predicates at levels `0..=level`). */
   readonly level: number;
   /** The sealed predicate symbols, sorted + deduped. */
-  readonly predicates: readonly Symbol[];
+  readonly predicates: readonly PredicateSymbol[];
 
-  private constructor(level: number, predicates: readonly Symbol[]) {
+  private constructor(level: number, predicates: readonly PredicateSymbol[]) {
     this.level = level;
     this.predicates = Object.freeze(Array.from(predicates));
     Object.freeze(this);
   }
 
+  static [copyRaw](scope: StratumPrefix): StratumPrefix {
+    return new StratumPrefix(scope.level, copyArray(scope.predicates, nativeSymbol));
+  }
+
   /** Build a prefix, sorting + deduping the predicate set canonically (by symbol bytes). */
-  static of(level: number, predicates: Iterable<Symbol>): StratumPrefix {
+  static of(level: number, predicates: Iterable<PredicateSymbol>): StratumPrefix {
     const sorted = Array.from(predicates).sort((a, b) => compareBytes(a.bytes(), b.bytes()));
-    const deduped: Symbol[] = [];
+    const deduped: PredicateSymbol[] = [];
     for (const p of sorted) {
       const last = deduped[deduped.length - 1];
       if (last === undefined || !last.equals(p)) deduped.push(p);
@@ -95,7 +107,7 @@ export class StratumPrefix {
   }
 
   /** Is `pred` sealed by this prefix? (linear scan over the small sorted predicate set) */
-  seals(pred: Symbol): boolean {
+  seals(pred: PredicateSymbol): boolean {
     for (const p of this.predicates) {
       if (p.equals(pred)) return true;
     }
@@ -113,18 +125,23 @@ export class StratumPrefix {
  */
 export class FiniteDomain {
   /** An opaque type tag naming this domain (e.g. `subject`, `action`). */
-  readonly typeTag: Symbol;
+  readonly typeTag: PredicateSymbol;
   /** The domain's values, sorted + deduped by canonical codec bytes. */
   readonly values: readonly Value[];
 
-  private constructor(typeTag: Symbol, values: readonly Value[]) {
+  private constructor(typeTag: PredicateSymbol, values: readonly Value[]) {
     this.typeTag = typeTag;
     this.values = Object.freeze(Array.from(values));
     Object.freeze(this);
   }
 
+  static [copyRaw](domain: FiniteDomain, max: number): FiniteDomain {
+    return new FiniteDomain(nativeSymbol(domain.typeTag),
+      copyArray(domain.values, value => nativeValue(value, max)));
+  }
+
   /** Build a domain, sorting + deduping its values by canonical codec bytes. */
-  static of(typeTag: Symbol, values: Iterable<Value>): FiniteDomain {
+  static of(typeTag: PredicateSymbol, values: Iterable<Value>): FiniteDomain {
     const keyed = Array.from(values).map((v) => ({ v, key: encode(v) }));
     keyed.sort((a, b) => compareBytes(a.key, b.key));
     const deduped: Value[] = [];
@@ -163,20 +180,25 @@ export class FiniteDomain {
  * this table (the rows are kept sorted + deduped by canonical codec bytes).
  */
 export class RelationTable {
-  readonly pred: Symbol;
+  readonly pred: PredicateSymbol;
   readonly arity: number;
   /** The exact rows, sorted + deduped by canonical codec bytes. */
   readonly rows: readonly GroundLiteral[];
 
-  private constructor(pred: Symbol, arity: number, rows: readonly GroundLiteral[]) {
+  private constructor(pred: PredicateSymbol, arity: number, rows: readonly GroundLiteral[]) {
     this.pred = pred;
     this.arity = arity;
     this.rows = Object.freeze(Array.from(rows));
     Object.freeze(this);
   }
 
+  static [copyRaw](table: RelationTable, max: number): RelationTable {
+    return new RelationTable(nativeSymbol(table.pred), table.arity,
+      copyArray(table.rows, row => nativeLiteral(row, max)));
+  }
+
   /** Build a table, sorting + deduping its rows by canonical codec bytes. */
-  static of(pred: Symbol, arity: number, rows: Iterable<GroundLiteral>): RelationTable {
+  static of(pred: PredicateSymbol, arity: number, rows: Iterable<GroundLiteral>): RelationTable {
     return new RelationTable(pred, arity, sortDedupByGroundKey(rows));
   }
 
@@ -227,6 +249,21 @@ export function groundKey(g: GroundLiteral): Uint8Array {
   const items: Value[] = [valueAtom(g.pred.bytes())];
   for (const a of g.args) items.push(a);
   return encode(valueTuple(items));
+}
+
+// Preserve order and duplicates exactly. Verification decides canonicality.
+// These fields are used by both the retained-proof gate and the world memo.
+const copyScope = StratumPrefix[copyRaw];
+const copyDomain = FiniteDomain[copyRaw];
+const copyTable = RelationTable[copyRaw];
+
+export function copyCertificateTables(cert: ClosedModelCert, max: number) {
+  return {
+    scope: copyScope(cert.scope),
+    partialScope: cert.partialScope === undefined ? undefined : copyScope(cert.partialScope),
+    domains: copyArray(cert.domains, domain => copyDomain(domain, max)),
+    extensions: copyArray(cert.extensions, table => copyTable(table, max)),
+  };
 }
 
 /**
@@ -448,12 +485,12 @@ export class ClosedModelCert {
   }
 
   /** ADR 0030: is `pred`'s sealed table a LOWER BOUND (in `partialScope`) rather than exact? */
-  isPartial(pred: Symbol): boolean {
+  isPartial(pred: PredicateSymbol): boolean {
     return this.partialScope !== undefined && this.partialScope.seals(pred);
   }
 
   /** Look the exact table for `pred` up among this cert's extensions, if sealed. */
-  table(pred: Symbol): RelationTable | undefined {
+  table(pred: PredicateSymbol): RelationTable | undefined {
     for (const t of this.extensions) {
       if (t.pred.equals(pred)) return t;
     }
@@ -482,3 +519,16 @@ function compareBytes(a: Uint8Array, b: Uint8Array): number {
   }
   return a.length - b.length;
 }
+
+// Scope, membership and canonicality are guarantees of the certificate model.
+Object.freeze(StratumPrefix.prototype);
+Object.freeze(StratumPrefix);
+Object.freeze(FiniteDomain.prototype);
+Object.freeze(FiniteDomain);
+Object.freeze(RelationTable.prototype);
+Object.freeze(RelationTable);
+Object.freeze(SupportEdge.prototype);
+Object.freeze(SupportEdge);
+Object.freeze(ClosedModelCert.prototype);
+Object.freeze(ClosedModelCert);
+Object.freeze(SupportRef);

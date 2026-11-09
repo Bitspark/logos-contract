@@ -155,6 +155,15 @@ type Policy struct {
 const Foundation = "logos/dependent-fragment-1/edition-1"
 const Checker = "logos/typed-check-only-v1/go"
 
+// MaxInputDepth bounds the nesting of each supplied expression during preflight.
+const MaxInputDepth uint32 = 128
+
+// MaxDepth bounds the checker's recursive judgments even with a larger caller limit.
+const MaxDepth uint32 = 512
+
+// MaxNatural is the greatest representable universe level or de Bruijn index.
+const MaxNatural = ^uint32(0)
+
 // Limits uses exact uint32 capacities in every binding. Raising depth above the
 // fixed implementation capacities does not remove those capacities.
 type Limits struct {
@@ -167,5 +176,5 @@ type Limits struct {
 }
 
 func DefaultLimits() Limits {
-	return Limits{100000, 128, 4096, 256, 1000000, 512}
+	return Limits{100000, MaxInputDepth, 4096, 256, 1000000, MaxDepth}
 }

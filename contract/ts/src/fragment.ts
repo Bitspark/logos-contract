@@ -229,3 +229,10 @@ function termVars(term: Term, out: Map<string, VarId>): void {
     else if (t.kind === "tuple") work.push(...t.children());
   }
 }
+
+// Graph reachability and sealed-relation membership implement the fixed
+// certificate fragment. The supplying program and theory remain independent.
+Object.freeze(ScopeGraph.prototype);
+Object.freeze(ScopeGraph);
+Object.freeze(SealContext.prototype);
+Object.freeze(SealContext);
