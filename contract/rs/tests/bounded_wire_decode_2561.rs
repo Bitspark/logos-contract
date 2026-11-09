@@ -10,6 +10,41 @@ use logos_contract::{
 
 const VECTOR: &str = include_str!("../../../vectors/cert_encoded_bytes.json");
 
+#[cfg(target_pointer_width = "64")]
+#[test]
+fn invalid_proof_configuration_precedes_wire_inspection() {
+    let certificate = wire("permit_one_certificate");
+    for (field, _) in CheckLimits::default().budgets() {
+        let mut limits = CheckLimits::default();
+        let (_, value) = limits
+            .budgets_mut()
+            .into_iter()
+            .find(|(name, _)| *name == field)
+            .expect("a declared budget");
+        *value = 1usize << 53;
+        for frame in [&[][..], certificate.as_slice()] {
+            let error = decode_derivation_wire_v1_bounded(frame, &limits)
+                .expect_err("an invalid configuration cannot decode a proof");
+            let BoundedWireError::InvalidLimits(invalid) = error else {
+                panic!("invalid {field} was reported as {error}");
+            };
+            assert_eq!(invalid.field, field);
+            assert_eq!(invalid.count, 1u64 << 53);
+        }
+    }
+}
+
+#[test]
+fn portable_certificate_caps_accept_a_real_frame_when_the_host_can_represent_them() {
+    let frame = wire("permit_one_certificate");
+    for count in [u64::from(u32::MAX), 1u64 << 32, (1u64 << 53) - 1] {
+        if let Ok(max_bytes) = usize::try_from(count) {
+            decode_derivation_wire_v1_bounded(&frame, &limits(max_bytes))
+                .expect("a small certificate fits this portable byte allowance");
+        }
+    }
+}
+
 /// A named case's derivation wire.
 fn wire(name: &str) -> Vec<u8> {
     let v: serde_json::Value = serde_json::from_str(VECTOR).expect("the vector parses");

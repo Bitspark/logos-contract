@@ -15,7 +15,7 @@ use super::RejectionCode;
 use crate::cert::{ClosedModelCert, RelationTable};
 use crate::fragment::{ScopeReads, SealContext};
 use crate::literal::{GroundLiteral, Symbol};
-use crate::program::Program;
+use crate::program::CompleteProgram;
 use crate::spi::Theory;
 use ontos_core::Value;
 use std::cell::{OnceCell, RefCell};
@@ -169,7 +169,7 @@ pub(super) fn resolve_lower_seals<'a>(
     own: usize,
     world: &'a [ClosedModelCert],
     status: Option<&[Option<CertStatus>]>,
-    program: &dyn Program,
+    program: &dyn CompleteProgram,
     theory: &dyn Theory,
 ) -> Result<CertView<'a>, (RejectionCode, String)> {
     let mut view = CertView::own(cert);
@@ -261,7 +261,7 @@ pub(super) fn resolve_lower_seals<'a>(
 /// existence is not parity debt.
 pub fn seal_contexts(
     world: &[ClosedModelCert],
-    program: &dyn Program,
+    program: &dyn CompleteProgram,
     theory: &dyn Theory,
 ) -> Result<Vec<SealContext>, (RejectionCode, String)> {
     (0..world.len())

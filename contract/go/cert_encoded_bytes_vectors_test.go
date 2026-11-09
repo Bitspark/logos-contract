@@ -62,7 +62,7 @@ func TestCertEncodedBytesVectors2524(t *testing.T) {
 			t.Fatalf("%s: decode: %v", c.Name, err)
 		}
 		// #2605: the value reading is byte-identical to the one the generator wrote.
-		if rt := hex.EncodeToString(EncodeDerivationWireV1(d)); rt != c.DerivationWire {
+		if rt := hex.EncodeToString(mustWire(EncodeDerivationWireV1(d))); rt != c.DerivationWire {
 			t.Errorf("%s: the derivation wire does not re-encode byte-identically", c.Name)
 		}
 		if len(d.ClosedWorld) == 0 || len(d.ClosedWorld) != len(c.CertBytes) {
@@ -79,4 +79,12 @@ func TestCertEncodedBytesVectors2524(t *testing.T) {
 			}
 		}
 	}
+}
+
+// These fixtures contain portable evidence. An encoding error fails the test at its call site.
+func mustWire[T any](value T, err error) T {
+	if err != nil {
+		panic(err)
+	}
+	return value
 }

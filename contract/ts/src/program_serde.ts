@@ -32,51 +32,34 @@
 // vectored), the sound fix is to RESERVE the byte `0x00` as the body-literal negation
 // tag: it is not a valid predicate name in a serializable program. `programToValue` /
 // `programBytes` therefore THROW (`ProgramSerdeEncodeError`) on any clause whose head or
-// body-literal predicate equals `0x00`. Over the ACCEPTED programs the round-trip law is
-// then total.
+// body-literal predicate uses a reserved tag. Each portable clause ID must also have
+// an exact UTF-8 encoding. An opaque native handle with a lone surrogate raises
+// ClauseIdEncodingError before the encoder can replace it with U+FFFD.
 
-import { UTF8_STRICT } from "./utf8.js";
+import { decodeUtf8 } from "./utf8.js";
+import { portableClauseIdBytes } from "./clause_id_encoding.js";
+export { ClauseIdEncodingError } from "./clause_id_encoding.js";
 import { encode } from "@bitspark/ontos-codec";
 import { Atom, Tuple, atom as valueAtom, tuple as valueTuple, type Value } from "@bitspark/ontos-core";
 
-import { clauseFromValue, clauseValue } from "./account.js";
+import { clauseFromValue, clauseValue, reservedProgramPredicateSymbols } from "./account.js";
 import { Clause, ClauseId, MapProgram } from "./program.js";
 
-/**
- * The version/shape tag atom that heads a serialized program (domain separation —
- * distinct from the §2a quote tags and the §9 clause prefix). Frozen v1;
- * byte-identical across {rs,go,ts}.
- */
-export const PROGRAM_SERDE_VERSION: Uint8Array = new TextEncoder().encode("logos/program/v1");
+/** The exact leading atom of a v1 serialized program, in caller-owned storage. */
+export function programFormatTag(): Uint8Array {
+  return new TextEncoder().encode("logos/program/v1");
+}
 
 /**
- * The single byte the frozen account encoding reserves as the body-literal NEGATION tag
- * (ADR-0007 NEG_TAG). A goal whose predicate symbol equals this byte cannot be serialized
- * unambiguously, so it is NOT a valid predicate name in a serializable program (see the
- * module note). Mirrors Rust's `RESERVED_PREDICATE_SYMBOL` and Go's
- * `ReservedPredicateSymbol`.
- */
-export const RESERVED_PREDICATE_SYMBOL: Uint8Array = new Uint8Array([0x00]);
-
-/**
- * Every predicate symbol the account encoding reserves (#2247): the negation tag and the count
- * tag. A positive literal whose predicate is one of these reads exactly like the tagged literal,
- * so it shares that literal's clause bytes, canonical id and program digest, and decodes as it.
- * With both excluded from the predicate domain the reading is injective, so every ingress that
- * makes a caller's clause identity-bearing or executable refuses them through
- * `reservedPredicateOf`. Mirrors Rust's `RESERVED_PREDICATE_SYMBOLS`.
- */
-export const RESERVED_PREDICATE_SYMBOLS: readonly Uint8Array[] = [new Uint8Array([0x00]), new Uint8Array([0x01])];
-
-/**
- * The first reserved predicate symbol (see `RESERVED_PREDICATE_SYMBOLS`) the clause carries, on
+ * The first reserved predicate symbol (see `reservedProgramPredicateSymbols`) the clause carries, on
  * its head or any body literal, the counted predicate of a count literal included; `undefined`
  * when it carries none. The one check every ingress shares (#2247). Mirrors Rust's
  * `reserved_predicate`.
  */
 export function reservedPredicateOf(clause: Clause): Uint8Array | undefined {
   const preds = [clause.head.pred.bytes(), ...clause.body.map((lit) => lit.pred().bytes())];
-  return preds.find((pred) => RESERVED_PREDICATE_SYMBOLS.some((reserved) => bytesEqual(pred, reserved)));
+  const reservedNames = reservedProgramPredicateSymbols();
+  return preds.find((pred) => reservedNames.some((reserved) => bytesEqual(pred, reserved)));
 }
 
 /** Why a `Value` is not a well-formed serialized program (the decode inverse is partial). */
@@ -99,8 +82,8 @@ export class ProgramSerdeDecodeError extends Error {
 
 /**
  * Thrown by `programToValue` / `programBytes` (the ENCODE direction) when a clause carries
- * a goal (head or body literal) whose predicate symbol equals `RESERVED_PREDICATE_SYMBOL`
- * (the NEG_TAG byte `0x00`), which the frozen account encoding cannot serialize
+ * a goal (head or body literal) whose predicate symbol equals a reserved account tag
+ * (negation or count), which the frozen account encoding cannot serialize
  * unambiguously. Names the offending clause id + predicate (lowercase hex).
  */
 export class ProgramSerdeEncodeError extends Error {
@@ -171,20 +154,19 @@ function checkNoReservedPredicate(id: string, clause: Clause): void {
  * Serialize a `MapProgram` to its canonical ground `Value` (§10).
  *
  * FALLIBLE — throws `ProgramSerdeEncodeError` if any clause carries a goal (head or body
- * literal) whose predicate symbol equals `RESERVED_PREDICATE_SYMBOL` (the NEG_TAG byte
- * `0x00`); such a clause cannot be serialized unambiguously under the frozen account
- * encoding (see the module note). For every ACCEPTED program there is exactly one
+ * literal) whose predicate symbol equals a reserved account tag (negation or count); such a clause cannot be serialized unambiguously under the frozen account
+ * encoding (see the module note). Throws `ClauseIdEncodingError` for an ID with a
+ * lone surrogate. For every ACCEPTED program there is exactly one
  * canonical value. The clause entries are emitted SORTED by clause-id bytes (independent
  * of how the program was built). The canonical BYTES are `encode` of this.
  */
 export function programToValue(program: MapProgram): Value {
-  const enc = new TextEncoder();
   const entries = program.entries().map(([id, clause]) => {
     checkNoReservedPredicate(id, clause);
-    return { id: enc.encode(id), value: clauseValue(clause) };
+    return { id: portableClauseIdBytes(id), value: clauseValue(clause) };
   });
   entries.sort((a, b) => compareBytes(a.id, b.id));
-  const children: Value[] = [valueAtom(PROGRAM_SERDE_VERSION)];
+  const children: Value[] = [valueAtom(programFormatTag())];
   for (const e of entries) {
     children.push(valueTuple([valueAtom(e.id), e.value]));
   }
@@ -193,7 +175,7 @@ export function programToValue(program: MapProgram): Value {
 
 /**
  * The canonical bytes of a program: `ontos-codec-v1(programToValue(p))`. FALLIBLE for the
- * same reserved-predicate reason as `programToValue`.
+ * same reserved-predicate and clause-ID reasons as `programToValue`.
  */
 export function programBytes(program: MapProgram): Uint8Array {
   return encode(programToValue(program));
@@ -203,19 +185,16 @@ export function programBytes(program: MapProgram): Uint8Array {
  * The partial inverse of `programToValue`: rebuild the `MapProgram` a value denotes, or
  * throw a `ProgramSerdeDecodeError` if `value` is not in the image of `programToValue`
  * (§10). The round-trip law is TOTAL OVER ACCEPTED programs: for any `p` that
- * `programToValue` accepts (i.e. carries no reserved predicate symbol),
- * `programFromValue(programToValue(p))` equals `p`. A program with a reserved predicate
- * symbol is rejected at encode time, so it never produces a value to invert.
+ * `programToValue` accepts, `programFromValue(programToValue(p))` equals `p`.
  */
 export function programFromValue(value: Value): MapProgram {
   if (!(value instanceof Tuple)) throw new ProgramSerdeDecodeError({ kind: "not_a_tuple" });
   const items = value.items();
   if (items.length === 0) throw new ProgramSerdeDecodeError({ kind: "bad_version" });
   const version = items[0]!;
-  if (!(version instanceof Atom) || !bytesEqual(version.bytes(), PROGRAM_SERDE_VERSION)) {
+  if (!(version instanceof Atom) || !bytesEqual(version.bytes(), programFormatTag())) {
     throw new ProgramSerdeDecodeError({ kind: "bad_version" });
   }
-  const decoder = UTF8_STRICT;
   const program = new MapProgram();
   for (let i = 1; i < items.length; i += 1) {
     const entry = items[i]!;
@@ -227,7 +206,7 @@ export function programFromValue(value: Value): MapProgram {
     // The id was serialized from a `ClauseId`'s UTF-8 handle bytes; reject a non-UTF-8 id.
     let id: string;
     try {
-      id = decoder.decode(idValue.bytes());
+      id = decodeUtf8(idValue.bytes());
     } catch {
       throw new ProgramSerdeDecodeError({ kind: "bad_entry" });
     }

@@ -40,16 +40,13 @@
 // with the empty slice) — these byte helpers agree with Rust's contains_subslice /
 // slice::starts_with / slice::ends_with and Go's bytes.Contains/HasPrefix/HasSuffix.
 
-import { UTF8_STRICT } from "./utf8.js";
+import { decodeUtf8 } from "./utf8.js";
 import { Atom, type Value } from "@bitspark/ontos-core";
 
 import { Symbol, type GroundLiteral } from "./literal.js";
 import { ComponentIdentity, DecisionCompletion, type Theory, TheoryOutcome } from "./spi.js";
 
 const utf8Encoder = new TextEncoder();
-// `fatal: true` makes decode throw on any byte sequence that is not valid UTF-8 —
-// the non-UTF-8 defensive arm (mirrors Rust's std::str::from_utf8 guard).
-const utf8FatalDecoder = UTF8_STRICT;
 
 /** Lower-case hex of a byte string — a byte-exact, UTF-8-agnostic map/set key. */
 function hexKey(bytes: Uint8Array): string {
@@ -96,7 +93,7 @@ export class TextTheory implements Theory {
     // identical code on every path.
     let name: string;
     try {
-      name = utf8FatalDecoder.decode(atom.pred.bytes());
+      name = decodeUtf8(atom.pred.bytes());
     } catch {
       return TheoryOutcome.Fails("text_unknown_predicate");
     }

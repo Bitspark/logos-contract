@@ -268,9 +268,12 @@ func evidenceAsValue(evidence Evidence) core.Value {
 	return Tagged("none")
 }
 
-func nodeAsValue(n Node) core.Value {
+func nodeAsValue(n Node) (core.Value, error) {
 	switch node := n.(type) {
 	case RuleNode:
+		if err := node.Clause.requirePortable(); err != nil {
+			return nil, err
+		}
 		premises := make([]core.Value, len(node.Premises))
 		for i, p := range node.Premises {
 			premises[i] = premiseAsValue(p)
@@ -281,11 +284,11 @@ func nodeAsValue(n Node) core.Value {
 			SubstAsValue(node.Subst),
 			core.NewTuple(premises...),
 			nodeMetaAsValue(node.Meta),
-		)
+		), nil
 	case BuiltinNode:
-		return Tagged("builtin", GroundLiteralAsValue(node.Conc))
+		return Tagged("builtin", GroundLiteralAsValue(node.Conc)), nil
 	case LeafNode:
-		return Tagged("leaf", GroundLiteralAsValue(node.Conc), evidenceAsValue(node.Evidence))
+		return Tagged("leaf", GroundLiteralAsValue(node.Conc), evidenceAsValue(node.Evidence)), nil
 	default:
 		panic("seam: nodeAsValue: unknown Node implementation")
 	}
@@ -354,10 +357,14 @@ func projectSpecAsValue(p ProjectSpec) core.Value {
 // nodes read via the FIRM account/quote readings of conclusions/substs (§5.2). The
 // node ordering is the derivation's own (a DAG order is identity-bearing); it is NOT
 // sorted.
-func DerivationAsValue(d Derivation) core.Value {
+func DerivationAsValue(d Derivation) (core.Value, error) {
 	nodes := make([]core.Value, len(d.Nodes))
 	for i, n := range d.Nodes {
-		nodes[i] = nodeAsValue(n)
+		value, err := nodeAsValue(n)
+		if err != nil {
+			return nil, err
+		}
+		nodes[i] = value
 	}
 	// closed_world is a TRAILING-OPTIONAL 3rd element (ADR 0007 / ADR 0023): appended ONLY
 	// when non-empty, so an all-positive derivation encodes the EXACT same Tuple[nodes, root]
@@ -366,11 +373,15 @@ func DerivationAsValue(d Derivation) core.Value {
 	if len(d.ClosedWorld) > 0 {
 		certs := make([]core.Value, len(d.ClosedWorld))
 		for i, c := range d.ClosedWorld {
-			certs[i] = ClosedModelCertAsValue(c)
+			value, err := ClosedModelCertAsValue(c)
+			if err != nil {
+				return nil, err
+			}
+			certs[i] = value
 		}
 		fields = append(fields, core.NewTuple(certs...))
 	}
-	return core.NewTuple(fields...)
+	return core.NewTuple(fields...), nil
 }
 
 // ClosedModelCertAsValue reads a ClosedModelCert (ADR 0007 / ADR 0023) as a value — the
@@ -378,23 +389,28 @@ func DerivationAsValue(d Derivation) core.Value {
 // DerivationAsValue's trailing closed_world slot so a certified candidate round-trips across
 // the seam. The ClosureWitness is an empty v1 marker (no bytes); it is reconstructed by
 // default on decode. Mirrors Rust's closed_model_cert_as_value.
-func ClosedModelCertAsValue(cert ClosedModelCert) core.Value {
+func ClosedModelCertAsValue(cert ClosedModelCert) (core.Value, error) {
 	// #2605: the shape is written once, in wire_sink.go, and read here as a value.
-	return buildValue(func(w wireSink) { writeClosedModelCert(w, cert, cert.LimitsDecl) })
+	sink := &portableCertSink{valueSink: newValueSink()}
+	writeClosedModelCert(sink, cert, cert.LimitsDecl)
+	if sink.err != nil {
+		return nil, sink.err
+	}
+	return sink.result(), nil
 }
 
-// CertEncodedBytes is a certificate's size in BYTES (#2524, seat:caa's ruling), the one
-// definition a producer declares and the checker measures: the length of its canonical wire
-// encoding (ClosedModelCertAsValue through the codec) with LimitsDecl.CertBytes set to 0. The
-// encoding CONTAINS the declaration, so declaring your own encoded size would be circular;
-// zeroing the field makes it well defined. Mirrors rs cert_encoded_bytes and ts certEncodedBytes,
-// and a generated vector pins their agreement (vectors/cert_encoded_bytes.json).
+// CertEncodedBytes returns the byte charge a producer declares and the checker measures.
+// It reads the certificate shape with CertBytes zeroed. For a portable certificate this
+// is the exact canonical encoded length. For native-only handles it charges the original
+// Go string bytes. Measuring native evidence never requires a portable identity.
 func CertEncodedBytes(cert ClosedModelCert) uint64 {
 	// #2605: measured through the length reading of the one wire shape, so no value tree and no
 	// encoded buffer is built (the rs twin was 41% of a certified-set run's peak heap, #2602).
 	decl := cert.LimitsDecl
 	decl.CertBytes = 0
-	return measureLen(func(w wireSink) { writeClosedModelCert(w, cert, decl) })
+	sink := &lenSink{}
+	writeClosedModelCert(sink, cert, decl)
+	return sink.total
 }
 
 // ClauseAsValue reads a clause as its frozen account value (ClauseValue). Re-exported
@@ -423,12 +439,22 @@ func PredicateSetValue(preds []Symbol) core.Value {
 const DerivationWireV1Tag = "proof-interchange/derivation/v1"
 
 // DerivationWirePayloadV1ToValue reads a derivation as the public v1 payload.
-func DerivationWirePayloadV1ToValue(d Derivation) core.Value { return DerivationAsValue(d) }
+func DerivationWirePayloadV1ToValue(d Derivation) (core.Value, error) { return DerivationAsValue(d) }
 
 // DerivationWireV1ToValue wraps a derivation payload with the proof-interchange v1 tag.
-func DerivationWireV1ToValue(d Derivation) core.Value {
-	return core.NewTuple(StrAtom(DerivationWireV1Tag), DerivationAsValue(d))
+func DerivationWireV1ToValue(d Derivation) (core.Value, error) {
+	payload, err := DerivationAsValue(d)
+	if err != nil {
+		return nil, err
+	}
+	return core.NewTuple(StrAtom(DerivationWireV1Tag), payload), nil
 }
 
 // EncodeDerivationWireV1 encodes the public proof-interchange v1 wrapper as ontos-codec bytes.
-func EncodeDerivationWireV1(d Derivation) []byte { return codec.Encode(DerivationWireV1ToValue(d)) }
+func EncodeDerivationWireV1(d Derivation) ([]byte, error) {
+	value, err := DerivationWireV1ToValue(d)
+	if err != nil {
+		return nil, err
+	}
+	return codec.Encode(value), nil
+}

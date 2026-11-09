@@ -30,19 +30,24 @@
  * / the validation record for the {rs,ts,go} dependency story).
  */
 
-// Re-export the ontos value model so consumers of logos-contract get one Value.
-export { Atom, Tuple, type Value } from "@bitspark/ontos-core";
-
 export * from "./term.js";
 export * from "./utf8.js";
+export { copyOctets, type OctetSource } from "./octets.js";
 export * from "./literal.js";
 export * from "./program.js";
 export * from "./program_serde.js";
 export * from "./reify.js";
 export * from "./account.js";
-export * from "./cert.js";
+export {
+  zeroHash, hashEquals, hashFromBytes, parseHashHex, StratumPrefix, FiniteDomain, RelationTable, sortDedupByGroundKey,
+  groundKey, SupportRef, SupportEdge, ClosedModelCert,
+  type Hash, type CertId, type NonMemberProof, type CertSizeDecl,
+} from "./cert.js";
 export * from "./answer_set.js";
 export * from "./derivation.js";
+export { cloneDerivation } from "./proof_copy.js";
+export { captureDerivation, captureSubst, type CaptureResult } from "./capture.js";
+export { captureClause, captureGroundLiteral } from "./native_copy.js";
 export * from "./derivation_wire.js";
 export * from "./cert_wire.js";
 export * from "./spi.js";
@@ -52,7 +57,7 @@ export * from "./text.js";
 export * from "./term_theory.js";
 export * from "./list_theory.js";
 export * from "./compound.js";
-export * from "./cert_check.js";
+export { CertContext, checkClosedModelChain, programDigestOf } from "./cert_check.js";
 export * from "./fragment.js";
 export * from "./check.js";
 export * from "./prelude.js";

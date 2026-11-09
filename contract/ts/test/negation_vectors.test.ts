@@ -450,6 +450,31 @@ for (const c of doc.cases) {
   });
 }
 
+test("the memo distinguishes native support clause handles with the same UTF-8 encoding", () => {
+  const row = doc.cases.find((c: any) => c.name === "c3_support_ref_own_nonzero_index_accepts");
+  assert.ok(row);
+  const real = String.fromCharCode(0xd800);
+  const missing = String.fromCharCode(0xfffd);
+  const renamed = new MapProgram();
+  for (const [id, clause] of program.iter()) {
+    renamed.insert(id.asStr() === "denied_rule" ? ClauseId.of(real) : id, clause);
+  }
+  const pin = programDigest(renamed.iter().map(([, clause]) => clause));
+  const context = CertContext.of(pin, PROFILE_PIN, CTX_PIN, THEORY_PIN);
+  const profile = negationProfile(leaves, limitsFromJson(row.limits));
+  const memo = new WorldMemo(renamed, profile, undefined, context);
+  const claim = groundFromJson(row.claim);
+  const proof = (handle: string) => new Derivation(row.derivation.nodes.map(nodeFromJson), row.derivation.root,
+    row.derivation.closed_world.map((c: any) => certFromJson({ ...c,
+      supports: c.supports.map((edge: any) => ({ ...edge, clause: handle })),
+    }, pin)));
+  assert.equal(checkWithWorldMemo(memo, claim, proof(real)).kind, "accept");
+  const changed = proof(missing);
+  const fresh = checkWithCertContext(renamed, claim, changed, undefined, profile, context);
+  assert.equal(fresh.kind === "reject" && fresh.code, "cert_unsupported");
+  assert.deepEqual(checkWithWorldMemo(memo, claim, changed), fresh);
+  assert.equal(memo.certificatesVerified, row.derivation.closed_world.length * 2);
+});
 // ------------------- #2313: the same vectors through checkClosedModelChain -------------------
 //
 // Design 0008 §1.4.3: a certificate chain that no derivation cites is verified by the verification

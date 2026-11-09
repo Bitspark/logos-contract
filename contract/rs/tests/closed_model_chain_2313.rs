@@ -73,7 +73,7 @@ fn subst2(a: (&str, &str), b: (&str, &str)) -> Subst {
     s
 }
 
-fn bound_context(program: &dyn Program) -> CertContext {
+fn bound_context(program: &dyn logos_contract::CompleteProgram) -> CertContext {
     CertContext::new(program_digest(program), [1u8; 32], [2u8; 32], [3u8; 32])
 }
 
@@ -293,4 +293,105 @@ fn a_cert_value_deeper_than_the_cap_is_term_too_deep_before_any_scan() {
     let (code, detail) = reject_code(&out);
     assert_eq!(code, "term_too_deep");
     assert!(detail.contains("certificate domain value"), "{detail}");
+}
+
+struct LookupOnly<'a>(&'a MapProgram);
+
+// test-double: consumer(an application supplies individual clauses by handle)
+impl Program for LookupOnly<'_> {
+    fn clause(&self, id: &ClauseId) -> Option<&Clause> {
+        self.0.clause(id)
+    }
+}
+
+// A content-addressed store owns clauses and computes their stable handles on demand.
+struct ContentAddressed(Vec<Clause>);
+
+// test-double: consumer(content-addressed positive clause lookup)
+impl Program for ContentAddressed {
+    fn clause(&self, id: &ClauseId) -> Option<&Clause> {
+        self.0
+            .iter()
+            .find(|clause| ClauseId::canonical(clause) == *id)
+    }
+
+    fn as_complete(&self) -> Option<&dyn logos_contract::CompleteProgram> {
+        Some(self)
+    }
+}
+
+// test-double: consumer(materialize each handle for the duration of a visit)
+impl logos_contract::CompleteProgram for ContentAddressed {
+    fn for_each_clause(&self, visit: &mut dyn FnMut(&ClauseId, &Clause)) {
+        let ordered: BTreeMap<_, _> = self
+            .0
+            .iter()
+            .map(|clause| (ClauseId::canonical(clause), clause))
+            .collect();
+        for (id, clause) in ordered {
+            visit(&id, clause);
+        }
+    }
+}
+
+#[test]
+fn positive_check_only_uses_the_cited_clause_lookup() {
+    let id = ClauseId::new("published");
+    let program = MapProgram::new().with(id.clone(), Clause::fact(Goal::new("published", [])));
+    let claim = GroundLiteral::new("published", []);
+    let proof = Derivation::new(
+        [Node::Rule {
+            conclusion: claim.clone(),
+            clause: id,
+            subst: Subst::new(),
+            premises: vec![],
+            meta: NodeMeta::none(),
+        }],
+        0,
+    );
+    assert!(matches!(
+        logos_contract::check(&LookupOnly(&program), &claim, &proof, &(), &profile()),
+        Outcome::Accept
+    ));
+}
+
+#[test]
+fn closure_requires_a_complete_inventory_even_when_the_expected_inventory_is_empty() {
+    let empty = MapProgram::new();
+    let lookup = LookupOnly(&empty);
+    let fact = Clause::fact(Goal::new("sealed", [Term::atom(b"a".to_vec())]));
+    let handle = ClauseId::canonical(&fact);
+    let with_fact = ContentAddressed(vec![fact]);
+    assert!(with_fact.clause(&handle).is_some());
+    let mut cert = valid_cert();
+    cert.scope = StratumPrefix::new(0, [sym("sealed")]);
+    cert.domains = vec![FiniteDomain::new(sym("domain"), [v("a")])];
+    cert.extensions = vec![RelationTable::new("sealed", 1, [])];
+    cert.supports.0.clear();
+    cert.edb_snapshot_hashes.clear();
+    let check = |program: &dyn Program, hash: Hash| {
+        let mut cert = cert.clone();
+        cert.program_hash = hash;
+        let context = CertContext::new(
+            hash,
+            cert.profile_hash,
+            cert.ctx_hash,
+            cert.theory_config_hash,
+        );
+        check_closed_model_chain(program, &[cert], &(), &profile(), &context)
+    };
+    let empty_hash = program_digest(&empty);
+    assert!(matches!(check(&empty, empty_hash), Outcome::Accept));
+    assert_eq!(
+        reject_code(&check(&lookup, empty_hash)).0,
+        "cert_scope_incomplete"
+    );
+    assert_eq!(
+        reject_code(&check(&with_fact, empty_hash)).0,
+        "cert_context_mismatch"
+    );
+    assert_eq!(
+        reject_code(&check(&with_fact, program_digest(&with_fact))).0,
+        "cert_not_closed"
+    );
 }

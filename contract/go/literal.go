@@ -18,6 +18,7 @@ package contract
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"unicode/utf8"
 
@@ -92,6 +93,11 @@ func NewGoal(pred string, args ...Term) Goal {
 type GroundLiteral struct {
 	Pred Symbol
 	Args []core.Value
+}
+
+func (g GroundLiteral) detached() GroundLiteral {
+	g.Args = slices.Clone(g.Args)
+	return g
 }
 
 // NewGroundLiteral builds a GroundLiteral from a predicate string and ground values.

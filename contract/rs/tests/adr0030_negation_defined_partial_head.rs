@@ -10,9 +10,9 @@
 
 use logos_contract::{
     check_with_cert_context, edb_table_hash, program_digest, CertContext, CertId, CertSizeDecl,
-    CheckLimits, CheckProfile, Clause, ClauseId, ClosedModelCert, ClosureWitness, Derivation,
-    Evidence, FiniteDomain, Goal, GroundLiteral, Hash, LeafOutcome, LeafVerifier, MapProgram, Node,
-    NodeMeta, NonMemberProof, Outcome, PredicateSet, Premise, Program, RelationTable,
+    CheckLimits, CheckProfile, Clause, ClauseId, ClosedModelCert, ClosureWitness, CompleteProgram,
+    Derivation, Evidence, FiniteDomain, Goal, GroundLiteral, Hash, LeafOutcome, LeafVerifier,
+    MapProgram, Node, NodeMeta, NonMemberProof, Outcome, PredicateSet, Premise, RelationTable,
     StratumPrefix, Subst, SupportEdge, SupportRef, SupportWitness, Symbol, Term, Theory,
     TheoryOutcome,
 };
@@ -106,14 +106,14 @@ fn profile() -> CheckProfile<()> {
     }
 }
 
-fn context(program: &dyn Program) -> CertContext {
+fn context(program: &dyn CompleteProgram) -> CertContext {
     CertContext::new(program_digest(program), [1u8; 32], [2u8; 32], [3u8; 32])
 }
 
 /// The certificate D3 describes for a trip inside the query stratum: `blocked` and `link`
 /// sealed complete, `permit` sealed PARTIAL with the one row derived before the trip and a
 /// support edge citing the same cert (`link` present, `blocked(b)` absent).
-fn cert(program: &dyn Program, seal_blocked: bool) -> ClosedModelCert {
+fn cert(program: &dyn CompleteProgram, seal_blocked: bool) -> ClosedModelCert {
     let cx = context(program);
     let mut subst: Subst = BTreeMap::new();
     subst.insert("X".into(), Term::atom(b"a".to_vec()));

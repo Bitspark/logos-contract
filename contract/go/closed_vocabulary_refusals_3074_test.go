@@ -164,8 +164,7 @@ func TestAnInternalValueOfUnknownKindPanicsByName3074(t *testing.T) {
 		}
 	}
 	// Every known code is placed in a band: the switch names each one, so none panics.
-	// BuiltinNotDecided (#3126) is the last code.
-	for c := EmptyDerivation; c <= BuiltinNotDecided; c++ {
+	for c := EmptyDerivation; c <= InvalidCheckLimits; c++ {
 		if msg, panicked := panicsNaming3074(func() { c.IsStructural() }, ""); panicked {
 			t.Errorf("IsStructural panicked on the known code %s: %s", c.Code(), msg)
 		}

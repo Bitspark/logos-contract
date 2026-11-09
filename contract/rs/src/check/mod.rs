@@ -32,7 +32,9 @@ mod world_memo;
 pub use cert::{
     cert_size_over_budget, closure_join_cost, closure_join_cost_in_world, program_digest,
 };
-use cert::{verify_cert, verify_count_premise, verify_neg_premise, CertPlace, CertStatus};
+use cert::{
+    verify_cert, verify_count_premise, verify_neg_premise, CertPlace, CertStatus, WorldProgram,
+};
 pub use cert_stack::seal_contexts;
 pub use world_memo::WorldMemo;
 
@@ -264,6 +266,8 @@ pub enum RejectionCode {
     BuiltinNotDecided,
     LeafRejected,
     RuleInadmissible,
+    /// The caller's configuration is invalid. No proof has been assessed.
+    InvalidCheckLimits,
 }
 
 impl RejectionCode {
@@ -312,6 +316,7 @@ impl RejectionCode {
             RejectionCode::BuiltinNotDecided => "builtin_not_decided",
             RejectionCode::LeafRejected => "leaf_rejected",
             RejectionCode::RuleInadmissible => "rule_inadmissible",
+            RejectionCode::InvalidCheckLimits => "invalid_check_limits",
         }
     }
 
@@ -328,6 +333,7 @@ impl RejectionCode {
                 | RejectionCode::BuiltinNotDecided
                 | RejectionCode::LeafRejected
                 | RejectionCode::RuleInadmissible
+                | RejectionCode::InvalidCheckLimits
         )
     }
 }
@@ -439,7 +445,64 @@ impl Default for CheckLimits {
     }
 }
 
+/// A native proof budget outside the protocol index domain.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CheckLimitError {
+    /// The offending field in the checker configuration.
+    pub field: &'static str,
+    /// The count supplied by the caller.
+    pub count: u64,
+}
+
+impl std::fmt::Display for CheckLimitError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "check limits: {}={} exceeds {}",
+            self.field,
+            self.count,
+            crate::derivation_wire::INDEX_MAX
+        )
+    }
+}
+
+impl std::error::Error for CheckLimitError {}
+
+/// A proof count in the portable index domain. The protocol domain is
+/// independent of the executing host's word size.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct ProofBudgetCount(u64);
+
+impl ProofBudgetCount {
+    /// Validate a count and identify the caller's field on refusal.
+    pub const fn new(field: &'static str, count: u64) -> Result<Self, CheckLimitError> {
+        if count > crate::derivation_wire::INDEX_MAX {
+            return Err(CheckLimitError { field, count });
+        }
+        Ok(Self(count))
+    }
+
+    /// The exact portable value, including on 32-bit hosts.
+    pub const fn get(self) -> u64 {
+        self.0
+    }
+}
+
+impl From<u32> for ProofBudgetCount {
+    fn from(count: u32) -> Self {
+        Self(u64::from(count))
+    }
+}
+
 impl CheckLimits {
+    /// Validate the caller's counts before reading evidence or consulting an extension.
+    pub fn validate(&self) -> Result<(), CheckLimitError> {
+        for (field, count) in self.budgets() {
+            ProofBudgetCount::new(field, count as u64)?;
+        }
+        Ok(())
+    }
+
     /// Every budget a caller can raise, by its field name, in declaration order (#2733, R3). The
     /// names are the keys a vector case's `limits` object uses. `term_identity` is not a budget and
     /// is not listed. Read from [`budgets_mut`](Self::budgets_mut), the one place the struct is
@@ -475,28 +538,6 @@ impl CheckLimits {
             ("max_rule_groundings", max_rule_groundings),
             ("max_join_steps", max_join_steps),
         ]
-    }
-
-    /// R3's variants at the checker (#2733, `seat:caa`'s ruling on 3b, C2): each budget raised to
-    /// at least `to` alone, then every budget together, labelled by the budget's name (or `every`).
-    /// A budget already at or above `to` is left alone, and a variant equal to `self` is dropped,
-    /// so a raise is never a no-op and never a lowering.
-    pub fn each_budget_raised(&self, to: usize) -> Vec<(&'static str, CheckLimits)> {
-        let mut out = Vec::new();
-        let mut every = *self;
-        for (i, (name, value)) in self.budgets().into_iter().enumerate() {
-            if value >= to {
-                continue;
-            }
-            let mut one = *self;
-            *one.budgets_mut()[i].1 = to;
-            *every.budgets_mut()[i].1 = to;
-            out.push((name, one));
-        }
-        if out.len() > 1 {
-            out.push(("every", every));
-        }
-        out
     }
 }
 
@@ -815,6 +856,9 @@ pub fn check_closed_model_chain<C>(
     profile: &CheckProfile<C>,
     cert_context: &CertContext,
 ) -> Outcome {
+    if let Err(error) = profile.limits.validate() {
+        return Outcome::reject(RejectionCode::InvalidCheckLimits, error.to_string());
+    }
     if certs.is_empty() {
         return Outcome::reject(
             RejectionCode::CertOutOfRange,
@@ -842,6 +886,7 @@ pub fn check_closed_model_chain<C>(
     // exactly as a derivation's closed world is, so a cert that reads a lower cert's seal does so
     // only once that cert's status is final. The first invalid cert in that order rejects.
     let mut status: Vec<Option<CertStatus>> = vec![None; certs.len()];
+    let source = WorldProgram::new(program);
     for own in cert_stack::verification_order(certs) {
         let place = CertPlace {
             own,
@@ -852,7 +897,7 @@ pub fn check_closed_model_chain<C>(
             place,
             certs,
             &status,
-            program,
+            &source,
             profile,
             ctx,
             cert_context,
@@ -923,6 +968,12 @@ fn derivation_prechecks<C>(
     deriv: &Derivation,
     profile: &CheckProfile<C>,
 ) -> Option<Outcome> {
+    if let Err(error) = profile.limits.validate() {
+        return Some(Outcome::reject(
+            RejectionCode::InvalidCheckLimits,
+            error.to_string(),
+        ));
+    }
     // 1. non-empty.
     if deriv.nodes.is_empty() {
         return Some(Outcome::reject(
@@ -995,6 +1046,7 @@ fn verify_world<C>(
     //     status is final (validity precedes citation).
     let context_unbound = !world.is_empty() && cert_context.is_unbound();
     let mut status: Vec<Option<CertStatus>> = vec![None; world.len()];
+    let source = WorldProgram::new(program);
     for own in cert_stack::verification_order(world) {
         let verdict = if context_unbound {
             CertStatus::Invalid(
@@ -1011,7 +1063,7 @@ fn verify_world<C>(
                 place,
                 world,
                 &status,
-                program,
+                &source,
                 profile,
                 ctx,
                 cert_context,

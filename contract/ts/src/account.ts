@@ -16,7 +16,7 @@
 // arche-core's browser checker already bundles), so canonicalClauseId is sync and
 // runs in the browser — matching the rs/go bindings (and keeping check() sync).
 
-import { UTF8_LOSSY } from "./utf8.js";
+import { decodeUtf8Lossy } from "./utf8.js";
 import { encode } from "@bitspark/ontos-codec";
 import { type Value } from "@bitspark/ontos-core";
 import { encodeInt, readInt } from "@bitspark/ontos-data";
@@ -39,14 +39,18 @@ import { quote, reify } from "./reify.js";
  * Domain separator for a canonical clause hash (so a clause id can never collide
  * with another hash over the same bytes).
  */
-export const CLAUSE_PREFIX: Uint8Array = new TextEncoder().encode("logos/account/clause/v1\n");
+export function clauseHashPrefix(): Uint8Array {
+  return new TextEncoder().encode("logos/account/clause/v1\n");
+}
 
 /**
  * Domain separator for the canonical whole-program digest (ADR 0007 §3.1). Distinct
- * from `CLAUSE_PREFIX` so a program digest can never collide with a single-clause hash
+ * from `clauseHashPrefix()` so a program digest can never collide with a single-clause hash
  * over the same bytes. Mirrors Rust's `PROGRAM_PREFIX`.
  */
-export const PROGRAM_PREFIX: Uint8Array = new TextEncoder().encode("logos/account/program/v1\n");
+export function programHashPrefix(): Uint8Array {
+  return new TextEncoder().encode("logos/account/program/v1\n");
+}
 
 /**
  * Tag byte sealing the negated body-literal reading (ADR 0007). A `Neg(g)` reads as
@@ -70,6 +74,11 @@ const NEG_TAG = 0x00;
  * Mirrors Rust's `COUNT_TAG`.
  */
 const COUNT_TAG = 0x01;
+
+/** The predicate bytes reserved by the negation and count literal encodings, in wire order. */
+export function reservedProgramPredicateSymbols(): readonly Uint8Array[] {
+  return [Uint8Array.of(NEG_TAG), Uint8Array.of(COUNT_TAG)];
+}
 
 /** The canonical ontos-data int embedding of a small non-negative count as a Term. */
 function intTerm(n: number): Term {
@@ -127,7 +136,7 @@ function projectAsTerm(p: ProjectSpec): Term {
 /** Inverse of `projectAsTerm`. */
 function projectFromTerm(t: Term): ProjectSpec | undefined {
   if (t.kind === "atom") {
-    return decoder.decode(t.bytes()) === "rows" ? { kind: "rows" } : undefined;
+    return decodeUtf8Lossy(t.bytes()) === "rows" ? { kind: "rows" } : undefined;
   }
   if (t.kind !== "tuple") return undefined;
   const children = t.children();
@@ -136,7 +145,7 @@ function projectFromTerm(t: Term): ProjectSpec | undefined {
   if (tag.kind !== "atom") return undefined;
   const attr = intTermToU32(children[1]!);
   if (attr === undefined) return undefined;
-  switch (decoder.decode(tag.bytes())) {
+  switch (decodeUtf8Lossy(tag.bytes())) {
     case "distinct":
       return { kind: "distinct", attr };
     case "sum":
@@ -209,9 +218,6 @@ function countLitFromTerm(children: readonly Term[]): CountLit | undefined {
   if (project === undefined) return undefined;
   return new CountLit(pred, filter, project, children[4]!);
 }
-
-/** A shared decoder for the small ASCII tags in the count reading. */
-const decoder = UTF8_LOSSY;
 
 /**
  * The labeled-compound reading of a goal `p(a…)` as a `Term`: `Tuple[Atom(p), a…]`
@@ -352,7 +358,7 @@ export function clauseBytes(clause: Clause): Uint8Array {
 
 /**
  * The canonical `ClauseId` of a clause — lowercase-hex
- * `SHA-256(CLAUSE_PREFIX ‖ ontos-codec(quote(clause)))` (§9, syntactic).
+ * `SHA-256(clauseHashPrefix() ‖ ontos-codec(quote(clause)))` (§9, syntactic).
  *
  * Stable and cross-language: any binding that follows this encoding computes the
  * same id for the same clause. The id satisfies the v1 `ClauseId` contract (stable +
@@ -361,15 +367,16 @@ export function clauseBytes(clause: Clause): Uint8Array {
  */
 export function canonicalClauseId(clause: Clause): ClauseId {
   const body = clauseBytes(clause);
-  const input = new Uint8Array(CLAUSE_PREFIX.length + body.length);
-  input.set(CLAUSE_PREFIX, 0);
-  input.set(body, CLAUSE_PREFIX.length);
+  const prefix = clauseHashPrefix();
+  const input = new Uint8Array(prefix.length + body.length);
+  input.set(prefix, 0);
+  input.set(body, prefix.length);
   return ClauseId.of(toHex(sha256(input)));
 }
 
 /**
  * The canonical whole-program digest (ADR 0007 §3.1): the 32-byte
- * `SHA-256(PROGRAM_PREFIX ‖ ⨁ len-prefixed SORTED clauseBytes)` over the program's
+ * `SHA-256(programHashPrefix() ‖ ⨁ len-prefixed SORTED clauseBytes)` over the program's
  * COMPLETE clause set. The per-clause frozen account bytes are SORTED (lexicographic
  * byte order — the same total order Rust's `Vec<Vec<u8>>::sort` uses), so the digest is
  * independent of clause enumeration order and commits to the WHOLE clause set: a dropped
@@ -383,13 +390,14 @@ export function canonicalClauseId(clause: Clause): ClauseId {
  */
 export function programDigest(clauses: readonly Clause[]): Uint8Array {
   const byteVecs = clauses.map(clauseBytes);
+  const prefix = programHashPrefix();
   byteVecs.sort(compareBytes);
-  let total = PROGRAM_PREFIX.length;
+  let total = prefix.length;
   for (const b of byteVecs) total += 8 + b.length;
   const input = new Uint8Array(total);
   let off = 0;
-  input.set(PROGRAM_PREFIX, off);
-  off += PROGRAM_PREFIX.length;
+  input.set(prefix, off);
+  off += prefix.length;
   const view = new DataView(input.buffer);
   for (const b of byteVecs) {
     // Length-prefix each clause's bytes with an 8-byte big-endian u64.

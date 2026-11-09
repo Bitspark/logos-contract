@@ -34,12 +34,12 @@
 // byte 0x00 as the body-literal negation tag: it is not a valid predicate name in a
 // serializable program. ProgramToValue / ProgramBytes therefore REJECT (with
 // ErrProgramReservedPredicate) any clause whose head or body-literal predicate equals
-// 0x00. Over the ACCEPTED programs the round-trip law is then total.
+// a reserved tag. A portable entry also requires a UTF-8 clause ID. Encoding a
+// native handle outside that domain returns a ClauseIdEncodingError.
 package contract
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"sort"
 	"unicode/utf8"
@@ -48,27 +48,14 @@ import (
 	core "github.com/bitspark/ontos/core/go"
 )
 
-// ProgramSerdeVersion is the version/shape tag atom that heads a serialized program
-// (domain separation — distinct from the §2a Quote tags and the §9 clause prefix).
-// Frozen v1; byte-identical across {rs,go,ts}.
-var ProgramSerdeVersion = []byte("logos/program/v1")
+// ProgramFormatTag returns the exact leading atom of a v1 serialized program.
+func ProgramFormatTag() []byte { return []byte("logos/program/v1") }
 
-// ReservedPredicateSymbol is the single byte the frozen account encoding reserves as
-// the body-literal NEGATION tag (ADR-0007 negTag). A goal whose predicate symbol equals
-// this byte cannot be serialized unambiguously, so it is NOT a valid predicate name in a
-// serializable program (see ErrProgramReservedPredicate / the package note). Mirrors
-// account.go's negTag and Rust's RESERVED_PREDICATE_SYMBOL.
-var ReservedPredicateSymbol = []byte{negTag}
+// ReservedProgramPredicateSymbols returns the predicate bytes reserved by the
+// negation and count literal encodings, in wire order. The caller owns both slices.
+func ReservedProgramPredicateSymbols() [][]byte { return [][]byte{{negTag}, {countTag}} }
 
-// ReservedPredicateSymbols is every predicate symbol the account encoding reserves (#2247): the
-// negation tag and the count tag. A positive literal whose predicate is one of these reads exactly
-// like the tagged literal, so it shares that literal's clause bytes, canonical id and program
-// digest, and decodes as it. With both excluded from the predicate domain the reading is
-// injective, so every ingress that makes a caller's clause identity-bearing or executable refuses
-// them through ReservedPredicateOf. Mirrors Rust's RESERVED_PREDICATE_SYMBOLS.
-var ReservedPredicateSymbols = [][]byte{{negTag}, {countTag}}
-
-// ReservedPredicateOf returns the first reserved predicate symbol (see ReservedPredicateSymbols)
+// ReservedPredicateOf returns the first reserved predicate symbol (see ReservedProgramPredicateSymbols)
 // the clause carries, on its head or any body literal, the counted predicate of a count literal
 // included, and whether there is one. The one check every ingress shares (#2247). Mirrors Rust's
 // reserved_predicate.
@@ -77,8 +64,9 @@ func ReservedPredicateOf(clause Clause) ([]byte, bool) {
 	for _, lit := range clause.Body {
 		preds = append(preds, lit.Pred().Bytes())
 	}
+	reservedNames := ReservedProgramPredicateSymbols()
 	for _, pred := range preds {
-		for _, reserved := range ReservedPredicateSymbols {
+		for _, reserved := range reservedNames {
 			if bytes.Equal(pred, reserved) {
 				return pred, true
 			}
@@ -87,25 +75,23 @@ func ReservedPredicateOf(clause Clause) ([]byte, bool) {
 	return nil, false
 }
 
-// ErrProgramSerde* classify why a Value is not a well-formed serialized program (the
-// inverse, ProgramFromValue, is partial). Mirrors Rust's ProgramSerdeError variants.
-var (
+type programFormatError string
+
+func (e programFormatError) Error() string { return string(e) }
+
+// These constants classify program codec failures and support errors.Is through wrapping.
+const (
 	// ErrProgramNotATuple: the top-level value was not a Tuple.
-	ErrProgramNotATuple = errors.New("program value is not a Tuple")
-	// ErrProgramBadVersion: the leading child was not Atom(ProgramSerdeVersion).
-	ErrProgramBadVersion = errors.New("program value has a bad/missing version tag")
+	ErrProgramNotATuple programFormatError = "program value is not a Tuple"
+	// ErrProgramBadVersion: the leading child was not Atom(ProgramFormatTag()).
+	ErrProgramBadVersion programFormatError = "program value has a bad/missing version tag"
 	// ErrProgramBadEntry: an entry was not Tuple[Atom(id), clause].
-	ErrProgramBadEntry = errors.New("program entry is not a Tuple[Atom(id), clause]")
+	ErrProgramBadEntry programFormatError = "program entry is not a Tuple[Atom(id), clause]"
 	// ErrProgramBadClause: an entry's clause value was not in the image of ClauseValue.
-	ErrProgramBadClause = errors.New("program entry's clause value is malformed")
-	// ErrProgramReservedPredicate: a clause carried a goal (head or body literal) whose
-	// predicate symbol equals ReservedPredicateSymbol (the negTag byte 0x00), which the
-	// frozen account encoding cannot serialize unambiguously. Returned only by
-	// ProgramToValue / ProgramBytes (the ENCODE direction). The concrete error from
-	// ProgramToValue wraps this (errors.Is matches) and names the offending clause id +
-	// predicate. The byte 0x00 is reserved as the body-literal negation tag and is
-	// therefore not a valid predicate name in a serializable program.
-	ErrProgramReservedPredicate = errors.New("clause carries a reserved predicate symbol (an account tag byte, 0x00 negation or 0x01 count, is not a valid predicate name)")
+	ErrProgramBadClause programFormatError = "program entry's clause value is malformed"
+	// ErrProgramReservedPredicate identifies either wire-reserved predicate.
+	// ProgramToValue and ProgramBytes wrap it with the clause ID and predicate bytes.
+	ErrProgramReservedPredicate programFormatError = "clause carries a reserved predicate symbol (an account tag byte, 0x00 negation or 0x01 count, is not a valid predicate name)"
 )
 
 // checkNoReservedPredicate rejects a clause that carries the reserved predicate symbol
@@ -119,12 +105,29 @@ func checkNoReservedPredicate(id string, clause Clause) error {
 	return nil
 }
 
+// ClauseIdEncodingError reports an opaque native handle without a valid UTF-8
+// encoding in a portable program or proof. Native clause lookup still accepts it.
+type ClauseIdEncodingError struct {
+	ClauseID ClauseId
+}
+
+func (e *ClauseIdEncodingError) Error() string {
+	return fmt.Sprintf("clause ID %q cannot be encoded as UTF-8", e.ClauseID.String())
+}
+
+func (id ClauseId) requirePortable() error {
+	if !utf8.ValidString(id.handle) {
+		return &ClauseIdEncodingError{ClauseID: id}
+	}
+	return nil
+}
+
 // ProgramToValue serializes a MapProgram to its canonical ground ontos Value (§10).
 //
 // FALLIBLE — returns an error wrapping ErrProgramReservedPredicate if any clause carries
-// a goal (head or body literal) whose predicate symbol equals ReservedPredicateSymbol
-// (the negTag byte 0x00); such a clause cannot be serialized unambiguously under the
-// frozen account encoding (see the package note). For every ACCEPTED program there is
+// a goal (head or body literal) whose predicate symbol equals a reserved account tag; such a clause cannot be serialized unambiguously under the
+// frozen account encoding (see the package note). Invalid UTF-8 clause IDs return a
+// *ClauseIdEncodingError. For every ACCEPTED program there is
 // exactly one canonical value. The clause entries are emitted SORTED by clause-id bytes
 // (independent of how the program was built). The canonical BYTES are codec.Encode of
 // this.
@@ -138,6 +141,9 @@ func ProgramToValue(program *MapProgram) (core.Value, error) {
 		if err := checkNoReservedPredicate(id.handle, clause); err != nil {
 			return nil, err
 		}
+		if err := id.requirePortable(); err != nil {
+			return nil, err
+		}
 		entries = append(entries, entry{id: id.handle, val: ClauseValue(clause)})
 	}
 	// Canonical order: sort ascending by clause-id bytes (the same total order Rust's
@@ -146,7 +152,7 @@ func ProgramToValue(program *MapProgram) (core.Value, error) {
 		return bytes.Compare([]byte(entries[i].id), []byte(entries[j].id)) < 0
 	})
 	children := make([]core.Value, 0, len(entries)+1)
-	children = append(children, core.NewAtom(ProgramSerdeVersion))
+	children = append(children, core.NewAtom(ProgramFormatTag()))
 	for _, e := range entries {
 		children = append(children, core.NewTuple(core.NewAtom([]byte(e.id)), e.val))
 	}
@@ -155,7 +161,7 @@ func ProgramToValue(program *MapProgram) (core.Value, error) {
 
 // ProgramBytes is the canonical bytes of a program: ontos-codec-v1(ProgramToValue(p)).
 // The single cross-language byte-pin (vectors/program_serde.json). FALLIBLE for the same
-// reserved-predicate reason as ProgramToValue.
+// reserved-predicate and clause-ID reasons as ProgramToValue.
 func ProgramBytes(program *MapProgram) ([]byte, error) {
 	value, err := ProgramToValue(program)
 	if err != nil {
@@ -166,10 +172,8 @@ func ProgramBytes(program *MapProgram) ([]byte, error) {
 
 // ProgramFromValue is the partial inverse of ProgramToValue: rebuild the MapProgram a
 // value denotes, or an error if value is not in the image of ProgramToValue (§10). The
-// round-trip law is TOTAL OVER ACCEPTED programs: for any p that ProgramToValue accepts
-// (i.e. carries no reserved predicate symbol), ProgramFromValue(ProgramToValue(p)) equals
-// p. A program with a reserved predicate symbol is rejected at encode time, so it never
-// produces a value to invert.
+// round-trip law is total over accepted programs. For every p that ProgramToValue
+// accepts, ProgramFromValue(ProgramToValue(p)) equals p.
 func ProgramFromValue(value core.Value) (*MapProgram, error) {
 	tup, ok := value.(core.Tuple)
 	if !ok {
@@ -180,7 +184,7 @@ func ProgramFromValue(value core.Value) (*MapProgram, error) {
 		return nil, ErrProgramBadVersion
 	}
 	versionAtom, ok := items[0].(core.Atom)
-	if !ok || !bytes.Equal(versionAtom.Bytes(), ProgramSerdeVersion) {
+	if !ok || !bytes.Equal(versionAtom.Bytes(), ProgramFormatTag()) {
 		return nil, ErrProgramBadVersion
 	}
 	program := NewMapProgram()

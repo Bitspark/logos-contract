@@ -5,6 +5,7 @@
 // `derivation_wire.ts` re-exports both, so their public names do not move.
 
 import { atom as valueAtom, toHex as coreToHex, type Value } from "@bitspark/ontos-core";
+import { hashFromBytes, type OctetSource } from "./octets.js";
 import { encodeInt } from "@bitspark/ontos-data";
 
 const enc = new TextEncoder();
@@ -27,6 +28,6 @@ export function intAtom(n: number): Value {
  * of every 32-byte digest in the seam. A digest is an opaque identifier, so it is a
  * bare hex `Atom`, not a scalar embedding.
  */
-export function digestAtom(d: Uint8Array): Value {
-  return valueAtom(enc.encode(coreToHex(d)));
+export function digestAtom(d: OctetSource): Value {
+  return valueAtom(enc.encode(coreToHex(hashFromBytes(d))));
 }

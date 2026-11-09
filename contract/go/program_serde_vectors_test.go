@@ -344,13 +344,13 @@ func TestProgramFromValueRejectsMalformed(t *testing.T) {
 		t.Error("expected error for bad version tag")
 	}
 	// A non-tuple entry.
-	bad := core.NewTuple(core.NewAtom(ProgramSerdeVersion), core.NewAtom([]byte("bad")))
+	bad := core.NewTuple(core.NewAtom(ProgramFormatTag()), core.NewAtom([]byte("bad")))
 	if _, err := ProgramFromValue(bad); err == nil {
 		t.Error("expected error for a non-tuple entry")
 	}
 	// An entry whose clause value is not a quoted clause term.
 	badClause := core.NewTuple(
-		core.NewAtom(ProgramSerdeVersion),
+		core.NewAtom(ProgramFormatTag()),
 		core.NewTuple(core.NewAtom([]byte("id")), core.NewAtom([]byte("not-a-clause"))),
 	)
 	if _, err := ProgramFromValue(badClause); err == nil {
@@ -359,7 +359,7 @@ func TestProgramFromValueRejectsMalformed(t *testing.T) {
 	// A duplicate clause id (two entries share an id).
 	one := ClauseValue(Fact(NewGoal("p")))
 	dup := core.NewTuple(
-		core.NewAtom(ProgramSerdeVersion),
+		core.NewAtom(ProgramFormatTag()),
 		core.NewTuple(core.NewAtom([]byte("same")), one),
 		core.NewTuple(core.NewAtom([]byte("same")), one),
 	)

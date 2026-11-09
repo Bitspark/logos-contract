@@ -36,6 +36,43 @@ import (
 // the scheme — it only compares pins for equality). Mirrors Rust's Hash = [u8; 32].
 type Hash = [32]byte
 
+// HashFromBytes copies exactly 32 supplied octets into an independent hash.
+func HashFromBytes(b []byte) (Hash, bool) {
+	if len(b) != len(Hash{}) {
+		return Hash{}, false
+	}
+	return Hash(b), true
+}
+
+// ParseHashHex reads exactly 64 lowercase ASCII hex digits. An invalid
+// spelling returns no hash. The zero hash is a valid successful result.
+func ParseHashHex(text string) (Hash, bool) {
+	var hash Hash
+	if len(text) != 2*len(hash) {
+		return Hash{}, false
+	}
+	for i := range hash {
+		hi, highOK := hexNibble(text[2*i])
+		lo, lowOK := hexNibble(text[2*i+1])
+		if !highOK || !lowOK {
+			return Hash{}, false
+		}
+		hash[i] = hi<<4 | lo
+	}
+	return hash, true
+}
+
+func hexNibble(c byte) (byte, bool) {
+	switch {
+	case c >= '0' && c <= '9':
+		return c - '0', true
+	case c >= 'a' && c <= 'f':
+		return c - 'a' + 10, true
+	default:
+		return 0, false
+	}
+}
+
 // IndexOffset turns a protocol index into a host offset into a collection of length n, and is the
 // ONLY place one becomes the other (#2735): ok only when i < n. A protocol index is an integer in
 // 0..=IndexMax, held as uint64 on every platform; an index past the collection is never an offset,

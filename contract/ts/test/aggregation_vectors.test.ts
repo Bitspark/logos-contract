@@ -71,12 +71,11 @@ import {
   type CheckProfile,
   defaultLimits,
   CHECK_BUDGETS,
-  eachBudgetRaised,
   type CheckLimits,
   WorldMemo,
 } from "../src/index.js";
 import { assertLengthReading2605 } from "./support/cert_len_2605.js";
-import { r3Domain, r3Raised } from "./support/r3_domain.js";
+import { eachBudgetRaised, r3Domain, r3Raised } from "./support/r3_domain.js";
 
 // ------------------------------- locate the oracle -------------------------------
 
@@ -406,4 +405,11 @@ for (const c of doc.cases) {
 
 test("#2569 control: some aggregation case reaches the memo's verification", () => {
   assert.ok(memoizedWorlds > 0, "no case filled the memo: the miss-then-hit check is vacuous");
+});
+
+test("raising each budget preserves the other native limits and term identity", () => {
+  const base: CheckLimits = { ...defaultLimits(), maxNodes: 1, maxDepth: 2, termIdentity: "exact" };
+  const expected = eachBudgetRaised(base, 3);
+  assert.deepEqual(expected.map(row => row.name), ["max_nodes", "max_depth", "every"]);
+  assert.deepEqual(eachBudgetRaised(Object.create(base), 3), expected);
 });

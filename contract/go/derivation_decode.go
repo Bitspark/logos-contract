@@ -616,35 +616,15 @@ func DerivationFromValue(v core.Value) (Derivation, error) {
 
 // readHash reads a digest atom (64 lowercase-hex chars) into a Hash, the inverse of DigestAtom.
 func readHash(v core.Value, ctx string) (Hash, error) {
-	var h Hash
 	hex, err := decAtomBytes(v, ctx)
 	if err != nil {
-		return h, err
+		return Hash{}, err
 	}
-	if len(hex) != 64 {
-		return h, &DecodeError{Kind: DecodeShape, Ctx: ctx}
+	hash, ok := ParseHashHex(string(hex))
+	if !ok {
+		return Hash{}, &DecodeError{Kind: DecodeShape, Ctx: ctx}
 	}
-	for i := 0; i < 32; i++ {
-		hi, ok1 := hexNibble(hex[2*i])
-		lo, ok2 := hexNibble(hex[2*i+1])
-		if !ok1 || !ok2 {
-			return h, &DecodeError{Kind: DecodeShape, Ctx: ctx}
-		}
-		h[i] = hi<<4 | lo
-	}
-	return h, nil
-}
-
-// hexNibble maps one lowercase-hex digit 0-9a-f to its nibble.
-func hexNibble(c byte) (byte, bool) {
-	switch {
-	case c >= '0' && c <= '9':
-		return c - '0', true
-	case c >= 'a' && c <= 'f':
-		return c - 'a' + 10, true
-	default:
-		return 0, false
-	}
+	return hash, nil
 }
 
 func symbolFromValue(v core.Value, ctx string) (Symbol, error) {

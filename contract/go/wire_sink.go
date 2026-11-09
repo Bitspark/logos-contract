@@ -56,8 +56,16 @@ type valueSink struct {
 
 // buildValue returns the value emit walks.
 func buildValue(emit func(s wireSink)) core.Value {
-	s := &valueSink{frames: [][]core.Value{make([]core.Value, 0, 1)}}
+	s := newValueSink()
 	emit(s)
+	return s.result()
+}
+
+func newValueSink() *valueSink {
+	return &valueSink{frames: [][]core.Value{make([]core.Value, 0, 1)}}
+}
+
+func (s *valueSink) result() core.Value {
 	if len(s.frames) != 1 || len(s.frames[0]) != 1 {
 		panic("contract: wire walk left an open tuple or emitted other than one value")
 	}
@@ -84,8 +92,32 @@ func (s *valueSink) quotedValue(v core.Value) { s.push(Quote(FromValue(v))) }
 func (s *valueSink) quotedTerm(t Term)        { s.push(Quote(t)) }
 func (s *valueSink) int(n uint64)             { s.push(U64Atom(n)) }
 
+// A certificate contains native clause handles. Its consumers choose the portable
+// identity reading or the native resource reading at that field.
+type certificateSink interface {
+	wireSink
+	clauseID(ClauseId)
+}
+
+type portableCertSink struct {
+	*valueSink
+	err error
+}
+
+func (s *portableCertSink) clauseID(id ClauseId) {
+	if s.err != nil {
+		return
+	}
+	if s.err = id.requirePortable(); s.err == nil {
+		s.atomStr(id.String())
+	}
+}
+
 // lenSink is the length reading: the canonical encoding's byte count, with no tree and no buffer.
 type lenSink struct{ total uint64 }
+
+// Native Go handles own their original bytes even outside the portable UTF-8 domain.
+func (s *lenSink) clauseID(id ClauseId) { s.atomStr(id.String()) }
 
 // measureLen returns the encoded length of the value emit walks.
 func measureLen(emit func(s wireSink)) uint64 {
@@ -268,7 +300,7 @@ func writeSubst(s wireSink, subst Subst) {
 // writeClosedModelCert is a closed-model certificate with decl in its size-declaration slot. The
 // trailing-optional elements follow ADR 0029 D10 (the 11th, a slice-seal pin) and ADR 0030 D4 (the
 // 12th, a partial scope; with no pin the 11th is Tuple[Atom("none")]).
-func writeClosedModelCert(s wireSink, cert ClosedModelCert, decl CertSizeDecl) {
+func writeClosedModelCert(s certificateSink, cert ClosedModelCert, decl CertSizeDecl) {
 	trailing := 0
 	switch {
 	case cert.PartialScope != nil:
@@ -351,10 +383,10 @@ func writeRelationTable(s wireSink, table RelationTable) {
 	})
 }
 
-func writeSupportEdge(s wireSink, edge SupportEdge) {
+func writeSupportEdge(s certificateSink, edge SupportEdge) {
 	wireTuple(s, 5, func() {
 		writeGroundLiteral(s, edge.Fact)
-		s.atomStr(edge.Clause.String())
+		s.clauseID(edge.Clause)
 		writeSubst(s, edge.Subst)
 		wireTuple(s, len(edge.BodyRefs), func() {
 			for _, r := range edge.BodyRefs {

@@ -18,14 +18,16 @@
 //! [`cert_bytes_slack`]. So a span over `max_cert_bytes + slack` means a measure over
 //! `max_cert_bytes`, which the checker refuses whatever the certificate declares.
 
-use crate::check::CheckLimits;
-use crate::derivation_wire::{derivation_wire_v1_from_value, u64_atom, DecodeError};
+use crate::check::{CheckLimitError, CheckLimits, ProofBudgetCount};
+use crate::derivation_wire::{derivation_wire_v1_from_value, u64_atom, DecodeError, INDEX_MAX};
 use crate::Derivation;
 
-/// Why a frame could not be walked. Every variant refuses the frame; none is a verdict about a
-/// certificate.
+/// Why a requested walk could not proceed: invalid configuration or unreadable frame.
+/// No variant is a verdict about a certificate.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CertWireError {
+    /// A selector index is outside the portable index domain.
+    InvalidPath,
     /// The frame ends inside a value.
     Truncated,
     /// A tag byte that is neither an atom (`0x00`) nor a tuple (`0x01`).
@@ -44,6 +46,7 @@ impl CertWireError {
     /// The stable name every core reports, pinned by the shared vector.
     pub fn name(self) -> &'static str {
         match self {
+            CertWireError::InvalidPath => "invalid_path",
             CertWireError::Truncated => "truncated",
             CertWireError::UnknownTag => "unknown_tag",
             CertWireError::NonCanonicalUvarint => "non_canonical_uvarint",
@@ -53,6 +56,14 @@ impl CertWireError {
         }
     }
 }
+
+impl std::fmt::Display for CertWireError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.name())
+    }
+}
+
+impl std::error::Error for CertWireError {}
 
 const TAG_ATOM: u8 = 0x00;
 const TAG_TUPLE: u8 = 0x01;
@@ -140,6 +151,7 @@ impl Cursor<'_> {
 /// value, each step an index into the tuple at that point. A step at or past a tuple's arity means
 /// the slot is ABSENT (an optional trailing element, an option's `none`): there are no
 /// certificates, and the result is empty.
+/// Every index must be in 0..=INDEX_MAX; malformed configuration is refused before reading the frame.
 ///
 /// The WHOLE frame is walked, not only the path (`seat:caa`'s fail-closed condition): every sibling
 /// after the target and the rest of an absent slot's tuple are skipped too, and bytes after the one
@@ -147,7 +159,7 @@ impl Cursor<'_> {
 /// host that refuses every `Err` never hands the decoder a frame its bound has not covered.
 ///
 /// The index-only case of [`cert_wire_spans_at`], which it runs.
-pub fn cert_wire_spans(frame: &[u8], path: &[usize]) -> Result<Vec<usize>, CertWireError> {
+pub fn cert_wire_spans(frame: &[u8], path: &[u64]) -> Result<Vec<usize>, CertWireError> {
     let steps: Vec<PathStep> = path.iter().map(|&i| PathStep::Index(i)).collect();
     Ok(cert_wire_spans_at(frame, &steps)?
         .into_iter()
@@ -163,17 +175,17 @@ pub fn cert_wire_spans(frame: &[u8], path: &[usize]) -> Result<Vec<usize>, CertW
 pub enum PathStep {
     /// The element at this index. One at or past the tuple's arity is an ABSENT slot (an optional
     /// trailing element, an option's `none`), with no certificates.
-    Index(usize),
+    Index(u64),
     /// Every element, each followed by the rest of the path.
     Each,
 }
 
 impl PathStep {
-    /// An index step's index, and `None` for every other kind of step (go's `Index`, which reads
-    /// `0` for `PathEach`, has no such `None`). The enum is `#[non_exhaustive]`, so a crate outside
+    /// An index step's coordinate, and None for every other kind of step. Go's Index
+    /// reports the same distinction with a boolean. The enum is non-exhaustive, so a crate outside
     /// this one cannot match it without a wildcard; it asks here instead, and a kind added later
     /// is placed by this match (#2892, research 0025 A22).
-    pub fn index(&self) -> Option<usize> {
+    pub fn index(&self) -> Option<u64> {
         match self {
             PathStep::Index(i) => Some(*i),
             PathStep::Each => None,
@@ -207,6 +219,12 @@ pub fn cert_wire_spans_at(
     frame: &[u8],
     steps: &[PathStep],
 ) -> Result<Vec<CertSpan>, CertWireError> {
+    if steps
+        .iter()
+        .any(|step| matches!(step, PathStep::Index(index) if *index > INDEX_MAX))
+    {
+        return Err(CertWireError::InvalidPath);
+    }
     let mut c = Cursor {
         bytes: frame,
         pos: 0,
@@ -263,13 +281,13 @@ impl Cursor<'_> {
             return Ok(());
         };
         match *step {
-            PathStep::Index(n) if n as u64 >= arity => self.skip_values(arity),
+            PathStep::Index(n) if n >= arity => self.skip_values(arity),
             PathStep::Index(n) => {
-                self.skip_values(n as u64)?;
-                path.push(n);
+                self.skip_values(n)?;
+                path.push(n as usize);
                 self.spans_at(rest, path, out)?;
                 path.pop();
-                self.skip_values(arity - n as u64 - 1)
+                self.skip_values(arity - n - 1)
             }
             PathStep::Each => {
                 for i in 0..arity {
@@ -311,13 +329,17 @@ pub fn cert_bytes_slack() -> u64 {
 
 /// Whether a certificate whose wire span is `span` measures over `max_cert_bytes` for certain,
 /// so a host may refuse it undecoded (see the module's soundness note).
-pub fn cert_span_over_budget(span: usize, max_cert_bytes: usize) -> bool {
-    span as u64 > max_cert_bytes as u64 + cert_bytes_slack()
+pub fn cert_span_over_budget(span: usize, max_cert_bytes: ProofBudgetCount) -> bool {
+    encoded_span_exceeds(span, max_cert_bytes.get())
+}
+
+fn encoded_span_exceeds(span: usize, max_cert_bytes: u64) -> bool {
+    (span as u64).saturating_sub(max_cert_bytes) > cert_bytes_slack()
 }
 
 /// The path to a v1 derivation wire's certificates: the tagged payload, then the derivation's
 /// trailing `closed_world` slot (absent for an all-positive derivation).
-pub const DERIVATION_WIRE_V1_CERT_PATH: [usize; 2] = [1, 2];
+pub const DERIVATION_WIRE_V1_CERT_PATH: [u64; 2] = [1, 2];
 
 /// Why [`decode_derivation_wire_v1_bounded`] refused its bytes. A type of its own, because
 /// [`DecodeError`] is exhaustive and contract v1 is additive-only (#2561). It is
@@ -326,6 +348,8 @@ pub const DERIVATION_WIRE_V1_CERT_PATH: [usize; 2] = [1, 2];
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum BoundedWireError {
+    /// The caller supplied a proof policy outside the portable index domain.
+    InvalidLimits(CheckLimitError),
     /// The walk could not read the bytes, so nothing was decoded (fail closed).
     Unreadable(CertWireError),
     /// Certificate `cert` spans `span` bytes, over `max_cert_bytes` plus the declaration's slack,
@@ -350,6 +374,7 @@ pub enum BoundedWireError {
 impl std::fmt::Display for BoundedWireError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            BoundedWireError::InvalidLimits(e) => write!(f, "invalid_check_limits: {e}"),
             BoundedWireError::Unreadable(e) => write!(f, "cert_wire_unreadable: {}", e.name()),
             BoundedWireError::OverBudget {
                 cert,
@@ -367,7 +392,17 @@ impl std::fmt::Display for BoundedWireError {
     }
 }
 
-impl std::error::Error for BoundedWireError {}
+impl std::error::Error for BoundedWireError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::InvalidLimits(error) => Some(error),
+            Self::Unreadable(error) => Some(error),
+            Self::Stopped(error) => Some(error),
+            Self::Decode(error) => Some(error),
+            Self::OverBudget { .. } => None,
+        }
+    }
+}
 
 /// #2561 (`seat:caa`'s ruling): [`decode_derivation_wire_v1`](crate::decode_derivation_wire_v1)
 /// held to the caller's [`CheckLimits`] BEFORE decoding, for a consumer decoding a derivation from
@@ -379,13 +414,14 @@ pub fn decode_derivation_wire_v1_bounded(
     bytes: &[u8],
     limits: &CheckLimits,
 ) -> Result<Derivation, BoundedWireError> {
+    limits.validate().map_err(BoundedWireError::InvalidLimits)?;
     let max_cert_bytes = limits.max_cert_bytes;
     let spans = cert_wire_spans(bytes, &DERIVATION_WIRE_V1_CERT_PATH)
         .map_err(BoundedWireError::Unreadable)?;
     if let Some((cert, &span)) = spans
         .iter()
         .enumerate()
-        .find(|(_, &span)| cert_span_over_budget(span, max_cert_bytes))
+        .find(|(_, &span)| encoded_span_exceeds(span, max_cert_bytes as u64))
     {
         return Err(BoundedWireError::OverBudget {
             cert,
@@ -571,8 +607,9 @@ mod tests {
             let growth = enc(&u64_atom(n)).len() - enc(&u64_atom(0)).len();
             assert!(growth as u64 <= slack, "{n}: {growth}");
         }
-        assert!(cert_span_over_budget(100 + slack as usize + 1, 100));
-        assert!(!cert_span_over_budget(100 + slack as usize, 100));
+        let budget = ProofBudgetCount::from(100u32);
+        assert!(cert_span_over_budget(100 + slack as usize + 1, budget));
+        assert!(!cert_span_over_budget(100 + slack as usize, budget));
     }
 
     #[test]

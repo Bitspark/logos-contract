@@ -128,7 +128,8 @@ func (c CompoundTheory) DecideGround(atom GroundLiteral) completion.TheoryGround
 func (c CompoundTheory) Identity() ComponentIdentity {
 	memberIdentities := make([]ComponentIdentity, len(c.theories))
 	for i, t := range c.theories {
-		memberIdentities[i] = identityOf(t)
+		id := identityOf(t)
+		memberIdentities[i] = NewComponentIdentity(id.Id, id.Version, id.ConfigDigest)
 	}
 	return CompoundIdentityOf(memberIdentities)
 }

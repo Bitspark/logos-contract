@@ -25,6 +25,8 @@
 // binding a compound derives the same digest tri-core.
 
 import { sha256 } from "@noble/hashes/sha2.js";
+import { copyOctets } from "./octets.js";
+import { hashFromBytes } from "./cert.js";
 
 import { newArithmeticTheory } from "./arithmetic.js";
 import { type GroundLiteral, Symbol } from "./literal.js";
@@ -113,7 +115,7 @@ export class CompoundTheory implements Theory {
     // Delegates to compoundIdentityOf so the identity-audit baseline and the live
     // identity share ONE code path and cannot drift (#767).
     return compoundIdentityOf(
-      this.theories.map((t) => t.identity?.() ?? ComponentIdentity.unidentified()),
+      this.theories.map((t) => ComponentIdentity.resolve(t)),
     );
   }
 }
@@ -153,8 +155,11 @@ export function compoundIdentityOf(
   memberIdentities: readonly ComponentIdentity[],
 ): ComponentIdentity {
   const parts: Uint8Array[] = [COMPOUND_THEORY_PREFIX];
-  for (const id of memberIdentities) {
-    parts.push(u64be(id.id.length), id.id, u64be(id.version.length), id.version, id.configDigest);
+  for (const report of memberIdentities) {
+    const id = copyOctets(report.id);
+    const version = copyOctets(report.version);
+    const config = hashFromBytes(report.configDigest);
+    parts.push(u64be(id.length), id, u64be(version.length), version, config);
   }
   const digest = sha256(concatBytes(parts));
   return ComponentIdentity.of(

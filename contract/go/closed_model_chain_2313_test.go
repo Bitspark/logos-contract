@@ -173,3 +173,27 @@ func TestClosedModelChainUnboundContextIsRefused2313(t *testing.T) {
 	}
 	t.Fatal("no accepted case with a closed_world to test the unbound context against")
 }
+
+func TestClosedModelChainBindsEveryCertificateBeforeTheFirstAttestation(t *testing.T) {
+	program := aggBaseProgram()
+	ctx := aggBoundContext(program)
+	chain := []ClosedModelCert{aggValidCert(), aggValidCert()}
+	if out := CheckClosedModelChain(program, chain, struct{}{}, aggProfile(), ctx); !out.IsAccept() {
+		t.Fatalf("matching control: %s", out)
+	}
+	original := chain[1].ProfileHash
+	chain[1].ProfileHash[0] ^= 1
+	if out := CheckClosedModelChain(program, chain, struct{}{}, aggProfile(), ctx); out.IsAccept() || out.Code() != CertContextMismatch {
+		t.Fatalf("mismatching control: %s", out)
+	}
+	profile := aggProfile()
+	calls := 0
+	profile.Leaves = editingSnapshot{profile.Leaves.(*aggLeaves), func() {
+		calls++
+		chain[1].ProfileHash = original
+	}}
+	out := CheckClosedModelChain(program, chain, struct{}{}, profile, ctx)
+	if calls == 0 || out.IsAccept() || out.Code() != CertContextMismatch {
+		t.Fatalf("an attestation changed a different certificate: %s (%d attestations)", out, calls)
+	}
+}

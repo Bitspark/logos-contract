@@ -44,6 +44,12 @@ PY
   go test -count=1 ./...
   go test -race -count=1 ./...
   go vet ./...
+  # Selector coordinates retain the portable range on a real 32-bit host.
+  # Compile only the external consumer fixture, importing the actual contract;
+  # historical exports without this fixture keep their existing test set.
+  if [ -f wire_selectors_consumer_test.go ]; then
+    GOARCH=386 go test -count=1 wire_selectors_consumer_test.go
+  fi
 )
 
 (
@@ -51,5 +57,27 @@ PY
   if [ -f package-lock.json ]; then npm ci --ignore-scripts; else npm install --ignore-scripts; fi
   npm run typecheck
   npm test
-  npm pack --dry-run
+  consumer_dir=$(mktemp -d "$RUNNER_TEMP/logos-contract-npm.XXXXXX")
+  tarball=$(npm pack --silent --pack-destination "$consumer_dir")
+  shopt -s nullglob
+  fixtures=(consumer/*.mjs)
+  type_fixtures=(consumer/*.mts)
+  compiler="$PWD/node_modules/.bin/tsc"
+  type_roots="$PWD/node_modules/@types"
+  if (( ${#type_fixtures[@]} )); then
+    cp "${type_fixtures[@]}" "$consumer_dir/"
+  fi
+  if (( ${#fixtures[@]} )); then
+    cp "${fixtures[@]}" "$consumer_dir/"
+  fi
+  cd "$consumer_dir"
+  echo '{"private":true}' > package.json
+  npm install --ignore-scripts --no-audit --no-fund --no-package-lock "./$tarball"
+  if (( ${#type_fixtures[@]} )); then
+    "$compiler" --strict --noEmit --target ES2022 --module NodeNext --typeRoots "$type_roots" ./*.mts
+  fi
+  node --input-type=module -e 'import { check } from "@bitspark/logos-contract"; if (typeof check !== "function") throw new Error("missing public checker")'
+  if (( ${#fixtures[@]} )); then
+    node --test ./*.mjs
+  fi
 )

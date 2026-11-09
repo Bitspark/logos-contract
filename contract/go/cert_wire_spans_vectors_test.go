@@ -63,11 +63,11 @@ func loadCertWireSpans(t *testing.T) certWireSpansFile {
 
 // vectorSteps reads a case's path: an index, or "*" for every element. indices is the same path as
 // indices when every step is one (the index-only walker's input), else nil.
-func vectorSteps(t *testing.T, name string, raw []json.RawMessage) (steps []PathStep, indices []int) {
+func vectorSteps(t *testing.T, name string, raw []json.RawMessage) (steps []PathStep, indices []uint64) {
 	t.Helper()
-	indices = []int{}
+	indices = []uint64{}
 	for _, r := range raw {
-		var i int
+		var i uint64
 		if err := json.Unmarshal(r, &i); err == nil {
 			steps = append(steps, PathIndex(i))
 			if indices != nil {
@@ -105,11 +105,11 @@ func TestCertWireSpansVectors2528(t *testing.T) {
 		}
 		walk := "ok"
 		if err := CertWireWalk(frame); err != nil {
-			var we *CertWireError
+			var we CertWireError
 			if !errors.As(err, &we) {
 				t.Fatalf("%s: the walk alone: %v", c.Name, err)
 			}
-			walk = we.Name
+			walk = we.Name()
 		}
 		if walk != c.Walk {
 			t.Errorf("%s: the walk alone %q, the vector %q", c.Name, walk, c.Walk)
@@ -120,12 +120,12 @@ func TestCertWireSpansVectors2528(t *testing.T) {
 		}
 		certs, err := CertWireSpansAt(frame, steps)
 		if c.Refused != nil {
-			var we *CertWireError
-			if !errors.As(err, &we) || we.Name != *c.Refused {
+			var we CertWireError
+			if !errors.As(err, &we) || we.Name() != *c.Refused {
 				t.Errorf("%s: want refused %q, got %v (certificates %v)", c.Name, *c.Refused, err, certs)
 			}
 			if indices != nil {
-				if _, err := CertWireSpans(frame, indices); !errors.As(err, &we) || we.Name != *c.Refused {
+				if _, err := CertWireSpans(frame, indices); !errors.As(err, &we) || we.Name() != *c.Refused {
 					t.Errorf("%s: the index-only walker: want refused %q, got %v", c.Name, *c.Refused, err)
 				}
 			}
@@ -151,9 +151,13 @@ func TestCertWireSpansVectors2528(t *testing.T) {
 			}
 		}
 		if c.MaxCertBytes != nil {
+			budget, err := ProofBudgetCountFromInt64("max_cert_bytes", int64(*c.MaxCertBytes))
+			if err != nil {
+				t.Fatal(err)
+			}
 			over := [][]int{}
 			for _, cert := range certs {
-				if CertSpanOverBudget(cert.Span, *c.MaxCertBytes) {
+				if CertSpanOverBudget(uint64(cert.Span), budget) {
 					over = append(over, cert.Path)
 				}
 			}
@@ -183,17 +187,17 @@ func TestCertWireWalkRefusesWhatTheCodecRefuses2528(t *testing.T) {
 	if _, err := codec.Decode(padded); err == nil {
 		t.Fatal("CONTROL: the codec must refuse the padded uvarint")
 	}
-	var we *CertWireError
-	if _, err := CertWireSpans(padded, nil); !errors.As(err, &we) || we.Name != "non_canonical_uvarint" {
+	var we CertWireError
+	if _, err := CertWireSpans(padded, nil); !errors.As(err, &we) || we.Name() != "non_canonical_uvarint" {
 		t.Fatalf("want non_canonical_uvarint, got %v", err)
 	}
 	frame := []byte{0x01, 0x01, 0x00, 0x01, 'a'}
 	for cut := 0; cut < len(frame); cut++ {
-		if _, err := CertWireSpans(frame[:cut], nil); !errors.As(err, &we) || we.Name != "truncated" {
+		if _, err := CertWireSpans(frame[:cut], nil); !errors.As(err, &we) || we.Name() != "truncated" {
 			t.Fatalf("cut %d: want truncated, got %v", cut, err)
 		}
 	}
-	if spans, err := CertWireSpans(frame, []int{3}); err != nil || len(spans) != 0 {
+	if spans, err := CertWireSpans(frame, []uint64{3}); err != nil || len(spans) != 0 {
 		t.Fatalf("an absent slot has no certificates, got %v %v", spans, err)
 	}
 }
@@ -206,7 +210,7 @@ func TestCertBytesSlackBoundsEveryDeclaration2528(t *testing.T) {
 			t.Fatalf("%d grows %d over the slack %d", n, growth, slack)
 		}
 	}
-	if !CertSpanOverBudget(100+int(slack)+1, 100) || CertSpanOverBudget(100+int(slack), 100) {
+	if !CertSpanOverBudget(100+slack+1, ProofBudgetCountFromUint32(100)) || CertSpanOverBudget(100+slack, ProofBudgetCountFromUint32(100)) {
 		t.Fatal("the bound is span > max + slack")
 	}
 }
@@ -215,11 +219,11 @@ func TestCertWireWalkAloneReadsAnyValue2561(t *testing.T) {
 	if err := CertWireWalk([]byte{0x00, 0x01, 'x'}); err != nil {
 		t.Fatalf("an atom root is a readable frame: %v", err)
 	}
-	var we *CertWireError
-	if err := CertWireWalk([]byte{0x00, 0x01, 'x', 0x00}); !errors.As(err, &we) || we.Name != "trailing_bytes" {
+	var we CertWireError
+	if err := CertWireWalk([]byte{0x00, 0x01, 'x', 0x00}); !errors.As(err, &we) || we.Name() != "trailing_bytes" {
 		t.Fatalf("want trailing_bytes, got %v", err)
 	}
-	if err := CertWireWalk([]byte{0x01, 0x02, 0x00, 0x00}); !errors.As(err, &we) || we.Name != "truncated" {
+	if err := CertWireWalk([]byte{0x01, 0x02, 0x00, 0x00}); !errors.As(err, &we) || we.Name() != "truncated" {
 		t.Fatalf("want truncated, got %v", err)
 	}
 }

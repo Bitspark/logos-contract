@@ -33,6 +33,26 @@ use ontos_core::Value;
 /// scheme — it only compares pins for equality).
 pub type Hash = [u8; 32];
 
+/// Read a 32-byte pin from its 64 lowercase ASCII hex digits.
+/// Invalid input has no hash. All zeroes are a valid pin.
+pub fn parse_hash_hex(text: &[u8]) -> Option<Hash> {
+    fn digit(c: u8) -> Option<u8> {
+        match c {
+            b'0'..=b'9' => Some(c - b'0'),
+            b'a'..=b'f' => Some(c - b'a' + 10),
+            _ => None,
+        }
+    }
+    let mut hash = [0; 32];
+    if text.len() != 2 * hash.len() {
+        return None;
+    }
+    for (byte, &[high, low]) in hash.iter_mut().zip(text.as_chunks::<2>().0) {
+        *byte = (digit(high)? << 4) | digit(low)?;
+    }
+    Some(hash)
+}
+
 /// An index into [`Derivation::closed_world`](crate::derivation::Derivation::closed_world).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct CertId(pub u64);

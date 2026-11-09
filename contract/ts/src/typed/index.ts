@@ -6,6 +6,6 @@ export { FOUNDATION, CHECKER, MAX_INPUT_DEPTH, MAX_DEPTH, MAX_NATURAL,
   type Statement, type StatementInput, statement,
   type Policy, type PolicyInput, policy,
   type Limits, type LimitsInput, limits, defaultLimits } from "./model.js";
-export type { Accepted, Outcome, Rejection, InvalidCode, IncompleteCause,
+export type { Acceptance, Outcome, Rejection, InvalidCode, IncompleteCause,
   UnsupportedCause, Phase, Location } from "./outcome.js";
 export { check } from "./check.js";

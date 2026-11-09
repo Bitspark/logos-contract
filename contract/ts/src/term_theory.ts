@@ -49,7 +49,7 @@
 // unification is structural equality, so `t = u` holds iff compareValues(t, u) === 0 and
 // `t \= u` iff it differs; `true` holds; `fail`/`false` never hold. Mirrors Rust/Go exactly.
 
-import { UTF8_STRICT } from "./utf8.js";
+import { decodeUtf8 } from "./utf8.js";
 import { Atom, Tuple, type Value } from "@bitspark/ontos-core";
 import { readInt } from "@bitspark/ontos-data";
 
@@ -58,9 +58,6 @@ import { Symbol, type GroundLiteral } from "./literal.js";
 import { ComponentIdentity, DecisionCompletion, type Theory, TheoryOutcome } from "./spi.js";
 
 const utf8Encoder = new TextEncoder();
-// `fatal: true` makes decode throw on any byte sequence that is not valid UTF-8 —
-// the non-UTF-8 defensive arm (mirrors Rust's std::str::from_utf8 guard).
-const utf8FatalDecoder = UTF8_STRICT;
 
 /** Lower-case hex of a byte string — a byte-exact, UTF-8-agnostic map/set key. */
 function hexKey(bytes: Uint8Array): string {
@@ -118,7 +115,7 @@ export class TermTheory implements Theory {
     }
     let name: string;
     try {
-      name = utf8FatalDecoder.decode(atom.pred.bytes());
+      name = decodeUtf8(atom.pred.bytes());
     } catch {
       return TheoryOutcome.Fails("term_unknown_predicate");
     }

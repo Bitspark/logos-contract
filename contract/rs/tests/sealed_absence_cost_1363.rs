@@ -80,10 +80,10 @@
 use logos_contract::{
     check_with_cert_context, closure_join_cost, edb_table_hash, encode_derivation_wire_v1,
     program_digest, CertContext, CertId, CertSizeDecl, CheckLimits, CheckProfile, Clause, ClauseId,
-    ClosedModelCert, ClosureWitness, Derivation, Evidence, FiniteDomain, Goal, GroundLiteral, Hash,
-    LeafOutcome, LeafVerifier, MapProgram, Node, NodeMeta, NonMemberProof, Outcome, PredicateSet,
-    Premise, Program, RelationTable, StratumPrefix, Subst, SupportEdge, SupportRef, SupportWitness,
-    Symbol, Term, Theory, TheoryOutcome,
+    ClosedModelCert, ClosureWitness, CompleteProgram, Derivation, Evidence, FiniteDomain, Goal,
+    GroundLiteral, Hash, LeafOutcome, LeafVerifier, MapProgram, Node, NodeMeta, NonMemberProof,
+    Outcome, PredicateSet, Premise, RelationTable, StratumPrefix, Subst, SupportEdge, SupportRef,
+    SupportWitness, Symbol, Term, Theory, TheoryOutcome,
 };
 use ontos_core::Value;
 use std::collections::BTreeMap;
@@ -194,10 +194,10 @@ fn profile(withdrawn_rows: &[GroundLiteral], claimed: &GroundLiteral) -> CheckPr
     }
 }
 
-fn bound_context(program: &dyn Program) -> CertContext {
+fn bound_context(program: &dyn CompleteProgram) -> CertContext {
     CertContext::new(program_digest(program), [1u8; 32], [2u8; 32], [3u8; 32])
 }
-fn bind_cert(cert: &mut ClosedModelCert, program: &dyn Program) {
+fn bind_cert(cert: &mut ClosedModelCert, program: &dyn CompleteProgram) {
     let cx = bound_context(program);
     cert.program_hash = cx.program_hash;
     cert.profile_hash = cx.profile_hash;

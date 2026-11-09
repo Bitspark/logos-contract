@@ -947,26 +947,7 @@ pub fn derivation_from_value(v: &Value) -> Result<Derivation> {
 /// [`digest_atom`](super::wire::digest_atom), which writes the 32 bytes as a 64-char
 /// lowercase-hex `Atom`.
 fn read_hash(v: &Value, ctx: &'static str) -> Result<[u8; 32]> {
-    let hex = atom_bytes(v, ctx)?;
-    if hex.len() != 64 {
-        return Err(DecodeError::Shape { ctx });
-    }
-    let mut out = [0u8; 32];
-    for (i, byte) in out.iter_mut().enumerate() {
-        let hi = hex_nibble(hex[2 * i]).ok_or(DecodeError::Shape { ctx })?;
-        let lo = hex_nibble(hex[2 * i + 1]).ok_or(DecodeError::Shape { ctx })?;
-        *byte = (hi << 4) | lo;
-    }
-    Ok(out)
-}
-
-/// A single lowercase-hex digit `0-9a-f` to its nibble value.
-fn hex_nibble(c: u8) -> Option<u8> {
-    match c {
-        b'0'..=b'9' => Some(c - b'0'),
-        b'a'..=b'f' => Some(c - b'a' + 10),
-        _ => None,
-    }
+    crate::parse_hash_hex(atom_bytes(v, ctx)?).ok_or(DecodeError::Shape { ctx })
 }
 
 /// Reconstruct a [`Symbol`] from a bare `Atom(bytes)`.

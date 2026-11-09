@@ -76,7 +76,7 @@ export type Completion<T, L> =
 /** A ground literal's outcome: decided true or false, a caller's limit, or not decided. */
 export type GroundOutcome<L> = Completion<Decision, L>;
 
-export const holds: Decision = { kind: "holds" };
+export const holds: Decision = Object.freeze({ kind: "holds" });
 
 export function fails(code: FalseCode): Decision {
   return { kind: "fails", code };
@@ -230,7 +230,7 @@ function validDecision(d: Decision): boolean {
   }
 }
 
-const MALFORMED: NonCompletion = { kind: "malformed_outcome" };
+const MALFORMED: NonCompletion = Object.freeze({ kind: "malformed_outcome" });
 
 /**
  * Every valid outcome unchanged; any other value (an unknown kind, an invalid decision, an illegal
@@ -355,7 +355,7 @@ export function or<L>(a: GroundOutcome<L>, b: GroundOutcome<L>): GroundOutcome<L
  */
 export type TheoryDecision = { readonly kind: "holds" } | { readonly kind: "fails"; readonly code: string };
 
-export const theoryHolds: TheoryDecision = { kind: "holds" };
+export const theoryHolds: TheoryDecision = Object.freeze({ kind: "holds" });
 
 export function theoryFails(code: string): TheoryDecision {
   return { kind: "fails", code };

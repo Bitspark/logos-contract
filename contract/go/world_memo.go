@@ -1,6 +1,9 @@
 package contract
 
-import "reflect"
+import (
+	"reflect"
+	"sync"
+)
 
 // WorldMemo is the go port of the checker's closed-world memo (#2569, the go/ts rung of #2565
 // term 1; seat:caa's ruling on #2569): a run that checks many derivations citing the SAME
@@ -29,6 +32,7 @@ type WorldMemo[C any] struct {
 	ctx         C
 	certContext CertContext
 
+	mu       sync.Mutex
 	filled   bool
 	limits   CheckLimits
 	world    []ClosedModelCert
@@ -38,13 +42,17 @@ type WorldMemo[C any] struct {
 
 // NewWorldMemo binds a memo to the inputs every check through it runs under.
 func NewWorldMemo[C any](program Program, profile *CheckProfile[C], ctx C, certContext CertContext) *WorldMemo[C] {
-	return &WorldMemo[C]{program: program, profile: profile, ctx: ctx, certContext: certContext}
+	return &WorldMemo[C]{program: program, profile: profile, ctx: ctx, certContext: captureCertContext(certContext)}
 }
 
 // CertificatesVerified is how many certificates have been verified through this memo, counting
 // each world it verified on a miss in full. N derivations citing one world of k certificates
 // give k.
-func (m *WorldMemo[C]) CertificatesVerified() int { return m.verified }
+func (m *WorldMemo[C]) CertificatesVerified() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.verified
+}
 
 // CheckWithWorldMemo is CheckWithCertContext under the memo's bound program, profile, ctx and
 // CertContext, with the derivation's closed world verified through the memo. The verdict is
@@ -52,82 +60,30 @@ func (m *WorldMemo[C]) CertificatesVerified() int { return m.verified }
 // from the memo; the prechecks, the forward pass over the derivation's own nodes and every
 // premise's own checks run on every call.
 func CheckWithWorldMemo[C any](m *WorldMemo[C], claim GroundLiteral, deriv Derivation) Outcome {
-	if out, ok := derivationPrechecks(m.program, claim, deriv, m.profile); !ok {
-		return out
-	}
-	return checkNodes(m.program, claim, deriv, m.ctx, m.profile, m.statuses(deriv.ClosedWorld))
+	return checkNative(m.program, claim, deriv, m.ctx, *m.profile, m.certContext, m)
 }
 
-// statuses serves world's statuses from the slot on a hit and verifies and stores them on a
-// miss. An EMPTY world (a positive derivation) needs no verification and does not touch the
-// slot, so positive answers between two that cite a world do not evict it.
-func (m *WorldMemo[C]) statuses(world []ClosedModelCert) []certStatus {
-	if len(world) == 0 {
-		return nil
+// captureWorld runs before any program or verifier callback. On a hit the
+// immutable slot already owns the exact input, so the checker shares both
+// the world and its statuses without copying the chain again.
+func (m *WorldMemo[C]) captureWorld(world []ClosedModelCert, limits CheckLimits) ([]ClosedModelCert, []certStatus) {
+	m.mu.Lock()
+	if m.filled && m.limits == limits && reflect.DeepEqual(m.world, world) {
+		owned, status := m.world, m.status
+		m.mu.Unlock()
+		return owned, status
 	}
-	hit := m.filled && m.limits == m.profile.Limits && reflect.DeepEqual(m.world, world)
-	if !hit {
-		m.status = verifyWorld(world, m.program, m.profile, m.ctx, m.certContext)
-		m.world = cloneWorld(world)
-		m.limits = m.profile.Limits
-		m.filled = true
-		m.verified += len(world)
-	}
-	return m.status
+	m.mu.Unlock()
+	return cloneWorld(world), nil
 }
 
-// cloneWorld deep-copies a world's own containers (slices, maps, pointers, structs), so a caller
-// that later mutates its derivation in place cannot change what the memo compares against: a
-// shallow copy would share the rows, and an in-place edit would then compare EQUAL to the stale
-// world it replaced. Values held through an interface (ontos core.Value, contract Term) are
-// immutable and are kept as they are. It runs on a miss only, never on a hit.
-func cloneWorld(world []ClosedModelCert) []ClosedModelCert {
-	return deepCopy(reflect.ValueOf(world)).Interface().([]ClosedModelCert)
-}
-
-func deepCopy(v reflect.Value) reflect.Value {
-	switch v.Kind() {
-	case reflect.Slice:
-		if v.IsNil() {
-			return v
-		}
-		out := reflect.MakeSlice(v.Type(), v.Len(), v.Len())
-		for i := 0; i < v.Len(); i++ {
-			out.Index(i).Set(deepCopy(v.Index(i)))
-		}
-		return out
-	case reflect.Map:
-		if v.IsNil() {
-			return v
-		}
-		out := reflect.MakeMapWithSize(v.Type(), v.Len())
-		for it := v.MapRange(); it.Next(); {
-			out.SetMapIndex(it.Key(), deepCopy(it.Value()))
-		}
-		return out
-	case reflect.Pointer:
-		if v.IsNil() {
-			return v
-		}
-		out := reflect.New(v.Elem().Type())
-		out.Elem().Set(deepCopy(v.Elem()))
-		return out
-	case reflect.Struct, reflect.Array:
-		out := reflect.New(v.Type()).Elem()
-		out.Set(v)
-		if v.Kind() == reflect.Array {
-			for i := 0; i < v.Len(); i++ {
-				out.Index(i).Set(deepCopy(v.Index(i)))
-			}
-			return out
-		}
-		for i := 0; i < v.NumField(); i++ {
-			if out.Field(i).CanSet() {
-				out.Field(i).Set(deepCopy(v.Field(i)))
-			}
-		}
-		return out
-	default:
-		return v
-	}
+// Verifiers may reenter the same memo. Only publishing the completed slot
+// takes its lock. Overlapping misses count the work each actually performed.
+func (m *WorldMemo[C]) rememberWorld(world []ClosedModelCert, status []certStatus, limits CheckLimits) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.world, m.status = world, status
+	m.limits = limits
+	m.filled = true
+	m.verified += len(world)
 }

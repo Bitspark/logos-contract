@@ -8,6 +8,7 @@ package contract
 
 import (
 	"bytes"
+	"slices"
 	"sort"
 )
 
@@ -41,11 +42,9 @@ const (
 	Count
 )
 
-// PredicateRef is an ARITY-SENSITIVE reference to the sealed relation a certifiable
-// aggregate counts over (ADR 0023, #581). A counted relation is matched by name AND
-// arity — obs/3 and obs/2 are different relations — so a wrong-arity count cannot slip
-// past name agreement alone (a mismatch is count_attr_out_of_range). Go sibling of
-// Rust's PredicateRef. Held as comparable fields so PredicateRef is a value type.
+// PredicateRef identifies a relation by exact predicate bytes and unsigned arity.
+// Finite dataset bindings use this comparable key. A count premise (ADR 0023)
+// selects a sealed table with the same predicate and arity.
 type PredicateRef struct {
 	Pred  Symbol
 	Arity uint32
@@ -357,6 +356,19 @@ type Clause struct {
 	Body []BodyLit
 }
 
+// CloneClause retains a native clause independently of its producer. Terms and
+// symbols are immutable. The head, body and aggregate filter slices are owned.
+func CloneClause(c Clause) Clause {
+	c.Head.Args = slices.Clone(c.Head.Args)
+	c.Body = slices.Clone(c.Body)
+	for i := range c.Body {
+		lit := &c.Body[i]
+		lit.Lit.Args = slices.Clone(lit.Lit.Args)
+		lit.CountVal.Filter = slices.Clone(lit.CountVal.Filter)
+	}
+	return c
+}
+
 // NewClause builds a Clause from a head and positive body goals (each read as a
 // Pos body literal), so every existing positive-body call site is unchanged.
 func NewClause(head Goal, body ...Goal) Clause {
@@ -392,33 +404,19 @@ func Fact(head Goal) Clause {
 	return Clause{Head: head, Body: nil}
 }
 
-// Program is the capability check requires of a program: look a cited clause up by id
-// (§2 "local checking"), and — for ADR-0007 certifiable negation — enumerate the
-// whole clause set. Whole-program predicate-partition hygiene (§4.4) is a consumer /
-// program-loading responsibility, not a per-check obligation. The second result of
-// Clause is false when the id is unknown.
-//
-// ADR 0007 closure soundness. Certifying a negated premise \+ r(a) requires the
-// checker to enumerate *every* clause defining a sealed predicate — the support
-// witness's cited clauses are attacker-chosen and cannot be trusted to be complete (a
-// non-cited defining clause could hide a derivable head). So Program carries
-// ForEachClause, a *trusted* whole-program iteration in canonical clause-id order. A
-// program that exposes an *empty* enumeration is fail-closed — the closure check then
-// finds no defining clauses and (if any sealed predicate a \+ cites has no enumerated
-// clause) the cert is rejected, never wrongly accepted.
-//
-// Go has no default interface methods (unlike the Rust trait, which defaults
-// for_each_clause to a no-op), so ForEachClause is a required member. The only
-// in-tree implementer is MapProgram; the kernel threads a MapProgram, never its own
-// Program. A consumer with a custom Program that does not yet enumerate may implement
-// ForEachClause as a no-op (fail-closed) until it wants certifiable negation.
+// Program is the application's trusted lookup of clauses by handle. Positive proofs
+// require only this capability. Unknown handles return false.
 type Program interface {
 	Clause(id ClauseId) (Clause, bool)
+}
 
-	// ForEachClause calls f with every (id, clause) of the program, in canonical
-	// clause-id byte order. The closure check (ADR 0007) drives over this to find all
-	// clauses defining a sealed predicate.
-	ForEachClause(f func(id ClauseId, clause Clause))
+// CompleteProgram additionally supplies the entire clause set of the same program.
+// ForEachClause visits each clause once, in canonical clause-id order. An empty
+// traversal declares a genuinely empty program. Hosts without a complete inventory
+// implement Program alone. Keep the interpretation stable for the check or binding.
+type CompleteProgram interface {
+	Program
+	ForEachClause(visit func(id ClauseId, clause Clause))
 }
 
 // MapProgram is a straightforward in-memory Program (a ClauseId → Clause map).

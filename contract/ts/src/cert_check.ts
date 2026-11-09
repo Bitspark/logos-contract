@@ -33,7 +33,8 @@
 // Every loop below ranges over a SUPPLIED finite table, pre-bounded by a CheckLimits cert budget
 // validated BEFORE any scan. No fixpoint, no Herbrand enumeration, no engine call.
 
-import { UTF8_LOSSY } from "./utf8.js";
+import type { OctetSource } from "./octets.js";
+import { decodeUtf8Lossy } from "./utf8.js";
 import { encode } from "@bitspark/ontos-codec";
 import { equals as valueEquals, type Value } from "@bitspark/ontos-core";
 import { encodeInt, readInt } from "@bitspark/ontos-data";
@@ -48,6 +49,7 @@ import {
   groundKey,
   type Hash,
   hashEquals,
+  hashFromBytes,
   type SupportRef,
   zeroHash,
 } from "./cert.js";
@@ -60,9 +62,11 @@ import {
   type NegPremise,
 } from "./derivation.js";
 import { certEncodedBytes } from "./derivation_wire.js";
+import { captureClause } from "./native_copy.js";
+import { captureCertContext, captureWorld } from "./capture.js";
 import { classifySealedClause, type Outside, ScopeGraph } from "./fragment.js";
 import { type GroundLiteral, type Symbol } from "./literal.js";
-import { type BodyLit, type Clause, type CountLit, type PredicateRef, type Program, type ProjectSpec } from "./program.js";
+import { type BodyLit, type Clause, type ClauseId, type CompleteProgram, type CountLit, type PredicateRef, type Program, type ProjectSpec } from "./program.js";
 import { decideGround, edbTableHash, type LeafVerifier, type PredicateSet, type Theory } from "./spi.js";
 import {
   and as completionAnd,
@@ -78,6 +82,7 @@ import {
 import { isDisowned, readGround } from "./ground_reading.js";
 import { Term, valueDepthLe, type VarId } from "./term.js";
 import {
+  captureCheckProfile,
   type CheckLimits,
   type CheckProfile,
   type Outcome,
@@ -106,17 +111,21 @@ export interface CertContext {
   readonly decompositionWitness?: Hash;
 }
 
-export const CertContext = {
+export const CertContext = Object.freeze({
   /** An explicit context over the four pins. */
-  of(programHash: Hash, profileHash: Hash, ctxHash: Hash, theoryConfigHash: Hash): CertContext {
-    return { programHash, profileHash, ctxHash, theoryConfigHash };
+  of(programHash: OctetSource, profileHash: OctetSource, ctxHash: OctetSource, theoryConfigHash: OctetSource): CertContext {
+    return {
+      programHash: hashFromBytes(programHash), profileHash: hashFromBytes(profileHash),
+      ctxHash: hashFromBytes(ctxHash), theoryConfigHash: hashFromBytes(theoryConfigHash),
+    };
   },
   /**
    * This context bound to a decomposition witness (ADR 0029 D10). Additive and opt-in: a caller
    * that does not decompose never calls it and its context is byte-identical to the pre-D10 one.
    */
-  withDecomposition(c: CertContext, witness: Hash): CertContext {
-    return { ...c, decompositionWitness: witness };
+  withDecomposition(c: CertContext, witness: OctetSource): CertContext {
+    const base = CertContext.of(c.programHash, c.profileHash, c.ctxHash, c.theoryConfigHash);
+    return { ...base, decompositionWitness: hashFromBytes(witness) };
   },
   /**
    * The all-zero context. Supplied by the plain `check` wrapper and NEVER consulted for
@@ -139,7 +148,7 @@ export const CertContext = {
       hashEquals(c.theoryConfigHash, z)
     );
   },
-};
+});
 
 /**
  * The memoized verification status of one cited `ClosedModelCert`. Computed once, up
@@ -150,7 +159,7 @@ export type CertStatus =
   | { readonly kind: "valid" }
   | { readonly kind: "invalid"; readonly code: RejectionCode; readonly detail: string };
 
-const VALID: CertStatus = { kind: "valid" };
+const VALID: CertStatus = Object.freeze({ kind: "valid" });
 function invalid(code: RejectionCode, detail: string): CertStatus {
   return { kind: "invalid", code, detail };
 }
@@ -239,17 +248,24 @@ function certDepthsWithin(cert: ClosedModelCert, max: number): string | undefine
  */
 export function checkClosedModelChain<C>(
   program: Program,
-  certs: readonly ClosedModelCert[],
+  chain: readonly ClosedModelCert[],
   ctx: C,
   profile: CheckProfile<C>,
   certContext: CertContext,
 ): Outcome {
+  const bound = captureCheckProfile(profile);
+  if (!bound.ok) return { kind: "reject", code: "invalid_check_limits", detail: bound.error.message };
+  profile = bound.value;
+  const captured = captureWorld(chain, profile.limits);
+  if (captured.kind === "reject") return captured;
+  const certs = captured.value;
   if (certs.length === 0) {
     return OutcomeOps.reject(
       "cert_out_of_range",
       "empty certificate chain: no closed-model certificate to verify",
     );
   }
+  certContext = captureCertContext(certContext);
   const max = profile.limits.maxTermDepth;
   for (let own = 0; own < certs.length; own += 1) {
     const what = certDepthsWithin(certs[own]!, max);
@@ -270,6 +286,7 @@ export function checkClosedModelChain<C>(
   // exactly as a derivation's closed world is, so a cert that reads a lower cert's seal does so
   // only once that cert's status is final. The first invalid cert in that order rejects.
   const status: (CertStatus | undefined)[] = certs.map(() => undefined);
+  const readClauses = worldClauses(program);
   for (const own of verificationOrder(certs)) {
     const verdict = verifyCert(
       certs[own]!,
@@ -280,6 +297,7 @@ export function checkClosedModelChain<C>(
       profile.limits,
       { own, worldLen: certs.length },
       { certs, status },
+      readClauses,
     );
     if (verdict.kind === "invalid") {
       return OutcomeOps.reject(verdict.code, `chain cert ${own}: ${verdict.detail}`);
@@ -297,6 +315,48 @@ function refAtom(ref: SupportRef): GroundLiteral | undefined {
 // =============================== whole-cert verifier ===============================
 
 /**
+ * Step 3a of `checkWithCertContext`: every certificate of `world` verified, into the status array
+ * the forward pass reads. A pure function of its arguments, which is what lets a `WorldMemo` serve
+ * it again for an equal world under the same inputs.
+ */
+export function verifyWorld<C>(
+  world: readonly ClosedModelCert[],
+  program: Program,
+  profile: CheckProfile<C>,
+  ctx: C,
+  certContext: CertContext,
+): CertStatus[] {
+  // 3a. verify every cited certificate ONCE, up front, memoized into a parallel array. A
+  //     `Neg` premise reuses the cached result. For an all-positive derivation
+  //     closedWorld is empty, so this is a no-op and the zero certContext is never
+  //     consulted — positive behavior is byte-identical.
+  //
+  //     CONTEXT-UNBOUND GATE (ADR 0007 §3.1): a certifying check needs a context DERIVED
+  //     from the live program/profile. An all-zero context is the UNBOUND sentinel — if
+  //     any cert is cited under it, every cert is invalid with `cert_context_unbound`.
+  //
+  //     STACKED certificates (#2258 (a)): certs are verified in ascending scope level, so a cert
+  //     that reads a predicate from a strictly lower cert does so only once that cert's status is
+  //     final (validity precedes citation).
+  const contextUnbound = world.length > 0 && CertContext.isUnbound(certContext);
+  const status: (CertStatus | undefined)[] = world.map(() => undefined);
+  const readClauses = worldClauses(program);
+  for (const own of verificationOrder(world)) {
+    status[own] = contextUnbound
+      ? { kind: "invalid", code: "cert_context_unbound", detail: "certifying check supplied an all-zero (unbound) cert context" }
+      : verifyCert(world[own]!, program, profile, ctx, certContext, profile.limits, {
+          own,
+          worldLen: world.length,
+        }, { certs: world, status }, readClauses);
+  }
+  // The order covers every index, so every status is set; a gap would be a checker defect,
+  // refused rather than read as Valid.
+  return status.map(
+    (s) => s ?? { kind: "invalid", code: "cert_scope_incomplete", detail: "certificate was never verified" },
+  );
+}
+
+/**
  * Verify one certificate fully, ONCE, in the normative order
  * budget → context → partition → scope-closure → domain → support → closure → EDB
  * (ADR 0007 §3). The budget gate is first (before any scan); context is RECOMPUTED, not
@@ -306,10 +366,9 @@ function refAtom(ref: SupportRef): GroundLiteral | undefined {
  *
  * `world` is the derivation's `closedWorld` with the statuses computed so far, in
  * `verificationOrder`: every certificate at a lower level is final, so a predicate this cert
- * reads from one is read only once that cert is known Valid (#2258 (a)). It defaults to a world
- * holding only this cert, which has nothing below it.
+ * reads from one is read only once that cert is known Valid (#2258 (a)). The whole-chain check owns the status table.
  */
-export function verifyCert<C>(
+function verifyCert<C>(
   cert: ClosedModelCert,
   program: Program,
   profile: CheckProfile<C>,
@@ -318,6 +377,7 @@ export function verifyCert<C>(
   limits: CheckLimits,
   place: CertPlace,
   world: CertWorld,
+  readClauses: () => readonly Clause[] | undefined,
 ): CertStatus {
   const theory = profile.theory;
   // 1. BUDGET GATE — first, before any scan.
@@ -333,14 +393,16 @@ export function verifyCert<C>(
   //     naming the real cause.
   e = checkCertCanonicalForm(cert);
   if (e) return invalid(e[0], e[1]);
+  const clauses = readClauses();
+  if (clauses === undefined) return invalid("cert_scope_incomplete", "program does not supply complete clause enumeration");
   // 1c. PARTIAL SUB-SCOPE (ADR 0030 D1) — canonical, a non-empty subset of the sealed prefix
   //     at its own level, upward-closed within it, never an extensional table. Verified
   //     before any table is consulted: a certificate is untrusted input.
-  e = checkCertPartialScope(cert, program, profile.leaves.extensional());
+  e = checkCertPartialScope(cert, clauses, profile.leaves.extensional());
   if (e) return invalid(e[0], e[1]);
   // 2. CONTEXT — recompute program_hash from the live program; require the cert pin to
   //    equal it AND all four pins to equal the caller-derived context.
-  e = checkCertContext(cert, program, certContext);
+  e = checkCertContext(cert, clauses, certContext);
   if (e) return invalid(e[0], e[1]);
   // 2a. PARTITION GATE — a stratum prefix holds only intensional/extensional predicates,
   //     NEVER theory-owned builtins (decided LIVE by the Theory, not sealed in a table).
@@ -354,17 +416,13 @@ export function verifyCert<C>(
   }
   // 2b. STACKED READS (#2258 (a)) — every predicate a sealed clause reads without this cert
   //     sealing it resolves to the UNIQUE certificate at a strictly lower level that seals it
-  //     EXACTLY and is Valid; an invalid one invalidates this cert with its own code. (A program
-  //     that cannot enumerate its clauses is refused by the scope gate next.)
-  let view = new CertView(cert);
-  const clauses = collectClauses(program);
-  if (clauses !== undefined) {
-    const resolved = resolveLowerSeals(cert, place.own, world, clauses, theory);
-    if ("err" in resolved) return invalid(resolved.err[0], resolved.err[1]);
-    view = resolved.view;
-  }
+  //     EXACTLY and is Valid; an invalid one invalidates this cert with its own code. The inventory is shared
+  //     by all certificates of this world.
+  const resolved = resolveLowerSeals(cert, place.own, world, clauses, theory);
+  if ("err" in resolved) return invalid(resolved.err[0], resolved.err[1]);
+  const view = resolved.view;
   // 3. SCOPE DOWNWARD-CLOSURE — the sealed prefix must be self-contained.
-  e = checkScopeDownwardClosed(view, program, theory);
+  e = checkScopeClauses(view, clauses, theory);
   if (e) return invalid(e[0], e[1]);
   // 4. DOMAIN COVERAGE — every value reachable through the cert lies in ∪domains.
   e = checkCertDomainCoverage(cert);
@@ -373,7 +431,7 @@ export function verifyCert<C>(
   e = checkCertSupport(view, place, program, theory, profile.leaves.extensional());
   if (e) return invalid(e[0], e[1]);
   // 6. CLOSURE — least model ⊆ E, driven by the TRUSTED enumerated defining clauses.
-  e = checkCertClosure(view, program, theory, limits);
+  e = checkCertClosure(view, clauses, theory, limits);
   if (e) return invalid(e[0], e[1]);
   // 7. EDB BINDING — every sealed extensional predicate's table == the live EDB snapshot.
   e = checkCertEdb(cert, profile.leaves, ctx);
@@ -394,7 +452,7 @@ export function verifyCert<C>(
  * table is never partial (snapshot-bound, complete by definition). Mirrors rs
  * `check_cert_partial_scope` / go `checkCertPartialScope` — same code, same order.
  */
-function checkCertPartialScope(cert: ClosedModelCert, program: Program, extensional: PredicateSet): GateErr {
+function checkCertPartialScope(cert: ClosedModelCert, clauses: readonly Clause[], extensional: PredicateSet): GateErr {
   const p = cert.partialScope;
   if (p === undefined) return undefined;
   const bad = (detail: string): GateErr => ["cert_partial_scope_invalid", detail];
@@ -419,8 +477,6 @@ function checkCertPartialScope(cert: ClosedModelCert, program: Program, extensio
       );
     }
   }
-  const clauses = collectClauses(program);
-  if (clauses === undefined) return undefined; // step 3 refuses such a program by name
   for (const clause of clauses) {
     if (!cert.scope.seals(clause.head.pred) || cert.isPartial(clause.head.pred)) continue;
     for (const bl of clause.body) {
@@ -478,11 +534,7 @@ function checkCertCanonicalForm(cert: ClosedModelCert): GateErr {
  * then require the cert's four pins to equal the caller-derived `certContext`. A program
  * that cannot be enumerated (no `forEachClause`) is `cert_scope_incomplete`.
  */
-function checkCertContext(cert: ClosedModelCert, program: Program, certContext: CertContext): GateErr {
-  const clauses = collectClauses(program);
-  if (clauses === undefined) {
-    return ["cert_scope_incomplete", "program does not support whole-clause enumeration (forEachClause)"];
-  }
+function checkCertContext(cert: ClosedModelCert, clauses: readonly Clause[], certContext: CertContext): GateErr {
   // ADR 0029 D10 — WHICH CLAUSE SET DOES programHash PIN? See the rs twin in
   // contract/rs/src/check/cert.rs for the full argument; the four cases are identical.
   //
@@ -539,22 +591,34 @@ export function programDigestOverScope(clauses: readonly Clause[], cert: ClosedM
   return programDigest(clauses.filter((c) => cert.scope.seals(c.head.pred)));
 }
 
-/** All clauses of the program in canonical order, or `undefined` if it cannot enumerate. */
+/** Own each emitted clause before returning to a provider that may reuse its buffers. */
 function collectClauses(program: Program): Clause[] | undefined {
-  if (typeof program.forEachClause !== "function") return undefined;
-  const out: Clause[] = [];
-  program.forEachClause((_id, clause) => out.push(clause));
-  return out;
+  const enumerate = program.forEachClause;
+  if (typeof enumerate !== "function") return undefined;
+  const clauses: Clause[] = [];
+  const visit = (_id: ClauseId, clause: Clause): void => { clauses.push(captureClause(clause)); };
+  Reflect.apply(enumerate, program, [visit]);
+  return clauses;
 }
 
-/**
- * The canonical program digest of a `Program` — `programDigest` over its clauses in canonical
- * order (or over the empty program when it cannot enumerate). The Go/rs `ProgramDigestOf` /
- * `program_digest(&dyn Program)` sibling: the value the certify gate pins as a cert context's
- * `programHash` (which `check` re-derives independently — the soundness anchor).
- */
-export function programDigestOf(program: Program): Hash {
-  return programDigest(collectClauses(program) ?? []);
+/** Resolve the inventory once for the world, after a certificate's size and form gates. */
+function worldClauses(program: Program): () => readonly Clause[] | undefined {
+  let read = false;
+  let clauses: Clause[] | undefined;
+  return () => {
+    if (!read) {
+      clauses = collectClauses(program);
+      read = true;
+    }
+    return clauses;
+  };
+}
+
+/** The canonical digest of every clause of a complete program, independent of traversal order. */
+export function programDigestOf(program: CompleteProgram): Hash {
+  const clauses = collectClauses(program);
+  if (clauses === undefined) throw new TypeError("programDigestOf requires complete clause enumeration");
+  return programDigest(clauses);
 }
 
 // -------------------------------- §step1 budget gate -----------------------------
@@ -620,11 +684,13 @@ export function checkScopeDownwardClosed(
   program: Program,
   theory: Theory,
 ): readonly [RejectionCode, string] | undefined {
-  const cert = view.cert;
   const clauses = collectClauses(program);
-  if (clauses === undefined) {
-    return ["cert_scope_incomplete", "program does not support whole-clause enumeration (forEachClause)"];
-  }
+  if (clauses === undefined) return ["cert_scope_incomplete", "program does not supply complete clause enumeration"];
+  return checkScopeClauses(view, clauses, theory);
+}
+
+function checkScopeClauses(view: CertView, clauses: readonly Clause[], theory: Theory): GateErr {
+  const cert = view.cert;
   // #3067 (research 0028 row A15): every gate is the contract tier's ONE classification,
   // `classifySealedClause`, which the seal plan calls too. check builds the clause's context from this
   // certificate and the lower certificates it resolved (step 2b), and the scope's dependency graph
@@ -910,13 +976,10 @@ function resolveSupportRef(
  * length. A lower-stratum support ref names a cert index, and #2258 C3 checks it against this.
  * Mirrors Rust's `CertPlace`.
  */
-export interface CertPlace {
+interface CertPlace {
   readonly own: number;
   readonly worldLen: number;
 }
-
-/** A cert verified on its own: a single-cert world with the cert at index 0. */
-export const STANDALONE_CERT: CertPlace = { own: 0, worldLen: 1 };
 
 /**
  * #2258: the cert index a `lower_stratum` / `neg_lower` support ref names must be one this checker
@@ -972,12 +1035,8 @@ function checkSupportRefCert(
  * a row of that literal's table matching it — exactly a tuple the join emits. Neither
  * direction under-fires. Mirrors Rust's `check_cert_closure`.
  */
-function checkCertClosure(view: CertView, program: Program, theory: Theory, limits: CheckLimits): GateErr {
+function checkCertClosure(view: CertView, clauses: readonly Clause[], theory: Theory, limits: CheckLimits): GateErr {
   const cert = view.cert;
-  const clauses = collectClauses(program);
-  if (clauses === undefined) {
-    return ["cert_scope_incomplete", "program does not support whole-clause enumeration (forEachClause)"];
-  }
   const counters = { groundings: 0, joins: 0 };
   for (const clause of clauses) {
     if (!cert.scope.seals(clause.head.pred)) continue;
@@ -1624,7 +1683,8 @@ function checkCertEdb<C>(cert: ClosedModelCert, leaves: LeafVerifier<C>, ctx: C)
     const table = cert.table(pred);
     const rows: readonly GroundLiteral[] = table ? table.rows : [];
     const recomputed = edbTableHash(pred, rows);
-    const attested = typeof leaves.edbSnapshot === "function" ? leaves.edbSnapshot(pred, ctx) : undefined;
+    const snapshot = leaves.edbSnapshot;
+    const attested = typeof snapshot === "function" ? Reflect.apply(snapshot, leaves, [pred, ctx]) : undefined;
     if (attested === undefined) {
       return ["cert_edb_mismatch", `no live EDB snapshot attested for sealed extensional predicate ${predDebug(pred)}`];
     }
@@ -1831,7 +1891,7 @@ export function projectEquals(a: ProjectSpec, b: ProjectSpec): boolean {
 
 /** A predicate symbol rendered for a diagnostic detail string (utf-8 lossy, quoted). */
 function predDebug(pred: Symbol): string {
-  return `"${UTF8_LOSSY.decode(pred.bytes())}"`;
+  return `"${decodeUtf8Lossy(pred.bytes())}"`;
 }
 
 /** Lowercase-hex of a byte slice (a stable map key for canonical codec bytes). */

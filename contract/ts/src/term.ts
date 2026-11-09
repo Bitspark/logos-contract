@@ -13,9 +13,9 @@ import {
   atom as valueAtom,
   tuple as valueTuple,
   bytesEqual,
-  copyBytes,
   type Value,
 } from "@bitspark/ontos-core";
+import { copyOctets, type OctetSource } from "./octets.js";
 import { wellFormedUtf16 } from "./utf8.js";
 
 /**
@@ -109,6 +109,10 @@ export class VarIdError extends Error {
 export class VarId {
   readonly #name: string;
 
+  static [Symbol.hasInstance](value: unknown): boolean {
+    return typeof value === "object" && value !== null && #name in value;
+  }
+
   constructor(name: string) {
     if (!wellFormedUtf16(name)) throw new VarIdError(name);
     this.#name = name;
@@ -136,17 +140,21 @@ export class TermAtom {
   readonly kind = "atom" as const;
   readonly #bytes: Uint8Array;
 
-  constructor(bytes: Uint8Array) {
-    this.#bytes = bytes;
+  static [Symbol.hasInstance](value: unknown): boolean {
+    return typeof value === "object" && value !== null && #bytes in value;
+  }
+
+  constructor(bytes: OctetSource) {
+    this.#bytes = copyOctets(bytes);
     Object.freeze(this);
   }
 
   bytes(): Uint8Array {
-    return this.#bytes;
+    return this.#bytes.slice();
   }
 
   equals(other: Term): boolean {
-    return other.kind === "atom" && bytesEqual(this.#bytes, other.bytes());
+    return other.kind === "atom" && bytesEqual(this.#bytes, other.#bytes);
   }
 }
 
@@ -154,6 +162,10 @@ export class TermAtom {
 export class TermTuple {
   readonly kind = "tuple" as const;
   readonly #children: readonly Term[];
+
+  static [Symbol.hasInstance](value: unknown): boolean {
+    return typeof value === "object" && value !== null && #children in value;
+  }
 
   constructor(children: readonly Term[]) {
     this.#children = Object.freeze(Array.from(children));
@@ -195,6 +207,10 @@ export class TermVar {
   readonly kind = "var" as const;
   readonly #id: VarId;
 
+  static [Symbol.hasInstance](value: unknown): boolean {
+    return typeof value === "object" && value !== null && #id in value;
+  }
+
   constructor(id: VarId) {
     this.#id = id;
     Object.freeze(this);
@@ -209,9 +225,18 @@ export class TermVar {
   }
 }
 
+Object.freeze(VarId.prototype);
+Object.freeze(VarId);
+Object.freeze(TermAtom.prototype);
+Object.freeze(TermAtom);
+Object.freeze(TermTuple.prototype);
+Object.freeze(TermTuple);
+Object.freeze(TermVar.prototype);
+Object.freeze(TermVar);
+
 export const Term = {
-  atom(bytes: Uint8Array | readonly number[]): Term {
-    return new TermAtom(copyBytes(bytes));
+  atom(bytes: OctetSource): Term {
+    return new TermAtom(bytes);
   },
   tuple(children: Iterable<Term>): Term {
     return new TermTuple(Array.from(children));
@@ -384,6 +409,8 @@ export const Term = {
     return out[out.length - 1]!;
   },
 };
+
+Object.freeze(Term);
 
 // ===========================================================================
 // account-v2 list canonicalization (cons ↔ `list`) — the BIJECTION on ground proper

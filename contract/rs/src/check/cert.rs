@@ -21,7 +21,9 @@ use crate::engine::NoCallerLimit;
 use crate::fragment::{classify_sealed_clause, Outside, ScopeGraph};
 use crate::intval::BigInt;
 use crate::literal::{GroundLiteral, Symbol};
-use crate::program::{BodyLit, Clause, PredicateRef, Program, ProjectSpec};
+use crate::program::{
+    BodyLit, Clause, ClauseId, CompleteProgram, PredicateRef, Program, ProjectSpec,
+};
 use crate::spi::{LeafVerifier, Theory};
 use crate::term::Term;
 use ontos_core::Value;
@@ -80,6 +82,60 @@ pub(super) struct CertPlace {
     pub(super) world_len: usize,
 }
 
+/// One authoritative inventory per world, first read after certificate size and form
+/// checks. Capture each row before returning to a store that computes its handles or clauses.
+pub(super) struct WorldProgram<'a> {
+    source: &'a dyn Program,
+    inventory: std::cell::OnceCell<Option<CheckedProgram<'a>>>,
+}
+
+impl<'a> WorldProgram<'a> {
+    pub(super) fn new(source: &'a dyn Program) -> Self {
+        Self {
+            source,
+            inventory: std::cell::OnceCell::new(),
+        }
+    }
+
+    fn complete(&self) -> Option<&CheckedProgram<'a>> {
+        self.inventory
+            .get_or_init(|| {
+                let complete = self.source.as_complete()?;
+                let mut clauses = Vec::new();
+                complete
+                    .for_each_clause(&mut |id, clause| clauses.push((id.clone(), clause.clone())));
+                Some(CheckedProgram {
+                    source: self.source,
+                    clauses,
+                })
+            })
+            .as_ref()
+    }
+}
+
+struct CheckedProgram<'a> {
+    source: &'a dyn Program,
+    clauses: Vec<(ClauseId, Clause)>,
+}
+
+impl Program for CheckedProgram<'_> {
+    fn clause(&self, id: &ClauseId) -> Option<&Clause> {
+        self.source.clause(id)
+    }
+
+    fn as_complete(&self) -> Option<&dyn CompleteProgram> {
+        Some(self)
+    }
+}
+
+impl CompleteProgram for CheckedProgram<'_> {
+    fn for_each_clause(&self, visit: &mut dyn FnMut(&ClauseId, &Clause)) {
+        for (id, clause) in &self.clauses {
+            visit(id, clause);
+        }
+    }
+}
+
 /// Verify one certificate fully, ONCE, in the normative order
 /// **budget → context → scope-closure → domain → support → closure → EDB** (ADR
 /// 0007 §3), with a canonical-form precheck (1b, issue #839) between budget and
@@ -99,7 +155,7 @@ pub(super) fn verify_cert<C>(
     place: CertPlace,
     world: &[ClosedModelCert],
     status: &[Option<CertStatus>],
-    program: &dyn Program,
+    source: &WorldProgram<'_>,
     profile: &CheckProfile<C>,
     ctx: &C,
     cert_context: &CertContext,
@@ -122,6 +178,12 @@ pub(super) fn verify_cert<C>(
     if let Err((code, detail)) = check_cert_canonical_form(cert) {
         return CertStatus::Invalid(code, detail);
     }
+    let Some(program) = source.complete() else {
+        return CertStatus::Invalid(
+            RejectionCode::CertScopeIncomplete,
+            "program does not supply complete clause enumeration".into(),
+        );
+    };
     // 1c. PARTIAL SUB-SCOPE (ADR 0030 D1) — before any table is consulted: `partial_scope` is
     //     the one field a malicious producer would most like the checker to trust, so its three
     //     invariants are verified up front. A cert with no `partial_scope` passes untouched.
@@ -212,7 +274,7 @@ pub(super) fn verify_cert<C>(
 ///     snapshot is complete by definition.
 fn check_cert_partial_scope(
     cert: &ClosedModelCert,
-    program: &dyn Program,
+    program: &dyn CompleteProgram,
     extensional: &crate::PredicateSet,
 ) -> Result<(), (RejectionCode, String)> {
     let Some(partial) = cert.partial_scope.as_ref() else {
@@ -330,7 +392,7 @@ const PROGRAM_PREFIX: &[u8] = b"logos/account/program/v1\n";
 /// require the cert's four pins to equal the caller-derived `cert_context`.
 fn check_cert_context(
     cert: &ClosedModelCert,
-    program: &dyn Program,
+    program: &dyn CompleteProgram,
     cert_context: &CertContext,
 ) -> Result<(), (RejectionCode, String)> {
     // ADR 0029 D10 — WHICH CLAUSE SET DOES `program_hash` PIN?
@@ -412,14 +474,14 @@ fn check_cert_context(
 }
 
 /// The canonical program digest: `SHA-256(PROGRAM_PREFIX ‖ ⨁ len-prefixed sorted
-/// clause_bytes)` over the program's COMPLETE clause set ([`Program::for_each_clause`]).
+/// clause_bytes)` over the program's COMPLETE clause set ([`CompleteProgram::for_each_clause`]).
 /// Sorting the per-clause frozen account bytes makes the digest independent of
 /// enumeration order and commits to the whole clause set — a dropped or added clause
 /// changes the digest, so an attacker cannot hide a defining clause.
 ///
 /// Public so a consumer that wants certifiable negation can DERIVE the `program_hash`
 /// of its bound [`CertContext`] from the live program it runs (ADR 0007 §3.1).
-pub fn program_digest(program: &dyn Program) -> Hash {
+pub fn program_digest(program: &dyn CompleteProgram) -> Hash {
     recompute_program_hash(program)
 }
 
@@ -433,7 +495,10 @@ pub fn program_digest(program: &dyn Program) -> Hash {
 ///
 /// A predicate that is a dependency-edge TARGET but not a stratum member (an EDB predicate)
 /// contributes no clause, exactly as it contributes none to the component.
-fn recompute_program_hash_over_scope(program: &dyn Program, cert: &ClosedModelCert) -> Hash {
+fn recompute_program_hash_over_scope(
+    program: &dyn CompleteProgram,
+    cert: &ClosedModelCert,
+) -> Hash {
     let mut clause_byte_vecs: Vec<Vec<u8>> = Vec::new();
     program.for_each_clause(&mut |_id, clause| {
         if cert.scope.seals(&clause.head.pred) {
@@ -451,7 +516,7 @@ fn recompute_program_hash_over_scope(program: &dyn Program, cert: &ClosedModelCe
     hasher.finalize().into()
 }
 
-fn recompute_program_hash(program: &dyn Program) -> Hash {
+fn recompute_program_hash(program: &dyn CompleteProgram) -> Hash {
     let mut clause_byte_vecs: Vec<Vec<u8>> = Vec::new();
     program.for_each_clause(&mut |_id, clause| {
         clause_byte_vecs.push(crate::account::clause_bytes(clause));
@@ -608,7 +673,7 @@ fn check_cert_budget(
 /// literal is decidable against a table of `view` or the pinned `Theory`.
 pub(super) fn check_scope_downward_closed(
     view: &CertView<'_>,
-    program: &dyn Program,
+    program: &dyn CompleteProgram,
     theory: &dyn Theory,
 ) -> Result<(), (RejectionCode, String)> {
     let cert = view.cert;
@@ -802,7 +867,7 @@ fn check_cert_edb<C>(
 
 /// §3.3 CLOSURE: least model ⊆ E, by a checker JOIN over the sealed extensions of the
 /// TRUSTED defining-clause set (#1829). For EVERY clause in the whole program (via the
-/// trusted [`Program::for_each_clause`]) whose head is sealed by `cert.scope`, join its
+/// trusted [`CompleteProgram::for_each_clause`]) whose head is sealed by `cert.scope`, join its
 /// positive sealed body literals over their sealed tables; every tuple the join emits is
 /// a grounding whose body is true against `E` (+ the pinned Theory), so its head MUST be
 /// present in `E`, else `cert_not_closed`. A satisfied grounding whose head value escapes
@@ -836,7 +901,7 @@ fn check_cert_edb<C>(
 /// satisfied grounding is still emitted, and its head is verified present and in-domain.
 fn check_cert_closure(
     view: &CertView<'_>,
-    program: &dyn Program,
+    program: &dyn CompleteProgram,
     theory: &dyn Theory,
     limits: &CheckLimits,
 ) -> Result<(), (RejectionCode, String)> {
@@ -896,7 +961,7 @@ fn check_cert_closure(
 /// counters — is the checker's code path.
 pub fn closure_join_cost(
     cert: &ClosedModelCert,
-    program: &dyn Program,
+    program: &dyn CompleteProgram,
     theory: &dyn Theory,
     limits: &CheckLimits,
 ) -> Result<(usize, usize), (RejectionCode, String)> {
@@ -917,7 +982,7 @@ pub fn closure_join_cost(
 pub fn closure_join_cost_in_world(
     world: &[ClosedModelCert],
     own: usize,
-    program: &dyn Program,
+    program: &dyn CompleteProgram,
     theory: &dyn Theory,
     limits: &CheckLimits,
 ) -> Result<(usize, usize), (RejectionCode, String)> {
@@ -933,7 +998,7 @@ pub fn closure_join_cost_in_world(
 
 fn closure_join_cost_over(
     view: &CertView<'_>,
-    program: &dyn Program,
+    program: &dyn CompleteProgram,
     theory: &dyn Theory,
     limits: &CheckLimits,
 ) -> Result<(usize, usize), (RejectionCode, String)> {
@@ -971,7 +1036,7 @@ fn closure_join_cost_over(
 #[cfg(test)]
 pub(super) fn closure_join_trace(
     view: &CertView<'_>,
-    program: &dyn Program,
+    program: &dyn CompleteProgram,
     theory: &dyn Theory,
     limits: &CheckLimits,
     verify: bool,

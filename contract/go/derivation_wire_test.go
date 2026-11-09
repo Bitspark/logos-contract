@@ -172,15 +172,15 @@ func TestDerivationWirePositiveVectors(t *testing.T) {
 	vf := loadDerivationWireVectors(t)
 	for _, c := range vf.Positive {
 		deriv := dwFixture(t, c.Name)
-		got := hex.EncodeToString(EncodeDerivationWireV1(deriv))
+		got := hex.EncodeToString(mustWire(EncodeDerivationWireV1(deriv)))
 		if got != c.WireHex {
 			t.Fatalf("%s wire bytes\n got  %s\n want %s", c.Name, got, c.WireHex)
 		}
-		decoded, err := DecodeDerivationWireV1(EncodeDerivationWireV1(deriv))
+		decoded, err := DecodeDerivationWireV1(mustWire(EncodeDerivationWireV1(deriv)))
 		if err != nil {
 			t.Fatalf("%s decode: %v", c.Name, err)
 		}
-		if rt := hex.EncodeToString(EncodeDerivationWireV1(decoded)); rt != c.WireHex {
+		if rt := hex.EncodeToString(mustWire(EncodeDerivationWireV1(decoded))); rt != c.WireHex {
 			t.Fatalf("%s round-trip bytes\n got  %s\n want %s", c.Name, rt, c.WireHex)
 		}
 	}
@@ -230,7 +230,7 @@ func TestDerivationWireDecodesVectorsAreAcceptedAndRoundTrip(t *testing.T) {
 		if d.Root != c.Root || len(d.Nodes) != c.Nodes {
 			t.Fatalf("%s: root %d over %d nodes, want root %d over %d", c.Name, d.Root, len(d.Nodes), c.Root, c.Nodes)
 		}
-		if rt := hex.EncodeToString(EncodeDerivationWireV1(d)); rt != c.WireHex {
+		if rt := hex.EncodeToString(mustWire(EncodeDerivationWireV1(d))); rt != c.WireHex {
 			t.Fatalf("%s re-encodes\n got  %s\n want %s", c.Name, rt, c.WireHex)
 		}
 	}

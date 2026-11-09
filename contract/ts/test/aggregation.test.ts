@@ -658,6 +658,49 @@ test("#2569: a world cited by many answers is verified once", () => {
   assert.equal(memo.certificatesVerified, 1, "five answers citing one certificate verify it once");
 });
 
+test("a verifier can change the producer's pin without changing the memo's verified world", () => {
+  const program = baseProgram();
+  const cert = certWith(program, { profileHash: PROFILE_PIN.slice() });
+  const deriv = memoDeriv(cert);
+  const profile = aggProfile();
+  const stable = profile.leaves;
+  // test-double: consumer(attests the fixed EDB while changing only the producer's pin)
+  const leaves: LeafVerifier<void> = {
+    extensional: () => stable.extensional(),
+    verify: (literal, ev, ctx) => stable.verify(literal, ev, ctx),
+    edbSnapshot(pred, ctx) {
+      cert.profileHash.fill(0);
+      return stable.edbSnapshot!(pred, ctx);
+    },
+  };
+  const memo = new WorldMemo(program, { ...profile, leaves }, undefined, boundContext(program));
+  assert.equal(checkWithWorldMemo(memo, memoClaim(), deriv).kind, "accept");
+  const fresh = memoFresh(program, profile, memoClaim(), deriv);
+  assertReject(fresh, "cert_context_mismatch");
+  assert.deepEqual(checkWithWorldMemo(memo, memoClaim(), deriv), fresh);
+  assert.equal(memo.certificatesVerified, 2);
+});
+
+test("a consumer cannot inject a valid world status or alter the memo's bound pins", () => {
+  const program = baseProgram();
+  const profile = aggProfile();
+  const context = { ...boundContext(program), profileHash: PROFILE_PIN.slice() };
+  class InjectedMemo extends WorldMemo<void> {
+    statuses() { return [{ kind: "valid" }]; }
+  }
+  const memo = new InjectedMemo(program, profile, undefined, context);
+  const valid = memoDeriv(validCert(program));
+  context.profileHash.fill(0);
+  memo.certContext.profileHash.fill(0);
+  assert.equal(checkWithWorldMemo(memo, memoClaim(), valid).kind, "accept");
+  const invalid = memoDeriv(certWith(program, { profileHash: new Uint8Array(32) }));
+  const expected = memoFresh(program, profile, memoClaim(), invalid);
+  assertReject(expected, "cert_context_mismatch");
+  assert.deepEqual(checkWithWorldMemo(memo, memoClaim(), invalid), expected);
+  assert.equal(memo.certificatesVerified, 2);
+  assert.equal(Reflect.get(WorldMemo.prototype, "statuses"), undefined);
+});
+
 test("#2569: a changed certificate is a miss with the fresh verdict", () => {
   const program = baseProgram();
   const prof = aggProfile();

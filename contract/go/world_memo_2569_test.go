@@ -9,6 +9,7 @@ package contract
 import (
 	"reflect"
 	"testing"
+	"time"
 
 	core "github.com/bitspark/ontos/core/go"
 )
@@ -19,7 +20,7 @@ func memoDeriv(cert ClosedModelCert) Derivation {
 	return aggCountDerivation(cEligibleCount, "eligible_count", Rows(), 4, cert)
 }
 
-func memoFresh(program Program, prof *CheckProfile[struct{}], claim GroundLiteral, deriv Derivation) Outcome {
+func memoFresh(program CompleteProgram, prof *CheckProfile[struct{}], claim GroundLiteral, deriv Derivation) Outcome {
 	return CheckWithCertContext[struct{}](program, claim, deriv, struct{}{}, prof, aggBoundContext(program))
 }
 
@@ -68,6 +69,108 @@ func TestWorldMemoVerifiesAWorldCitedByManyAnswersOnce2569(t *testing.T) {
 	}
 	if got := memo.CertificatesVerified(); got != 1 {
 		t.Fatalf("five answers citing one certificate verified %d certificates, want 1", got)
+	}
+}
+
+// test-double: consumer(attests its fixed EDB and retains the producer's input)
+type editingSnapshot struct {
+	*aggLeaves
+	edit func()
+}
+
+func (s editingSnapshot) EdbSnapshot(pred Symbol, ctx struct{}) (Hash, bool) {
+	s.edit()
+	return s.aggLeaves.EdbSnapshot(pred, ctx)
+}
+
+func TestWorldMemoBindsTheWorldBeforeCallingTheVerifier(t *testing.T) {
+	program := aggBaseProgram()
+	deriv := memoDeriv(aggValidCert())
+	profile := aggProfile()
+	profile.Leaves = editingSnapshot{profile.Leaves.(*aggLeaves), func() {
+		// The attestor still attests the same EDB. Only the producer's proposed
+		// certificate changes during the callback, after context validation.
+		deriv.ClosedWorld[0].ProfileHash[0] = 0
+		deriv.ClosedWorld[0].Extensions[0] = NewRelationTable(aggSym("obs"), 3, nil)
+	}}
+	memo := NewWorldMemo(program, profile, struct{}{}, aggBoundContext(program))
+	if first := CheckWithWorldMemo(memo, memoClaim(), deriv); !first.IsAccept() {
+		t.Fatalf("the original verified table should discharge the original count: %s", first)
+	}
+	fresh := memoFresh(program, aggProfile(), memoClaim(), deriv)
+	if fresh.IsAccept() || fresh.Code() != CertContextMismatch {
+		t.Fatalf("control: the changed input should fail the context check: %s", fresh)
+	}
+	if got := CheckWithWorldMemo(memo, memoClaim(), deriv); got.String() != fresh.String() || memo.CertificatesVerified() != 2 {
+		t.Fatalf("the changed world needs a fresh verification: %s, verified %d", got, memo.CertificatesVerified())
+	}
+}
+
+func TestWorldMemoCanBeReenteredDuringCertificateVerification(t *testing.T) {
+	program := aggBaseProgram()
+	profile := aggProfile()
+	deriv := memoDeriv(aggValidCert())
+	var memo *WorldMemo[struct{}]
+	entered, innerOK := false, false
+	profile.Leaves = editingSnapshot{profile.Leaves.(*aggLeaves), func() {
+		if !entered {
+			entered = true
+			innerOK = CheckWithWorldMemo(memo, memoClaim(), deriv).IsAccept()
+		}
+	}}
+	memo = NewWorldMemo(program, profile, struct{}{}, aggBoundContext(program))
+	done := make(chan bool, 1)
+	go func() {
+		first := CheckWithWorldMemo(memo, memoClaim(), deriv)
+		repeated := CheckWithWorldMemo(memo, memoClaim(), deriv)
+		done <- first.IsAccept() && innerOK && repeated.IsAccept() && memo.CertificatesVerified() == 2
+	}()
+	select {
+	case ok := <-done:
+		if !ok {
+			t.Fatal("the overlapping misses must both verify and the subsequent hit must reuse their result")
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("world verification held the cache lock across its callback")
+	}
+}
+
+func TestWorldMemoPublishesOverlappingVerifiedWorlds(t *testing.T) {
+	program := aggBaseProgram()
+	profile := aggProfile()
+	entered := make(chan struct{}, 2)
+	release := make(chan struct{})
+	profile.Leaves = editingSnapshot{profile.Leaves.(*aggLeaves), func() {
+		select {
+		case <-release:
+			return
+		default:
+		}
+		entered <- struct{}{}
+		<-release
+	}}
+	memo := NewWorldMemo(program, profile, struct{}{}, aggBoundContext(program))
+	deriv := memoDeriv(aggValidCert())
+	results := make(chan Outcome, 2)
+	for range 2 {
+		go func() { results <- CheckWithWorldMemo(memo, memoClaim(), deriv) }()
+	}
+	for range 2 {
+		select {
+		case <-entered:
+		case <-time.After(5 * time.Second):
+			close(release)
+			t.Fatal("both misses must be able to enter the verifier")
+		}
+	}
+	close(release)
+	for range 2 {
+		if out := <-results; !out.IsAccept() {
+			t.Fatal(out)
+		}
+	}
+	if out := CheckWithWorldMemo(memo, memoClaim(), deriv); !out.IsAccept() || memo.CertificatesVerified() != 2 {
+		t.Fatalf("overlapping misses then reuse: %v, verified %d", out, memo.CertificatesVerified())
 	}
 }
 

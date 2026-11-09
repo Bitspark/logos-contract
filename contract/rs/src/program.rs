@@ -33,22 +33,15 @@ impl<S: Into<String>> From<S> for ClauseId {
     }
 }
 
-/// An **arity-sensitive** reference to the sealed relation a certifiable aggregate
-/// counts over (ADR 0023, the #581 sharpening). A counted relation is matched by name
-/// **and** arity — `obs/3` and `obs/2` are *different* relations, so the count premise
-/// pins both. A `pred`/`arity` that names no sealed table, or a wrong arity, is rejected
-/// (`count_attr_out_of_range`) rather than silently counting a different-arity table.
-///
-/// Replaces the bare [`Symbol`] the early ADR-0023 draft carried in `CountLit`/
-/// `Premise::Count`; threading the arity here is the one expert sharpening shared by all
-/// three cores before the go/ts mirror, so a wrong-arity count can never slip past name
-/// agreement alone.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+/// A relation identified by its predicate's exact bytes and unsigned arity.
+/// Finite dataset bindings use this key. A count premise uses it to select a
+/// sealed relation table of that same arity. Canonical order compares predicate
+/// bytes first, then arity numerically.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct PredicateRef {
-    /// The counted relation's predicate symbol.
+    /// The relation's predicate symbol.
     pub pred: Symbol,
-    /// The counted relation's arity (number of arguments). A sealed table is matched
-    /// only when BOTH its predicate and its arity equal this ref.
+    /// The relation's arity (number of arguments).
     pub arity: u32,
 }
 
@@ -364,29 +357,21 @@ impl Clause {
     }
 }
 
-/// The only capability `check` requires of a program: look a cited clause up by id
-/// (§2 "local checking"). Whole-program predicate-partition hygiene (§4.4) is a
-/// consumer / program-loading responsibility, not a per-`check` obligation.
-///
-/// **ADR 0007 closure soundness (additive).** Certifying a negated premise `\+ r(a)`
-/// requires the checker to enumerate **every** clause defining a sealed predicate —
-/// the support witness's cited clauses are attacker-chosen and cannot be trusted to
-/// be complete (a non-cited defining clause could hide a derivable head). So the
-/// trait gains [`Program::for_each_clause`], a **trusted** whole-program iteration.
-/// It is **DEFAULTED to a no-op** (additive — no existing impl breaks): a program
-/// that does not override it exposes an *empty* clause set, which is **fail-closed**
-/// — the closure check then finds no defining clauses and (if any predicate the
-/// scope seals has no enumerated clause yet a `\+` cites it) the cert is rejected,
-/// never wrongly accepted. A consumer that wants certifiable negation MUST override
-/// it to enumerate its real clause set (as [`MapProgram`] does).
+/// The application's trusted lookup of clauses by handle. Positive proofs require only lookup.
 pub trait Program {
     fn clause(&self, id: &ClauseId) -> Option<&Clause>;
 
-    /// Iterate **every** clause of the program, calling `f` with each `(id, clause)`.
-    /// The closure check (ADR 0007) drives over this to find all clauses defining a
-    /// sealed predicate. **Defaulted to a no-op** (empty enumeration) — additive and
-    /// fail-closed; certifiable negation requires a real override.
-    fn for_each_clause(&self, _f: &mut dyn FnMut(&ClauseId, &Clause)) {}
+    /// An inventory of this same program when the application can attest completeness.
+    fn as_complete(&self) -> Option<&dyn CompleteProgram> {
+        None
+    }
+}
+
+/// The complete finite clause inventory of a program, in canonical clause-id order.
+/// An empty traversal declares a genuinely empty program. Keep the interpretation
+/// stable for the check or binding. The references need only live for each visit.
+pub trait CompleteProgram: Program {
+    fn for_each_clause(&self, visit: &mut dyn FnMut(&ClauseId, &Clause));
 }
 
 /// A straightforward in-memory `Program` (a `ClauseId → Clause` map). Provided for
@@ -439,6 +424,12 @@ impl Program for MapProgram {
         self.clauses.get(id)
     }
 
+    fn as_complete(&self) -> Option<&dyn CompleteProgram> {
+        Some(self)
+    }
+}
+
+impl CompleteProgram for MapProgram {
     /// Iterate the backing map in `ClauseId` order (deterministic) — the trusted
     /// whole-program enumeration the ADR-0007 closure check needs.
     fn for_each_clause(&self, f: &mut dyn FnMut(&ClauseId, &Clause)) {

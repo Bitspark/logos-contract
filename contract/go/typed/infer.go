@@ -12,7 +12,7 @@ func (m *machine) infer(e Expr, ctx []Expr, depth uint32) Expr {
 	a := e.node.args
 	switch e.Kind() {
 	case SortKind:
-		if e.Index() == maxNatural {
+		if e.Index() == MaxNatural {
 			m.budget.fail(incomplete(UniverseCapacity))
 			return Expr{}
 		}
@@ -23,7 +23,7 @@ func (m *machine) infer(e Expr, ctx []Expr, depth uint32) Expr {
 			m.fail(EscapedVariable)
 			return Expr{}
 		}
-		if index == maxNatural {
+		if index == MaxNatural {
 			m.budget.fail(incomplete(IndexCapacity))
 			return Expr{}
 		}

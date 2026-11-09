@@ -161,11 +161,11 @@ func TestPreludeLoaderVectors(t *testing.T) {
 // vector's hex must equal the constants this binding hashes with.
 func TestPreludeVectorProgramPrefixPin(t *testing.T) {
 	vf := loadPreludeVectors(t)
-	if got := hex.EncodeToString(ProgramPrefix); got != vf.ProgramPrefixHex {
-		t.Errorf("ProgramPrefix hex = %q, want vector %q", got, vf.ProgramPrefixHex)
+	if got := hex.EncodeToString(ProgramHashPrefix()); got != vf.ProgramPrefixHex {
+		t.Errorf("ProgramHashPrefix() hex = %q, want vector %q", got, vf.ProgramPrefixHex)
 	}
-	if got := hex.EncodeToString(ClausePrefix); got != vf.ClausePrefixHex {
-		t.Errorf("ClausePrefix hex = %q, want vector %q", got, vf.ClausePrefixHex)
+	if got := hex.EncodeToString(ClauseHashPrefix()); got != vf.ClausePrefixHex {
+		t.Errorf("ClauseHashPrefix() hex = %q, want vector %q", got, vf.ClausePrefixHex)
 	}
 }
 

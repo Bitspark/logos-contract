@@ -7,6 +7,71 @@ consumer premises. It does not execute Horos, analyze Go or generate Bittype
 artifacts. The source/native models, procedure results and mapping laws are named
 assumptions; the resulting composition and exact claim are checked by Logos.
 
+## Ownership and independent composition
+
+Apply the owner's [architectural-correctness rule](https://github.com/Bitspark/platform/blob/main/docs/concepts/architectural-correctness.md)
+and the [Logos review method](https://github.com/Bitspark/logos/blob/main/docs/WORKFLOW.md#design-and-review-the-ownership-boundary)
+to the declared boundary, not only to these successful examples. This check-only
+service admits independently supplied declarations, definitions and candidate
+proofs **within dependent-fragment-1**. It does not claim an open foundation or
+native-verifier registry. Its fixed calculus constructors are the foundation's
+own meaning, not a closed catalogue of consumer interpretations.
+
+| Responsibility | Owner and actual construction |
+| --- | --- |
+| Formation, scope, substitution, conversion and dependency closure | Logos's selected foundation and checker. Go `typed.Check` admits the supplied declaration sequence, checks the receiver's expected type and candidate, then computes the used basis; it dispatches on logical constructors, not domain interpretations. |
+| Interpretation, artifact identity and association | The consumer and its selected domain implementations. A declaration identity in a signature is not authentication of an external object. Changing a mapping changes supplied premises/proofs and their association, not Logos's inference rules. |
+| Permitted assumptions and exact requested conclusion | The receiving composition, supplied separately from candidate evidence. The checker enforces that policy afresh before constructing immutable acceptance. An admitted assumption remains an assumption. |
+| Theorem reuse | Supply a checked `Define` and an application through the same public operation. No report import, privileged domain registration or assumption of the previous verdict is needed. |
+
+The external Go-package fixture
+[`TestIndependentPublicTypedComposition`](../../contract/go/typed/composition_test.go)
+selects two separate public-API constructions: an invented
+[value-indexed observation](../../contract/go/typed/composition_observation_test.go)
+and an independent [predicate-transport theorem](../../contract/go/typed/composition_transport_test.go).
+The latter quantifies over a Type-0 domain, a predicate, two values, equality and
+evidence at the first value. It derives evidence at the second value without
+knowing the observation's identity or meaning. The consuming fixture chooses a
+computed natural index, checks the theorem without assumptions, reuses it as a
+definition and checks a nested application. The observation's interpretation and
+truth remain the only imported assumptions. The other subject in the signature
+is unused and cannot be substituted for the requested subject.
+
+This changes only fixture code and its consuming composition. The existing
+checker, public constructors, case types and bootstrap remain unchanged. Controls
+exercise a different requested predicate, false equality, withdrawn observation
+permission, omitted theorem, replaced theorem body and exhausted checking. They
+must retain the Invalid/Unsupported/Incomplete distinction and expose no acceptance.
+The fixture is materially different from source/native type representation; it
+uses the same public `Statement`, `Define`, `Expr`, `Policy` and `Check` operation.
+It adds no production extension framework or artifact-association mechanism.
+
+The evidence is scoped: the external Go fixture qualifies public composition for
+these constructions, while the existing shared vectors cover cross-binding
+calculus agreement for their cases. Neither establishes all future extensions,
+formal implementation correctness or source-model adequacy. The Rust experiments
+already reuse the production foundation through
+[`heterogeneous/foundation.rs`](https://github.com/Bitspark/logos/blob/main/conformance/rs/tests/heterogeneous/foundation.rs);
+there is no separate experimental copy of its inference rules to keep synchronized.
+
+**Remaining boundary work.** Bittype's
+[known verification-composition violation](https://github.com/Bitspark/bittype/blob/main/docs/verification.md#known-architectural-violation)
+is a consumer architectural defect, separate from the validity of its conditional
+proofs. This fixture does not repair its closed mapping/claim construction or
+qualify Bittype's artifact-association boundary. That correction must make its
+interpretations independently composable without making Logos learn their names.
+
+[Design 0014](https://github.com/Bitspark/logos/blob/main/docs/design/0014-typed-package-production.md) remains the broader kernel
+proposal. Its preparation, registry, family finalization and parent replay need
+their own production qualification. The existing checker can check statements
+expressed in this foundation; the proposal must establish how its actual package
+judgments and evidence reduce to that service while preserving exact scope and
+policy. Reusing inference code alone does not prove that fit. If a required
+judgment exposes a missing general guarantee, explain and decide that contract
+change rather than adding a package-specific acceptance path. This application
+does not admit those unimplemented interfaces or identify their absence as a
+defect in the scoped supplied-proof service.
+
 ## Fixture notation
 
 The test-only JSON schema is `logos/typed-check-fixtures/v1`. Expressions are

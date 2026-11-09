@@ -618,7 +618,7 @@ func TestAggregationVectors(t *testing.T) {
 			// R3 (#2733, the checker's arm): an accepted case stays accepted under each raised
 			// budget, alone and together, to the declared table's value.
 			if domain[c.Name] {
-				for _, rb := range limits.EachBudgetRaised(raised) {
+				for _, rb := range EachBudgetRaised(limits, raised) {
 					raisedProfile := *profile
 					raisedProfile.Limits = rb.Limits
 					again := CheckWithCertContext[unitCtx](program, c.Claim.buildGround(t), deriv, unitCtx{}, &raisedProfile, derived)
@@ -649,4 +649,35 @@ func TestAggregationVectors(t *testing.T) {
 	if memoizedWorlds == 0 {
 		t.Fatal("no aggregation case reached the memo's verification: the miss-then-hit check is vacuous")
 	}
+}
+
+// raisedBudget is one of R3's checker variants: the budget raised (or "every"), and the limits.
+type raisedBudget struct {
+	Name   string
+	Limits CheckLimits
+}
+
+// EachBudgetRaised is R3's variants at the checker (#2733; seat:caa's C2 on 3b): each budget raised
+// to at least `to` alone, then every budget together. A budget already at or above `to` is left
+// alone, and a variant equal to l is dropped, so a raise is never a no-op and never a lowering.
+func EachBudgetRaised(l CheckLimits, to int) []raisedBudget {
+	if _, err := ProofBudgetCountFromInt64("raised", int64(to)); err != nil {
+		panic(err)
+	}
+	var out []raisedBudget
+	every := l
+	everyBudgets := every.Budgets()
+	for i, b := range l.Budgets() {
+		if *b.Value >= to {
+			continue
+		}
+		one := l
+		*one.Budgets()[i].Value = to
+		*everyBudgets[i].Value = to
+		out = append(out, raisedBudget{Name: b.Name, Limits: one})
+	}
+	if len(out) > 1 {
+		out = append(out, raisedBudget{Name: "every", Limits: every})
+	}
+	return out
 }

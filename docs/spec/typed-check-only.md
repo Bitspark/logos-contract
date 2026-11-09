@@ -26,6 +26,12 @@ does not prove an extractor, compiler model, imported procedure or assumed law
 correct. Those dependencies must be named and permitted. A premise asserting the
 entire answer is still an assumption, never an independently derived answer.
 
+The [ownership and composition application](typed-check-only-cases.md#ownership-and-independent-composition)
+traces this boundary and qualifies independent public-API constructions. Its scope
+is supplied declarations and proofs in this foundation; neither the consumer's
+artifact/interpretation composition nor the proposed typed kernel is qualified by
+the checker's acceptance examples alone.
+
 ## Public operation
 
 The three bindings expose the same operation under a `typed` module/namespace:

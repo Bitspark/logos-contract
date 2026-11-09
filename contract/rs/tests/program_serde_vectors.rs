@@ -20,8 +20,8 @@
 
 use logos_contract::intval::BigInt;
 use logos_contract::{
-    program_bytes, program_from_value, program_to_value, BodyLit, Clause, ClauseId, Goal,
-    MapProgram, Program, Symbol, Term,
+    program_bytes, program_from_value, program_to_value, BodyLit, Clause, ClauseId,
+    CompleteProgram, Goal, MapProgram, Program, Symbol, Term,
 };
 use serde_json::Value as Json;
 

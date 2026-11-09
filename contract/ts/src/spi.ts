@@ -5,7 +5,8 @@ import { encode } from "@bitspark/ontos-codec";
 import { atom as valueAtom, tuple as valueTuple, type Value } from "@bitspark/ontos-core";
 import { sha256 } from "@noble/hashes/sha2.js";
 
-import { sortDedupByGroundKey, type Hash } from "./cert.js";
+import { copyOctets, type OctetSource } from "./octets.js";
+import { hashFromBytes, sortDedupByGroundKey, type Hash } from "./cert.js";
 import { Symbol, type GroundLiteral } from "./literal.js";
 import { type Evidence, type NodeMeta } from "./derivation.js";
 import { type Clause } from "./program.js";
@@ -23,11 +24,13 @@ import {
  * EDB-snapshot digest can never collide with a clause id or any other hash. Mirrors
  * Rust's `EDB_PREFIX`.
  */
-export const EDB_PREFIX: Uint8Array = new TextEncoder().encode("logos/account/edb-snapshot/v1\n");
+export function edbSnapshotHashPrefix(): Uint8Array {
+  return new TextEncoder().encode("logos/account/edb-snapshot/v1\n");
+}
 
 /**
  * The canonical snapshot hash of one extensional predicate's table, read as a SET —
- * `SHA-256(EDB_PREFIX ‖ pred-bytes ‖ ontos-codec(Tuple[rows…]))`, with the rows sorted by
+ * `SHA-256(edbSnapshotHashPrefix() ‖ pred-bytes ‖ ontos-codec(Tuple[rows…]))`, with the rows sorted by
  * `groundKey` and a repeated row ignored (#2279): order and multiplicity never change the
  * hash. This is the value a `LeafVerifier.edbSnapshot` returns for `pred` over its trusted
  * EDB, and the value `check` recomputes over a cert's sealed extension table to bind that
@@ -44,10 +47,11 @@ export function edbTableHash(pred: Symbol, rows: readonly GroundLiteral[]): Hash
   });
   const body = encode(valueTuple(rowValues));
   const predBytes = pred.bytes();
-  const input = new Uint8Array(EDB_PREFIX.length + predBytes.length + body.length);
-  input.set(EDB_PREFIX, 0);
-  input.set(predBytes, EDB_PREFIX.length);
-  input.set(body, EDB_PREFIX.length + predBytes.length);
+  const prefix = edbSnapshotHashPrefix();
+  const input = new Uint8Array(prefix.length + predBytes.length + body.length);
+  input.set(prefix, 0);
+  input.set(predBytes, prefix.length);
+  input.set(body, prefix.length + predBytes.length);
   return sha256(input);
 }
 
@@ -57,13 +61,13 @@ export type TheoryOutcome =
   | { readonly kind: "fails"; readonly code: string }
   | { readonly kind: "not_mine" };
 
-export const TheoryOutcome = {
-  Holds: { kind: "holds" } as const satisfies TheoryOutcome,
+export const TheoryOutcome = Object.freeze({
+  Holds: Object.freeze({ kind: "holds" } as const satisfies TheoryOutcome),
   Fails(code: string): TheoryOutcome {
     return { kind: "fails", code };
   },
-  NotMine: { kind: "not_mine" } as const satisfies TheoryOutcome,
-};
+  NotMine: Object.freeze({ kind: "not_mine" } as const satisfies TheoryOutcome),
+});
 
 /**
  * §5 Theory SPI — builtins / decidable atoms.
@@ -123,14 +127,14 @@ export type DecisionCompletion =
   | { readonly kind: "may_not_complete"; readonly decider: ComponentIdentity; readonly cause: string }
   | { readonly kind: "undeclared"; readonly decider: ComponentIdentity };
 
-export const DecisionCompletion = {
+export const DecisionCompletion = Object.freeze({
   /**
    * Every non-decision on the predicate reaches readers as `decideGround`'s typed `not_completed`,
    * so a `Fails` is always a decided false. A decider that never stops satisfies it trivially; one
    * that stops satisfies it when every stop is typed (arithmetic's work cap, #3313). Named for the
    * claim the guard needs, never "completes": a decider here may stop.
    */
-  StopsAreTyped: { kind: "stops_are_typed" } as const satisfies DecisionCompletion,
+  StopsAreTyped: Object.freeze({ kind: "stops_are_typed" } as const satisfies DecisionCompletion),
   /** A decision may stop without deciding and still answer `Fails`; `cause` says why. */
   mayNotComplete(decider: ComponentIdentity, cause: string): DecisionCompletion {
     return { kind: "may_not_complete", decider, cause };
@@ -153,7 +157,7 @@ export const DecisionCompletion = {
       }
     }
   },
-};
+});
 
 /**
  * `t`'s declaration for `pred`: its own when it implements the optional `completion`, otherwise
@@ -168,7 +172,8 @@ export function completionOf(t: Theory, pred: Symbol): DecisionCompletion {
  * one, else the default derived from `decide`. Every logos reader calls it, never `decide`.
  */
 export function decideGround(theory: Theory, atom: GroundLiteral): TheoryGround {
-  return theory.decideGround !== undefined ? theory.decideGround(atom) : groundFromLegacy(theory.decide(atom));
+  const decide = theory.decideGround;
+  return decide === undefined ? groundFromLegacy(theory.decide(atom)) : Reflect.apply(decide, theory, [atom]);
 }
 
 /**
@@ -211,12 +216,12 @@ export type LeafOutcome =
   | { readonly kind: "admit" }
   | { readonly kind: "reject"; readonly code: string };
 
-export const LeafOutcome = {
-  Admit: { kind: "admit" } as const satisfies LeafOutcome,
+export const LeafOutcome = Object.freeze({
+  Admit: Object.freeze({ kind: "admit" } as const satisfies LeafOutcome),
   Reject(code: string): LeafOutcome {
     return { kind: "reject", code };
   },
-};
+});
 
 /**
  * §6 Leaf SPI — attestation / extensional admission, generic over the verification
@@ -257,12 +262,12 @@ export type RuleOutcome =
   | { readonly kind: "admit" }
   | { readonly kind: "reject"; readonly code: string };
 
-export const RuleOutcome = {
-  Admit: { kind: "admit" } as const satisfies RuleOutcome,
+export const RuleOutcome = Object.freeze({
+  Admit: Object.freeze({ kind: "admit" } as const satisfies RuleOutcome),
   Reject(code: string): RuleOutcome {
     return { kind: "reject", code };
   },
-};
+});
 
 /**
  * §5a RuleAdmissibility SPI — validates a `Rule` node's metadata after the core has
@@ -301,32 +306,30 @@ export class AlwaysAdmit<C> implements RuleAdmissibility<C> {
  * certificate's meaning depends on (ADR 0004 D4 · parity with the Rust binding's
  * `ComponentIdentity`).
  *
- * A check-only consumer EXPOSES this identity so it can be attested. There is NO
- * check-profile-digest derivation in the go/ts bindings — that lives only in the
- * Rust kernel/seam; these bindings carry the identity, nothing more.
+ * A check-only consumer exposes its component's identity through this contract.
+ * The kernel derives a negotiated profile and its digest from the live components.
  *
  * The seam is the optional `identity?()` method on {@link Theory},
  * {@link LeafVerifier}, and {@link RuleAdmissibility}: ABSENT = `unidentified()`.
  */
 export class ComponentIdentity {
-  /** The component's identifier (e.g. utf8 "core/always-admit"). */
-  readonly id: Uint8Array;
-  /** The component's version (e.g. utf8 "1.0.0"); may be empty. */
-  readonly version: Uint8Array;
-  /** A 32-byte digest pinning the config; all-zero when there is none (not computed here). */
-  readonly configDigest: Uint8Array;
+  /** Inspections return a caller-owned copy of each identity field. */
+  declare readonly id: Uint8Array;
+  declare readonly version: Uint8Array;
+  declare readonly configDigest: Hash;
 
-  private constructor(id: Uint8Array, version: Uint8Array, configDigest: Uint8Array) {
-    if (configDigest.length !== 32) {
-      throw new RangeError(`configDigest must be 32 bytes, got ${configDigest.length}`);
-    }
-    this.id = id;
-    this.version = version;
-    this.configDigest = configDigest;
+  private constructor(id: OctetSource, version: OctetSource, configDigest: OctetSource) {
+    const field = (bytes: Uint8Array): PropertyDescriptor => ({ enumerable: true, get: () => bytes.slice() });
+    Object.defineProperties(this, {
+      id: field(copyOctets(id)),
+      version: field(copyOctets(version)),
+      configDigest: field(hashFromBytes(configDigest)),
+    });
+    Object.freeze(this);
   }
 
-  /** Build a ComponentIdentity from its parts. `configDigest` must be exactly 32 bytes. */
-  static of(id: Uint8Array, version: Uint8Array, configDigest: Uint8Array): ComponentIdentity {
+  /** Build a ComponentIdentity from its parts. The config digest is exactly 32 octets. */
+  static of(id: OctetSource, version: OctetSource, configDigest: OctetSource): ComponentIdentity {
     return new ComponentIdentity(id, version, configDigest);
   }
 
@@ -352,7 +355,14 @@ export class ComponentIdentity {
   static resolve(component: {
     identity?(): ComponentIdentity;
   }): ComponentIdentity {
-    return component.identity ? component.identity() : ComponentIdentity.unidentified();
+    const identity = component.identity;
+    if (identity === undefined) return ComponentIdentity.unidentified();
+    const reported: ComponentIdentity = Reflect.apply(identity, component, []);
+    // Complete one report before invoking another independently supplied component.
+    const id = copyOctets(reported.id);
+    const version = copyOctets(reported.version);
+    const config = hashFromBytes(reported.configDigest);
+    return new ComponentIdentity(id, version, config);
   }
 
   /**
@@ -382,6 +392,8 @@ export class ComponentIdentity {
     return this.equals(ComponentIdentity.unidentified());
   }
 }
+Object.freeze(ComponentIdentity.prototype);
+Object.freeze(ComponentIdentity);
 
 /** Byte-wise equality of two buffers. */
 function bytesEq(a: Uint8Array, b: Uint8Array): boolean {
@@ -416,3 +428,8 @@ export class PredicateSet {
 function symbolKey(pred: Symbol): string {
   return Array.from(pred.bytes(), (b) => b.toString(16).padStart(2, "0")).join("");
 }
+
+// Applications own each set's contents, through insert/from. Its byte equality
+// and membership operations cannot be replaced for a different consumer.
+Object.freeze(PredicateSet.prototype);
+Object.freeze(PredicateSet);

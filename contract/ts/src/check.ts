@@ -9,7 +9,7 @@ import {
   isNegPremise,
   type Node,
 } from "./derivation.js";
-import { type GroundLiteral, type Goal, type Symbol } from "./literal.js";
+import { type GroundLiteral, type Goal, type Symbol as PredicateSymbol } from "./literal.js";
 import { type Program } from "./program.js";
 import {
   ComponentIdentity,
@@ -20,19 +20,20 @@ import {
 } from "./spi.js";
 import { isDisowned, readGround } from "./ground_reading.js";
 import { Term, valueDepthLe, MAX_TERM_DEPTH_DEFAULT } from "./term.js";
+import { captureCertContext, captureDerivation } from "./capture.js";
+import { copyArray } from "./native_copy.js";
 import {
   CertContext,
   type CertStatus,
   checkCertTermDepths,
   equalGroundFilter,
   projectEquals,
-  verifyCert,
+  verifyWorld,
   verifyCountPremise,
   verifyNegPremise,
 } from "./cert_check.js";
-import { verificationOrder } from "./cert_stack.js";
-import { type ClosedModelCert } from "./cert.js";
-import { closedModelCertAsValue } from "./derivation_wire.js";
+import type { ClosedModelCert } from "./cert.js";
+import { nativeCertificateKey } from "./wire_sink.js";
 
 /**
  * Rejection codes (§4). Two bands: a FIRM structural band (the kernel emits these;
@@ -126,11 +127,14 @@ export type RejectionCode =
   // `detail` is the stop's kind (`work_cap`, ...), as `builtin_failed` carries the theory's code.
   | "builtin_not_decided"
   | "leaf_rejected"
-  | "rule_inadmissible";
+  | "rule_inadmissible"
+  // Caller configuration. No proof or SPI decision is inspected.
+  | "invalid_check_limits";
 
 /** True for the closed FIRM structural band — the codes a `check` over well-typed input may itself emit. */
 export function isStructural(code: RejectionCode): boolean {
   return (
+    code !== "invalid_check_limits" &&
     code !== "builtin_failed" &&
     code !== "builtin_not_decided" &&
     code !== "leaf_rejected" &&
@@ -143,15 +147,16 @@ export type Outcome =
   | { readonly kind: "accept" }
   | { readonly kind: "reject"; readonly code: RejectionCode; readonly detail: string };
 
-export const Outcome = {
-  Accept: { kind: "accept" } as const satisfies Outcome,
+export const Outcome = Object.freeze({
+  Accept: Object.freeze({ kind: "accept" } as const satisfies Outcome),
   reject(code: RejectionCode, detail: string): Outcome {
     return { kind: "reject", code, detail };
   },
   isAccept(o: Outcome): boolean {
     return o.kind === "accept";
   },
-};
+});
+
 
 /**
  * The TERM IDENTITY (#2226, §4.3). **INERT since #3022** (seat:caa's ruling on #3037): `check`
@@ -240,27 +245,61 @@ export const CHECK_BUDGETS = [
   ["max_rule_groundings", "maxRuleGroundings"],
   ["max_join_steps", "maxJoinSteps"],
 ] as const satisfies readonly (readonly [string, keyof CheckLimits])[];
+for (const pair of CHECK_BUDGETS) Object.freeze(pair);
+Object.freeze(CHECK_BUDGETS);
 
 type UnlistedBudget = Exclude<keyof CheckLimits, (typeof CHECK_BUDGETS)[number][1] | "termIdentity">;
 const everyBudgetIsListed: [UnlistedBudget] extends [never] ? true : never = true;
 void everyBudgetIsListed;
 
-/**
- * R3's variants at the checker (#2733; seat:caa's C2 on 3b): each budget raised to at least `to`
- * alone, labelled by its name, then every budget together (`every`). A budget already at or above `to`
- * is left alone, and a variant equal to `limits` is dropped, so a raise is never a no-op and never a
- * lowering.
- */
-export function eachBudgetRaised(limits: CheckLimits, to: number): { name: string; limits: CheckLimits }[] {
-  const out: { name: string; limits: CheckLimits }[] = [];
-  let every: CheckLimits = limits;
-  for (const [name, key] of CHECK_BUDGETS) {
-    if (limits[key] >= to) continue;
-    out.push({ name, limits: { ...limits, [key]: to } });
-    every = { ...every, [key]: to };
+/** A caller budget is outside the range this host can represent exactly. */
+export class CheckLimitError extends RangeError {
+  constructor(readonly field: string, readonly value: unknown) {
+    super(`check limits: ${field} must be a nonnegative safe integer`);
+    this.name = "CheckLimitError";
   }
-  if (out.length > 1) out.push({ name: "every", limits: every });
-  return out;
+}
+
+/** Inspect one proof budget before native construction or wire encoding. */
+export function proofBudgetError(field: string, value: number): CheckLimitError | undefined {
+  return Number.isSafeInteger(value) && value >= 0 ? undefined : new CheckLimitError(field, value);
+}
+
+/** Report the first invalid budget in declaration order. Zero is a valid cap. */
+export function validateCheckLimits(limits: CheckLimits): CheckLimitError | undefined {
+  for (const [field, key] of CHECK_BUDGETS) {
+    const error = proofBudgetError(field, limits[key]);
+    if (error !== undefined) return error;
+  }
+  return undefined;
+}
+
+/** A native policy value or the caller's first invalid proof budget. */
+export type CheckPolicyResult<T> = { readonly ok: true; readonly value: T }
+  | { readonly ok: false; readonly error: CheckLimitError };
+
+/** The numeric proof policy carried on the wire. */
+export type ProofBudgets = Pick<CheckLimits, (typeof CHECK_BUDGETS)[number][1]>;
+
+/** Capture each effective numeric field once, refusing the first invalid count in wire order. */
+export function captureProofBudgets(limits: ProofBudgets, overrides?: Partial<ProofBudgets>): CheckPolicyResult<ProofBudgets> {
+  const counts = {} as Record<(typeof CHECK_BUDGETS)[number][1], number>;
+  for (const [field, key] of CHECK_BUDGETS) {
+    const value = overrides !== undefined && key in overrides ? overrides[key]! : limits?.[key];
+    const error = proofBudgetError(field, value);
+    if (error !== undefined) return { ok: false, error };
+    counts[key] = value;
+  }
+  return { ok: true, value: Object.freeze(counts) };
+}
+
+/** Capture the effective native limits. Replacement fields take precedence without
+ * consulting the original getters for those fields. Each retained value is read once. */
+export function captureCheckLimits(limits: CheckLimits, overrides?: Partial<CheckLimits>): CheckPolicyResult<CheckLimits> {
+  const counts = captureProofBudgets(limits, overrides);
+  if (!counts.ok) return counts;
+  const termIdentity = overrides !== undefined && "termIdentity" in overrides ? overrides.termIdentity : limits.termIdentity;
+  return termIdentity === undefined ? counts : { ok: true, value: Object.freeze({ ...counts.value, termIdentity }) };
 }
 
 export function defaultLimits(): CheckLimits {
@@ -284,6 +323,19 @@ export interface CheckProfile<C> {
   readonly leaves: LeafVerifier<C>;
   readonly admit: RuleAdmissibility<C>;
   readonly limits: CheckLimits;
+}
+
+/** Bind the verifier handles and their validated native limits without calling an SPI.
+ * The application retains ownership of the component implementations and their context. */
+export function captureCheckProfile<C>(profile: CheckProfile<C>): CheckPolicyResult<CheckProfile<C>> {
+  if (profile == null) throw new TypeError("a live check profile is required");
+  const limits = captureCheckLimits(profile.limits);
+  if (!limits.ok) return limits;
+  const { theory, leaves, admit } = profile;
+  if (theory == null || leaves == null || admit == null) {
+    throw new TypeError("a live check profile requires theory, leaves and rule admission");
+  }
+  return { ok: true, value: Object.freeze({ theory, leaves, admit, limits: limits.value }) };
 }
 
 /**
@@ -330,15 +382,15 @@ export function unidentifiedProfileSlotsAllowing<C>(
   profile: CheckProfile<C>,
   allowUnidentified: readonly ProfileSlot[],
 ): ProfileSlot[] {
-  // Fold order is identity-bearing: theory ‖ leaves ‖ admit, unchanged by the allowance.
-  const candidates: [ProfileSlot, boolean][] = [
-    ["theory", ComponentIdentity.resolve(profile.theory).isUnidentified()],
-    ["leaves", ComponentIdentity.resolve(profile.leaves).isUnidentified()],
-    ["admit", ComponentIdentity.resolve(profile.admit).isUnidentified()],
-  ];
-  return candidates
-    .filter(([slot, anonymous]) => anonymous && !allowUnidentified.includes(slot))
-    .map(([slot]) => slot);
+  const { theory, leaves, admit } = profile;
+  const allowed = copyArray(allowUnidentified, slot => slot);
+  const components = [["theory", theory], ["leaves", leaves], ["admit", admit]] as const;
+  const unidentified: ProfileSlot[] = [];
+  for (const [slot, component] of components) {
+    const identity = ComponentIdentity.resolve(component);
+    if (identity.isUnidentified() && !allowed.includes(slot)) unidentified.push(slot);
+  }
+  return unidentified;
 }
 
 /**
@@ -389,11 +441,18 @@ export function check<C>(
 export function checkWithCertContext<C>(
   program: Program,
   claim: GroundLiteral,
-  deriv: Derivation,
+  proposal: Derivation,
   ctx: C,
   profile: CheckProfile<C>,
   certContext: CertContext,
 ): Outcome {
+  const bound = captureCheckProfile(profile);
+  if (!bound.ok) return { kind: "reject", code: "invalid_check_limits", detail: bound.error.message };
+  profile = bound.value;
+  const captured = captureDerivation(proposal, profile.limits);
+  if (captured.kind === "reject") return captured;
+  const deriv = captured.value;
+  if (deriv.closedWorld.length > 0) certContext = captureCertContext(certContext);
   const early = derivationPrechecks(program, claim, deriv, profile);
   if (early !== undefined) {
     return early;
@@ -402,15 +461,17 @@ export function checkWithCertContext<C>(
   return checkNodes(program, claim, deriv, ctx, profile, certStatus);
 }
 
+const runBoundCheck = Symbol("check under the bound inputs");
+
 /**
  * #2569 (the ts rung of #2565 term 1): a memo of one closed world's certificate verification, so
  * a run that checks many derivations citing the SAME certificates verifies them once.
  *
  * Its inputs are BOUND AT CONSTRUCTION, and the whole check runs under them: the program, profile,
  * ctx and CertContext are the memo's own, so a caller cannot pass a different one with it. The
- * per-call key is the derivation's WHOLE closed world, compared certificate by certificate on its
- * canonical wire value (`closedModelCertAsValue`, which carries every field; the stored world's
- * values are computed once, when it is filled). That comparison is exact and does not depend on how
+ * per-call key is the derivation's WHOLE closed world, compared on the account fields with each support
+ * handle read as its exact native code units. The stored world's keys are computed once on a miss.
+ * That comparison does not depend on how
  * a class holds its state: ontos values and `Symbol` keep theirs in private fields, so a generic walk
  * of own properties would see every atom as equal. It is deliberately NOT short-circuited on object
  * identity: a certificate is frozen, but its hashes' bytes and its size declaration are not, so an
@@ -424,17 +485,24 @@ export function checkWithCertContext<C>(
  * construction.
  */
 export class WorldMemo<C> {
-  #canonical: readonly Value[] = [];
+  #keys: readonly Value[] = [];
   #status: readonly CertStatus[] = [];
   #limits: CheckLimits | undefined;
   #verified = 0;
+  readonly #certContext: CertContext;
 
   constructor(
     readonly program: Program,
     readonly profile: CheckProfile<C>,
     readonly ctx: C,
-    readonly certContext: CertContext,
-  ) {}
+    certContext: CertContext,
+  ) {
+    this.#certContext = captureCertContext(certContext);
+    Object.freeze(this);
+  }
+
+  /** A detached reading of the pins bound at construction. */
+  get certContext(): CertContext { return captureCertContext(this.#certContext); }
 
   /** Certificates verified through this memo, each world verified on a miss counted in full. */
   get certificatesVerified(): number {
@@ -445,34 +513,49 @@ export class WorldMemo<C> {
    * The statuses of `world`: from the slot on a hit, verified and stored on a miss. An EMPTY world
    * (a positive derivation) needs no verification and does not touch the slot.
    */
-  statuses(world: readonly ClosedModelCert[]): readonly CertStatus[] {
+  #statuses(world: readonly ClosedModelCert[], profile: CheckProfile<C>): readonly CertStatus[] {
     if (world.length === 0) {
       return [];
     }
-    if (!this.#hit(world)) {
-      this.#status = verifyWorld(world, this.program, this.profile, this.ctx, this.certContext);
-      this.#canonical = world.map(closedModelCertAsValue);
-      this.#limits = { ...this.profile.limits };
+    if (!this.#hit(world, profile.limits)) {
+      const status = verifyWorld(world, this.program, profile, this.ctx, this.#certContext);
+      this.#keys = world.map(nativeCertificateKey);
+      this.#status = status;
+      this.#limits = profile.limits;
       this.#verified += world.length;
     }
     return this.#status;
   }
 
-  #hit(world: readonly ClosedModelCert[]): boolean {
-    if (this.#limits === undefined || world.length !== this.#canonical.length) {
+  #hit(world: readonly ClosedModelCert[], limits: CheckLimits): boolean {
+    if (this.#limits === undefined || world.length !== this.#keys.length) {
       return false;
     }
-    if (!sameLimits(this.#limits, this.profile.limits)) {
+    if (!sameLimits(this.#limits, limits)) {
       return false;
     }
-    return world.every((cert, i) => valueEquals(closedModelCertAsValue(cert), this.#canonical[i]!));
+    return world.every((cert, i) => valueEquals(nativeCertificateKey(cert), this.#keys[i]!));
+  }
+
+  static [runBoundCheck]<C>(memo: WorldMemo<C>, claim: GroundLiteral, proposal: Derivation): Outcome {
+    if (!(#keys in memo)) throw new TypeError("checking requires a bound WorldMemo");
+    const bound = captureCheckProfile(memo.profile);
+    if (!bound.ok) return { kind: "reject", code: "invalid_check_limits", detail: bound.error.message };
+    const profile = bound.value;
+    const captured = captureDerivation(proposal, profile.limits);
+    if (captured.kind === "reject") return captured;
+    const deriv = captured.value;
+    const early = derivationPrechecks(memo.program, claim, deriv, profile);
+    if (early !== undefined) return early;
+    const statuses = memo.#statuses(deriv.closedWorld, profile);
+    return checkNodes(memo.program, claim, deriv, memo.ctx, profile, statuses);
   }
 }
+const checkBoundWorld = WorldMemo[runBoundCheck];
 
 /** Every field of two `CheckLimits`, compared by value. */
 function sameLimits(a: CheckLimits, b: CheckLimits): boolean {
-  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
-  return [...keys].every((k) => (a as unknown as Record<string, unknown>)[k] === (b as unknown as Record<string, unknown>)[k]);
+  return a.termIdentity === b.termIdentity && CHECK_BUDGETS.every(([, key]) => a[key] === b[key]);
 }
 
 /**
@@ -481,39 +564,16 @@ function sameLimits(a: CheckLimits, b: CheckLimits): boolean {
  * `checkWithCertContext`'s: only step 3a can be served from the memo.
  */
 export function checkWithWorldMemo<C>(memo: WorldMemo<C>, claim: GroundLiteral, deriv: Derivation): Outcome {
-  const early = derivationPrechecks(memo.program, claim, deriv, memo.profile);
-  if (early !== undefined) {
-    return early;
-  }
-  const certStatus = memo.statuses(deriv.closedWorld);
-  return checkNodes(memo.program, claim, deriv, memo.ctx, memo.profile, certStatus);
+  return checkBoundWorld(memo, claim, deriv);
 }
 
-/** Steps 1 to 3b of `checkWithCertContext`; a returned Outcome is the rejection. */
+
 function derivationPrechecks<C>(
   program: Program,
   claim: GroundLiteral,
   deriv: Derivation,
   profile: CheckProfile<C>,
 ): Outcome | undefined {
-  // 1. non-empty.
-  if (deriv.nodes.length === 0) {
-    return Outcome.reject("empty_derivation", "derivation has no nodes");
-  }
-  // 2. node cap — BEFORE any delegation, strict `>` (§4.3).
-  if (deriv.nodes.length > profile.limits.maxNodes) {
-    return Outcome.reject(
-      "too_many_nodes",
-      `${deriv.nodes.length} nodes exceeds max_nodes ${profile.limits.maxNodes}`,
-    );
-  }
-  // 3. root in range.
-  if (deriv.root >= deriv.nodes.length) {
-    return Outcome.reject(
-      "root_out_of_range",
-      `root ${deriv.root} out of range (len ${deriv.nodes.length})`,
-    );
-  }
   // 3b. TERM-NESTING DEPTH CAP (issue #253) — BEFORE any recursive term traversal
   //     (cert verification in 3a, the forward pass in 4, the root `equals` in 5). A
   //     single term can nest arbitrarily deep within one node, which neither the node
@@ -535,47 +595,6 @@ function derivationPrechecks<C>(
     }
   }
   return undefined;
-}
-
-/**
- * Step 3a of `checkWithCertContext`: every certificate of `world` verified, into the status array
- * the forward pass reads. A pure function of its arguments, which is what lets a `WorldMemo` serve
- * it again for an equal world under the same inputs.
- */
-function verifyWorld<C>(
-  world: readonly ClosedModelCert[],
-  program: Program,
-  profile: CheckProfile<C>,
-  ctx: C,
-  certContext: CertContext,
-): CertStatus[] {
-  // 3a. verify every cited certificate ONCE, up front, memoized into a parallel array. A
-  //     `Neg` premise reuses the cached result. For an all-positive derivation
-  //     closedWorld is empty, so this is a no-op and the zero certContext is never
-  //     consulted — positive behavior is byte-identical.
-  //
-  //     CONTEXT-UNBOUND GATE (ADR 0007 §3.1): a certifying check needs a context DERIVED
-  //     from the live program/profile. An all-zero context is the UNBOUND sentinel — if
-  //     any cert is cited under it, every cert is invalid with `cert_context_unbound`.
-  //
-  //     STACKED certificates (#2258 (a)): certs are verified in ascending scope level, so a cert
-  //     that reads a predicate from a strictly lower cert does so only once that cert's status is
-  //     final (validity precedes citation).
-  const contextUnbound = world.length > 0 && CertContext.isUnbound(certContext);
-  const status: (CertStatus | undefined)[] = world.map(() => undefined);
-  for (const own of verificationOrder(world)) {
-    status[own] = contextUnbound
-      ? { kind: "invalid", code: "cert_context_unbound", detail: "certifying check supplied an all-zero (unbound) cert context" }
-      : verifyCert(world[own]!, program, profile, ctx, certContext, profile.limits, {
-          own,
-          worldLen: world.length,
-        }, { certs: world, status });
-  }
-  // The order covers every index, so every status is set; a gap would be a checker defect,
-  // refused rather than read as Valid.
-  return status.map(
-    (s) => s ?? { kind: "invalid", code: "cert_scope_incomplete", detail: "certificate was never verified" },
-  );
 }
 
 /** Steps 4 and 5 of `checkWithCertContext`: the forward pass, then the root against the claim. */
@@ -955,8 +974,8 @@ function checkNode<C>(
 export function unownedBuiltinPredicates<C>(
   deriv: Derivation,
   profile: CheckProfile<C>,
-): Symbol[] {
-  const out: Symbol[] = [];
+): PredicateSymbol[] {
+  const out: PredicateSymbol[] = [];
   for (const node of deriv.nodes) {
     if (node.kind !== "builtin") continue;
     const pred = node.conclusion.pred;

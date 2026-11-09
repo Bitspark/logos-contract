@@ -50,7 +50,7 @@
 use crate::account::clause_bytes;
 use crate::check::program_digest;
 use crate::literal::{Goal, Symbol};
-use crate::program::{BodyLit, Clause, ClauseId, MapProgram, Program};
+use crate::program::{BodyLit, Clause, ClauseId, CompleteProgram, MapProgram};
 use crate::term::Term;
 use serde_json::Value as Json;
 use std::collections::BTreeSet;

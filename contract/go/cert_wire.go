@@ -27,19 +27,23 @@ import (
 	codec "github.com/bitspark/ontos/codec/go"
 )
 
-// CertWireError is why a frame could not be walked. It refuses the frame; it is never a verdict
+// CertWireError is why a requested walk could not proceed. It is never a verdict
 // about a certificate. Name is the stable name every core reports, pinned by the shared vector.
-type CertWireError struct{ Name string }
+type CertWireError string
 
-func (e *CertWireError) Error() string { return "cert wire: " + e.Name }
+// Name returns the stable wire-walk refusal.
+func (e CertWireError) Name() string { return string(e) }
 
-var (
-	errWireTruncated    = &CertWireError{"truncated"}
-	errWireUnknownTag   = &CertWireError{"unknown_tag"}
-	errWireNonCanonical = &CertWireError{"non_canonical_uvarint"}
-	errWireOverflow     = &CertWireError{"uvarint_overflow"}
-	errWireNotATuple    = &CertWireError{"not_a_tuple"}
-	errWireTrailing     = &CertWireError{"trailing_bytes"}
+func (e CertWireError) Error() string { return "cert wire: " + e.Name() }
+
+const (
+	errWireTruncated    CertWireError = "truncated"
+	errWireUnknownTag   CertWireError = "unknown_tag"
+	errWireNonCanonical CertWireError = "non_canonical_uvarint"
+	errWireOverflow     CertWireError = "uvarint_overflow"
+	errWireNotATuple    CertWireError = "not_a_tuple"
+	errWireTrailing     CertWireError = "trailing_bytes"
+	errWireInvalidPath  CertWireError = "invalid_path"
 )
 
 const (
@@ -145,7 +149,7 @@ func (c *wireCursor) skipValues(pending uint64) error {
 // refuses every error never hands the decoder a frame its bound has not covered.
 //
 // The index-only case of CertWireSpansAt, which it runs.
-func CertWireSpans(frame []byte, path []int) ([]int, error) {
+func CertWireSpans(frame []byte, path []uint64) ([]int, error) {
 	steps := make([]PathStep, len(path))
 	for i, step := range path {
 		steps[i] = PathIndex(step)
@@ -167,12 +171,13 @@ func CertWireSpans(frame []byte, path []int) ([]int, error) {
 // batch) needs no new walker. Its kinds are open to growth.
 type PathStep struct {
 	each  bool
-	index int
+	index uint64
 }
 
 // PathIndex is the step to the element at index. One at or past the tuple's arity is an ABSENT
 // slot (an optional trailing element, an option's none), with no certificates.
-func PathIndex(index int) PathStep { return PathStep{index: index} }
+// Indices belong to 0..IndexMax. The walker validates the complete selector before reading its frame.
+func PathIndex(index uint64) PathStep { return PathStep{index: index} }
 
 // PathEach is the step to every element, each followed by the rest of the path.
 func PathEach() PathStep { return PathStep{each: true} }
@@ -180,8 +185,8 @@ func PathEach() PathStep { return PathStep{each: true} }
 // IsEach reports whether the step is PathEach.
 func (s PathStep) IsEach() bool { return s.each }
 
-// Index is a PathIndex step's index (0 for PathEach).
-func (s PathStep) Index() int { return s.index }
+// Index reports an index step's coordinate. The boolean is false for PathEach.
+func (s PathStep) Index() (uint64, bool) { return s.index, !s.each }
 
 // CertSpan is one certificate CertWireSpansAt found: its byte span, where it starts, and the
 // concrete path to it, every PathEach resolved to the element's index and the certificate's own
@@ -200,11 +205,18 @@ type CertSpan struct {
 // CertWireSpansAt returns the byte span of every certificate the steps reach, with its concrete
 // path: each path the steps expand to (every PathEach over every element) leads to a tuple, and
 // each element of that tuple is a certificate. A path through an absent slot reaches none.
+// A malformed selector reports invalid_path before any frame is read.
 //
 // Fail closed exactly as CertWireSpans: the WHOLE frame is walked and bytes after the one value
 // are refused. The walk recurses only along the steps, so its depth is the path's length, which the
 // host chooses, never the frame's nesting; skipping stays iterative.
 func CertWireSpansAt(frame []byte, steps []PathStep) ([]CertSpan, error) {
+	steps = append([]PathStep(nil), steps...)
+	for _, step := range steps {
+		if !step.each && step.index > IndexMax {
+			return nil, errWireInvalidPath
+		}
+	}
 	c := &wireCursor{bytes: frame}
 	out := []CertSpan{}
 	path := make([]int, 0, len(steps)+1)
@@ -261,16 +273,16 @@ func (c *wireCursor) spansAt(steps []PathStep, path []int, out *[]CertSpan) erro
 		}
 		return nil
 	}
-	if uint64(step.index) >= arity {
+	if step.index >= arity {
 		return c.skipValues(arity)
 	}
-	if err := c.skipValues(uint64(step.index)); err != nil {
+	if err := c.skipValues(step.index); err != nil {
 		return err
 	}
-	if err := c.spansAt(rest, append(path, step.index), out); err != nil {
+	if err := c.spansAt(rest, append(path, int(step.index)), out); err != nil {
 		return err
 	}
-	return c.skipValues(arity - uint64(step.index) - 1)
+	return c.skipValues(arity - step.index - 1)
 }
 
 // CertWireTag returns the bytes of the atom that tags a frame, Tuple[Atom(tag), ..], read without
@@ -304,8 +316,12 @@ func CertBytesSlack() uint64 {
 
 // CertSpanOverBudget reports whether a certificate whose wire span is span measures over
 // maxCertBytes for certain, so a host may refuse it undecoded.
-func CertSpanOverBudget(span, maxCertBytes int) bool {
-	return uint64(span) > uint64(maxCertBytes)+CertBytesSlack()
+func CertSpanOverBudget(span uint64, maxCertBytes ProofBudgetCount) bool {
+	return encodedSpanExceeds(span, maxCertBytes.Uint64())
+}
+
+func encodedSpanExceeds(span, maxCertBytes uint64) bool {
+	return span > maxCertBytes && span-maxCertBytes > CertBytesSlack()
 }
 
 // CertWireOverBudget names the refusal a host reports for a certificate wire whose span exceeds
@@ -317,7 +333,7 @@ func CertWireOverBudget(index, span, maxCertBytes int) error {
 
 // DerivationWireV1CertPath is the path to a v1 derivation wire's certificates: the tagged payload,
 // then the derivation's trailing closed_world slot (absent for an all-positive derivation).
-var DerivationWireV1CertPath = []int{1, 2}
+func DerivationWireV1CertPath() []uint64 { return []uint64{1, 2} }
 
 // The kinds of BoundedWireError. The set is OPEN (seat:caa, #2561): a future decode-time bound adds a
 // kind, so a consumer must treat an unknown kind as a refusal, never as success.
@@ -326,6 +342,8 @@ const (
 	BoundedWireUnreadable = "cert_wire_unreadable"
 	// BoundedWireOverBudget: a certificate spans over MaxCertBytes plus the slack; nothing decoded.
 	BoundedWireOverBudget = "cert_wire_over_budget"
+	// BoundedWireInvalidLimits carries the caller's CheckLimitError, before the walk.
+	BoundedWireInvalidLimits = "invalid_check_limits"
 	// BoundedWireStopped: the bytes walked within budget, and the codec STOPPED before they were a
 	// value (#2734 3c, seat:caa's ruling C). Err is the codec's own *codec.DecodeError, unfolded: a
 	// capacity stop (its decode depth, an atom length or an arity) is not evidence the bytes are
@@ -338,7 +356,7 @@ const (
 
 // BoundedWireError is why DecodeDerivationWireV1Bounded refused its bytes. Kind is one of the
 // BoundedWire* kinds, an open set. Cert, Span and MaxCertBytes are set for BoundedWireOverBudget;
-// Err carries the walk's *CertWireError or the decoder's error.
+// Err carries the CheckLimitError, wire-walk error or decoder error.
 type BoundedWireError struct {
 	Kind         string
 	Cert         int
@@ -353,9 +371,9 @@ func (e *BoundedWireError) Error() string {
 		return fmt.Sprintf("%s: certificate %d spans %d bytes, over max_cert_bytes %d + slack %d",
 			e.Kind, e.Cert, e.Span, e.MaxCertBytes, CertBytesSlack())
 	case BoundedWireUnreadable:
-		var we *CertWireError
+		var we CertWireError
 		if errors.As(e.Err, &we) {
-			return e.Kind + ": " + we.Name
+			return e.Kind + ": " + we.Name()
 		}
 	}
 	return e.Kind + ": " + e.Err.Error()
@@ -370,12 +388,15 @@ func (e *BoundedWireError) Unwrap() error { return e.Err }
 // guest's frames (#2528). It takes the whole CheckLimits so a future decode bound joins by
 // construction. Mirrors rs decode_derivation_wire_v1_bounded and ts decodeDerivationWireV1Bounded.
 func DecodeDerivationWireV1Bounded(bytes []byte, limits CheckLimits) (Derivation, error) {
-	spans, err := CertWireSpans(bytes, DerivationWireV1CertPath)
+	if err := limits.Validate(); err != nil {
+		return Derivation{}, &BoundedWireError{Kind: BoundedWireInvalidLimits, Err: err}
+	}
+	spans, err := CertWireSpans(bytes, DerivationWireV1CertPath())
 	if err != nil {
 		return Derivation{}, &BoundedWireError{Kind: BoundedWireUnreadable, Err: err}
 	}
 	for i, span := range spans {
-		if CertSpanOverBudget(span, limits.MaxCertBytes) {
+		if encodedSpanExceeds(uint64(span), uint64(limits.MaxCertBytes)) {
 			return Derivation{}, &BoundedWireError{Kind: BoundedWireOverBudget, Cert: i, Span: span, MaxCertBytes: limits.MaxCertBytes}
 		}
 	}

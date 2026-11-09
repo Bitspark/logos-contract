@@ -61,9 +61,9 @@
 use logos_contract::{
     check_with_cert_context, edb_table_hash, intval::BigInt, program_digest, ArithmeticTheory,
     BodyLit, CertContext, CertId, CertSizeDecl, CheckLimits, CheckProfile, Clause, ClauseId,
-    ClosedModelCert, ClosureWitness, CountLit, Derivation, Evidence, FiniteDomain, Goal,
-    GroundLiteral, Hash, LeafOutcome, LeafVerifier, Literal, MapProgram, Node, NodeMeta, Outcome,
-    PredicateRef, PredicateSet, Premise, Program, ProjectSpec, RelationTable, StratumPrefix, Subst,
+    ClosedModelCert, ClosureWitness, CompleteProgram, CountLit, Derivation, Evidence, FiniteDomain,
+    Goal, GroundLiteral, Hash, LeafOutcome, LeafVerifier, Literal, MapProgram, Node, NodeMeta,
+    Outcome, PredicateRef, PredicateSet, Premise, ProjectSpec, RelationTable, StratumPrefix, Subst,
     SupportWitness, Symbol, Term,
 };
 use ontos_core::Value;
@@ -120,10 +120,10 @@ fn flow(c: &str, side: &str, qty: i128) -> GroundLiteral {
     GroundLiteral::new("flow", [v(c), v(side), int_v(qty)])
 }
 
-fn bound_context(program: &dyn Program) -> CertContext {
+fn bound_context(program: &dyn CompleteProgram) -> CertContext {
     CertContext::new(program_digest(program), [1u8; 32], [2u8; 32], [3u8; 32])
 }
-fn bind_cert(cert: &mut ClosedModelCert, program: &dyn Program) {
+fn bind_cert(cert: &mut ClosedModelCert, program: &dyn CompleteProgram) {
     let cx = bound_context(program);
     cert.program_hash = cx.program_hash;
     cert.profile_hash = cx.profile_hash;

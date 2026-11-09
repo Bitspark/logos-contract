@@ -25,14 +25,14 @@ import (
 	data "github.com/bitspark/ontos/data/go"
 )
 
-// ClausePrefix is the domain separator for a canonical clause hash (so a clause id
+// ClauseHashPrefix is the domain separator for a canonical clause hash (so a clause id
 // can never collide with another hash over the same bytes).
-var ClausePrefix = []byte("logos/account/clause/v1\n")
+func ClauseHashPrefix() []byte { return []byte("logos/account/clause/v1\n") }
 
-// ProgramPrefix is the domain separator for the canonical whole-program digest (ADR
-// 0007 §3.1). Distinct from ClausePrefix so a program digest can never collide with a
+// ProgramHashPrefix is the domain separator for the canonical whole-program digest (ADR
+// 0007 §3.1). Distinct from ClauseHashPrefix so a program digest can never collide with a
 // single-clause hash over the same bytes. Mirrors Rust's PROGRAM_PREFIX.
-var ProgramPrefix = []byte("logos/account/program/v1\n")
+func ProgramHashPrefix() []byte { return []byte("logos/account/program/v1\n") }
 
 // negTag is the tag byte sealing the negated body-literal reading (ADR 0007). A
 // Neg(g) reads as Tuple[Atom(negTag), goalAsTerm(g)] — a 2-tuple whose first child
@@ -370,7 +370,7 @@ func ClauseBytes(c Clause) []byte {
 }
 
 // CanonicalClauseId is the canonical ClauseId of a clause — lowercase-hex
-// SHA-256(ClausePrefix ‖ ontos-codec(Quote(clause))) (§9, syntactic).
+// SHA-256(ClauseHashPrefix ‖ ontos-codec(Quote(clause))) (§9, syntactic).
 //
 // Stable and cross-language: any binding that follows this encoding computes the
 // same id for the same clause. The id satisfies the v1 ClauseId contract (stable +
@@ -378,13 +378,13 @@ func ClauseBytes(c Clause) []byte {
 // ClauseId::canonical.
 func CanonicalClauseId(c Clause) ClauseId {
 	h := sha256.New()
-	h.Write(ClausePrefix)
+	h.Write(ClauseHashPrefix())
 	h.Write(ClauseBytes(c))
 	return NewClauseId(hex.EncodeToString(h.Sum(nil)))
 }
 
 // ProgramDigest is the canonical whole-program digest (ADR 0007 §3.1):
-// SHA-256(ProgramPrefix ‖ ⨁ len-prefixed SORTED ClauseBytes) over the program's
+// SHA-256(ProgramHashPrefix ‖ ⨁ len-prefixed SORTED ClauseBytes) over the program's
 // COMPLETE clause set. The per-clause frozen account bytes are SORTED (lexicographic
 // byte order — the same total order Rust's Vec<Vec<u8>>::sort uses), so the digest is
 // independent of clause enumeration order and commits to the WHOLE clause set: a
@@ -402,9 +402,13 @@ func ProgramDigest(clauses []Clause) [32]byte {
 	for i, c := range clauses {
 		byteVecs[i] = ClauseBytes(c)
 	}
+	return digestProgramBytes(byteVecs)
+}
+
+func digestProgramBytes(byteVecs [][]byte) [32]byte {
 	sortByteSlices(byteVecs)
 	h := sha256.New()
-	h.Write(ProgramPrefix)
+	h.Write(ProgramHashPrefix())
 	var lenBuf [8]byte
 	for _, b := range byteVecs {
 		binary.BigEndian.PutUint64(lenBuf[:], uint64(len(b)))
@@ -419,13 +423,13 @@ func ProgramDigest(clauses []Clause) [32]byte {
 // ProgramDigestOf is the whole-program digest recomputed over a Program's COMPLETE
 // clause set (via the trusted ForEachClause enumeration) — the ADR-0007 §3.1
 // recompute that the certifying Check compares a cert's pinned ProgramHash against.
-// Byte-identical to Rust's recompute_program_hash / program_digest(&dyn Program): the
+// Byte-identical to Rust's recompute_program_hash / program_digest(&dyn CompleteProgram): the
 // per-clause frozen bytes are sorted, so the digest is independent of enumeration
 // order and commits to the whole clause set.
-func ProgramDigestOf(program Program) [32]byte {
-	var clauses []Clause
+func ProgramDigestOf(program CompleteProgram) [32]byte {
+	var encoded [][]byte
 	program.ForEachClause(func(_ ClauseId, clause Clause) {
-		clauses = append(clauses, clause)
+		encoded = append(encoded, ClauseBytes(clause))
 	})
-	return ProgramDigest(clauses)
+	return digestProgramBytes(encoded)
 }

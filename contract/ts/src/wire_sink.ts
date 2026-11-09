@@ -32,11 +32,13 @@ import type {
   SupportEdge,
   SupportRef,
 } from "./cert.js";
+import { hashFromBytes, nativeOctetLength } from "./octets.js";
 import { digestAtom, intAtom } from "./atoms.js";
 import type { GroundLiteral, Symbol } from "./literal.js";
 import { quote } from "./reify.js";
 import { Term, type Subst, VarIdError } from "./term.js";
 import { wellFormedUtf16 } from "./utf8.js";
+import { portableClauseIdBytes } from "./clause_id_encoding.js";
 
 const enc = new TextEncoder();
 
@@ -50,6 +52,8 @@ export interface WireSink {
   readonly ordered: boolean;
   /** An Atom of a string's UTF-8 bytes. */
   atomStr(s: string): void;
+  /** Read a native clause handle under this sink's identity or size contract. */
+  clauseId(handle: string): void;
   /** An Atom of bytes the sink must not keep or mutate. */
   atomBytes(b: Uint8Array): void;
   /** A digest's lowercase-hex Atom. */
@@ -73,11 +77,16 @@ class ValueSink implements WireSink {
   // The open tuples' children so far, innermost last; frame 0 holds the result.
   readonly #frames: Value[][] = [[]];
 
+  constructor(private readonly clauseBytes: (handle: string) => Uint8Array = portableClauseIdBytes) {}
+
   #push(v: Value): void {
     this.#frames[this.#frames.length - 1]!.push(v);
   }
   atomStr(s: string): void {
     this.#push(valueAtom(enc.encode(s)));
+  }
+  clauseId(handle: string): void {
+    this.#push(valueAtom(this.clauseBytes(handle)));
   }
   atomBytes(b: Uint8Array): void {
     this.#push(valueAtom(b));
@@ -118,6 +127,23 @@ export function buildValue(emit: (s: WireSink) => void): Value {
   const s = new ValueSink();
   emit(s);
   return s.result();
+}
+
+/** Exact JavaScript code units, including unpaired surrogates. Used only for native memo equality. */
+function nativeHandleBytes(handle: string): Uint8Array {
+  const bytes = new Uint8Array(handle.length * 2);
+  for (let i = 0; i < handle.length; i++) {
+    const unit = handle.charCodeAt(i);
+    bytes[2 * i] = unit >>> 8;
+    bytes[2 * i + 1] = unit & 0xff;
+  }
+  return bytes;
+}
+
+export function nativeCertificateKey(cert: ClosedModelCert): Value {
+  const sink = new ValueSink(nativeHandleBytes);
+  writeClosedModelCert(sink, cert, cert.limitsDecl);
+  return sink.result();
 }
 
 /** The width of `n` as a shortest-form LEB128 uvarint. */
@@ -219,11 +245,17 @@ class LenSink implements WireSink {
   atomStr(s: string): void {
     this.total += atomLen(utf8Len(s));
   }
+  clauseId(handle: string): void {
+    this.total += atomLen(utf8Len(handle));
+  }
   atomBytes(b: Uint8Array): void {
     this.total += atomLen(b.length);
   }
   digest(d: Uint8Array): void {
-    this.total += atomLen(2 * d.length);
+    // The native Hash reading only needs its width. Explicit numeric input,
+    // like the value sink's, first has to establish each of the 32 octets.
+    if (nativeOctetLength(d) !== 32) hashFromBytes(d);
+    this.total += atomLen(64);
   }
   tupleBegin(arity: number): void {
     this.total += 1 + uvarintLen(arity);
@@ -414,7 +446,7 @@ function writeRelationTable(s: WireSink, table: RelationTable): void {
 function writeSupportEdge(s: WireSink, edge: SupportEdge): void {
   wireTuple(s, 5, () => {
     writeGroundLiteral(s, edge.fact);
-    s.atomStr(edge.clause.asStr());
+    s.clauseId(edge.clause.asStr());
     writeSubst(s, edge.subst);
     wireTuple(s, edge.bodyRefs.length, () => {
       for (const r of edge.bodyRefs) writeSupportRef(s, r);
