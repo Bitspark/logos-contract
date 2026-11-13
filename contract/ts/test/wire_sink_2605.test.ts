@@ -28,7 +28,8 @@ import {
   substAsValue,
   type CertSizeDecl,
   type SupportRef,
-  type Subst,
+  Subst,
+  VarId,
 } from "../src/index.js";
 import { measureLen, utf8Len, writeSubst } from "../src/wire_sink.js";
 import { assertLengthReading2605 } from "./support/cert_len_2605.js";
@@ -79,14 +80,14 @@ test("#2605: a string's UTF-8 length is TextEncoder's, lone surrogates included"
 const NAMES = ["AB", "Z", "c".repeat(255), "d".repeat(256), "a".repeat(127), "b".repeat(128), "é", "ab"];
 
 function subst2605(): Subst {
-  const s: Subst = new Map();
-  NAMES.forEach((name, i) => s.set(name, Term.tuple([Term.atom([i]), Term.var(name)])));
+  const s: Subst = new Subst();
+  NAMES.forEach((name, i) => s.set(new VarId(name), Term.tuple([Term.atom([i]), Term.var(name)])));
   return s;
 }
 
 test("#2605 condition 1: a substitution reads in codec order, exactly as sortedMap did", () => {
   const subst = subst2605();
-  const want = encode(sortedMap(Array.from(subst, ([name, term]) => [bytesAtom(enc.encode(name)), quote(term)] as const)));
+  const want = encode(sortedMap(Array.from(subst, ([id, term]) => [bytesAtom(enc.encode(id.asStr())), quote(term)] as const)));
   const value = substAsValue(subst);
   assert.deepEqual(encode(value), want, "the value reading moved from sortedMap's");
   assert.equal(value.kind, "tuple");

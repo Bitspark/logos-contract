@@ -24,7 +24,7 @@ export function readGround(g: TheoryGround): GroundReading {
   return { arm: "not_decided", cause: fault("malformed_outcome") };
 }
 
-/** Whether a reading is the fault a `not_mine` from `decide` becomes (#3126). */
+/** Whether a reading is the `inconsistent_theory` fault: the theory disowned the atom (#3126). */
 export function isDisowned(r: GroundReading): boolean {
   return r.arm === "not_decided" && r.cause.kind === "inconsistent_theory";
 }

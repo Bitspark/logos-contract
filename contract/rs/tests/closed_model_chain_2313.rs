@@ -14,7 +14,7 @@ use logos_contract::{
     ClosureWitness, Derivation, Evidence, FiniteDomain, Goal, GroundLiteral, Hash, LeafOutcome,
     LeafVerifier, MapProgram, Node, NodeMeta, NonMemberProof, Outcome, PredicateSet, Premise,
     Program, RelationTable, StratumPrefix, Subst, SupportEdge, SupportRef, SupportWitness, Symbol,
-    Term, Theory, TheoryOutcome,
+    Term, Theory, TheoryGround, Verdict,
 };
 use ontos_core::Value;
 use std::collections::BTreeMap;
@@ -29,10 +29,8 @@ impl Theory for NoTheory {
     fn owns(&self, _pred: &Symbol) -> bool {
         false
     }
-    fn decide(&self, _atom: &GroundLiteral) -> TheoryOutcome {
-        TheoryOutcome::Fails {
-            code: "no_theory".into(),
-        }
+    fn decide_ground(&self, _atom: &GroundLiteral) -> TheoryGround {
+        TheoryGround::fails("no_theory")
     }
 }
 
@@ -208,9 +206,9 @@ fn cited(cert: ClosedModelCert) -> Outcome {
 }
 
 fn reject_code(outcome: &Outcome) -> (&'static str, String) {
-    match outcome {
-        Outcome::Reject { code, detail } => (code.code(), detail.clone()),
-        Outcome::Accept => panic!("expected a rejection, got Accept"),
+    match &outcome.verdict {
+        Verdict::Reject { code, detail } => (code.code(), detail.clone()),
+        Verdict::Accept => panic!("expected a rejection, got Accept"),
     }
 }
 
@@ -219,11 +217,11 @@ fn a_valid_cert_accepts_through_the_chain_and_through_a_citing_derivation() {
     // The positive control first: the fixture is a real, valid seal, or every rejection below
     // would be vacuous.
     assert_eq!(
-        cited(valid_cert()),
-        Outcome::Accept,
+        cited(valid_cert()).verdict,
+        Verdict::Accept,
         "fixture: the cited cert must verify"
     );
-    assert_eq!(chain(&[valid_cert()]), Outcome::Accept);
+    assert_eq!(chain(&[valid_cert()]).verdict, Verdict::Accept);
 }
 
 #[test]
@@ -349,10 +347,8 @@ fn positive_check_only_uses_the_cited_clause_lookup() {
         }],
         0,
     );
-    assert!(matches!(
-        logos_contract::check(&LookupOnly(&program), &claim, &proof, &(), &profile()),
-        Outcome::Accept
-    ));
+    let outcome = logos_contract::check(&LookupOnly(&program), &claim, &proof, &(), &profile());
+    assert_eq!(outcome.verdict, Verdict::Accept);
 }
 
 #[test]
@@ -381,7 +377,7 @@ fn closure_requires_a_complete_inventory_even_when_the_expected_inventory_is_emp
         check_closed_model_chain(program, &[cert], &(), &profile(), &context)
     };
     let empty_hash = program_digest(&empty);
-    assert!(matches!(check(&empty, empty_hash), Outcome::Accept));
+    assert_eq!(check(&empty, empty_hash).verdict, Verdict::Accept);
     assert_eq!(
         reject_code(&check(&lookup, empty_hash)).0,
         "cert_scope_incomplete"

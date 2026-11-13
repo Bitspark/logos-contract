@@ -1,7 +1,7 @@
 import { Atom, Tuple, type Value } from "@bitspark/ontos-core";
 import { Goal, GroundLiteral, Symbol as PredicateSymbol } from "./literal.js";
 import { BodyLit, Clause, ClauseId, CountLit, PredicateRef } from "./program.js";
-import { TermAtom, TermTuple, TermVar, VarId, type Subst, type Term } from "./term.js";
+import { Subst, TermAtom, TermTuple, TermVar, VarId, type Term } from "./term.js";
 
 /** Model sequences are arrays. Read their captured length by index, so a
  * producer cannot substitute a different sequence through its iterator. */
@@ -105,6 +105,11 @@ export function nativePredicateRef(source: PredicateRef): PredicateRef {
   return new PredicateRef(nativeSymbol(source.pred), source.arity);
 }
 
+const substEntries = Subst.prototype.entries;
+
+/** Copy a substitution through `Subst`'s own frozen iterator, so a producer cannot substitute a
+ * different sequence of entries: a source that is not a `Subst` is refused with a `TypeError` by its
+ * brand. Its keys are plain `VarId`s by `Subst`'s construction (#3288). */
 export function nativeSubst(source: Subst): Subst {
-  return new Map(Map.prototype.entries.call(source) as IterableIterator<[string, Term]>);
+  return new Subst(substEntries.call(source));
 }

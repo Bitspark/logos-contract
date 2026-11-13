@@ -1,0 +1,3870 @@
+{
+  "seam": "logos Semiring SPI vector v1 (ADR 0031 D1, D2, G3; v2 §14.3) [PROPOSED]",
+  "note": "HAND-AUTHORED from the algebra and ADR 0031, never from an implementation's output. Language-agnostic tri-core vector for the Semiring SPI: four core semirings (Provenance ℕ[X], polynomials over fact identities in one canonical encoding: a Tuple of terms Tuple[int c >= 1, Tuple[variables in non-decreasing codec order]], terms in strictly increasing codec order of their monomials, so lower degree first; Counting (ℕ, +, ×, 0, 1) over the frozen ontos-data int embedding; Tropical (ℚ≥0 ∪ {+∞}, min, +, +∞, 0) and Probability (ℚ≥0, +, ×, 0, 1, sum-product under Independence::Assumed) over CANONICAL non-negative decimals, the carriers ruled on #1821, with Tropical's +∞ the atom inf), six FIXTURE semirings each core's replay defines in test code, the identity a semiring is named by, and the registration audit `audit_semiring` (Rust) / `AuditSemiring` (Go) / `auditSemiring` (TS). Values use the structural grammar {\"int\": N} = the ontos-data int embedding of N; {\"bigint\": \"<digits>\"} = the int embedding of a value beyond the JSON-int range; {\"atom\": \"<utf8>\"} = a bare Atom; {\"tuple\": [..]} = a Tuple of the encoded children; {\"decimal\": [m, e]} = the raw Tuple(Atom decimal, int m, int e), canonical or not (the rows say which). DECIMALS (pinned before any semiring reads them, as ruled on #1821): `decimal_parts` builds a decimal from (mantissa, exponent) through the contract's one constructor and pins its canonical form (trailing zeros carried into the exponent, zero only as decimal(0, 0), |exponent| <= 65536 after canonicalization, else out_of_band); `decimal_decode` pins which terms decode as a decimal (a non-canonical or past-band term, or an int, does not). A decimal carrier's element is a canonical decimal that decodes and is non-negative; an int embedding is not an element. A sum whose alignment shift exceeds 65536, or a result whose exponent leaves the band, is a capacity stop. ANSWERS (ADR 0031 D1 as clarified on #1821): an operation answers an element (`expected` is the value), \"not_an_element\" (an operand is outside the carrier), or {\"stopped\": {\"kind\", \"scope\"}} (a result past a capacity bound the carrier declares: a non-completion, never a rejection). IDENTITY: a semiring is named by (declared id, declared version, SHA-256(identity_prefix ‖ u64be(len id) ‖ id ‖ u64be(len version) ‖ version ‖ declared config digest (32 bytes) ‖ laws_byte)), laws_byte the OR of law_bits over the declared laws; every identity_digest_hex below was computed by coreutils sha256sum over that byte layout, independently of all three cores, and the two counting rows show that declaring one more law moves the digest. AUDIT: the evaluated set is [zero, one, samples...]; the laws are tested in audit_order, every axiom (the first ten) always and a declarable law (the last five) only when declared; within a law the set is enumerated in order with the first operand outermost. Each tuple reads in three values, strong Kleene over the answers: the law holds, fails, or is UNDECIDED because an operation it names stopped (a failing conjunct fails the tuple even beside a stop; a not_an_element answer on elements fails). The first failing tuple is the verdict (`counterexample`, its refuting elements the witness). Otherwise each law tested reports its tally, `decided` tuples and `undecided` tuples; a law with decided 0 is VACUOUS, never holding, and makes the verdict `vacuous` (not a pass) instead of `no_counterexample`. no_counterexample means NO COUNTEREXAMPLE IN THE SAMPLES: a finite sample can only refute a law, never prove one. audit_sample_limit samples at most; more is refused by name. The law definitions: carrier = zero, one and every sample are elements; add_closed / mul_closed = a⊕b / a⊗b is an element and the same one when asked again; add_associative, add_commutative, add_identity (zero), mul_associative, mul_identity (one, both sides), annihilation (zero, both sides), distributive (both sides); idempotent a⊕a=a; bounded one⊕a=one; monotone = a==b, or not both a≤b and b≤a, where a≤b iff a⊕c=b for some c of the set; commutative a⊗b=b⊗a (⊕ is commutative by axiom); supports_retraction = b==c, or a⊕b≠a⊕c (⊕ is cancellative). FIXTURES (defined identically in each core's replay): boolean = carrier {atom false, atom true}, zero false, one true, ⊕ or, ⊗ and; left_add = the boolean carrier with ⊕ the LEFT PROJECTION a⊕b=a (non-commutative, declared commutative per ADR 0031 G3's fixture, refuted by the add_commutative axiom); string_set = finite sets of atoms, an element a Tuple of Atoms strictly increasing by unsigned byte order, zero the empty set, one {atom \"\"}, ⊕ union, ⊗ pairwise concatenation (a lawful semiring whose ⊗ is NOT commutative, declared commutative: refuted by the declared law); noisy_or = decimals in [0, 1], ⊕ a + b - ab, ⊗ ab: not distributive, so not a semiring, and the audit refutes it by the distributive axiom (ruled on #1821); counting_declared_idempotent = Counting's operations under Counting's declared identity with idempotent also declared (refuted by the declared law, and a different identity); stopping = Counting's carrier, zero and one, declared like Counting, every add and mul on elements stopped with the capacity non-completion at literal scope (every operation at the bound): its audit decides only the laws a tuple settles without an operation, so it is vacuous. PRODUCTS (v2 §14.2, P9 I7, rulings Q23-Q28 on #1821): `products` holds one row per ORDERED pair of the four core semirings, the diagonal included (16), plus the fixture counting_x_tropical_declared_bounded. A product is binary; its element is a bare Tuple[a, b]; zero and one are componentwise; its laws are the AND of its members' laws. Its declared identity is logos-core/product-semiring@1.0.0 with config_digest = SHA-256(product_identity_prefix || for each member in order: u64be len id || id || u64be len version || version || the member's COMPUTED identity digest), and its identity digest folds its own laws byte as every semiring's does; so the swapped order is another identity. `product_ops` pins componentwise add and mul, a non-element operand (a non-pair, a triple, or a pair with a member non-element) as not_an_element before any member runs, and the FIRST member that stops as the product's stop. `product_audits` pins the audit over a product, and the fixture that declares a law (bounded) a member lacks, refuted on [one]. Authored from these rules by an independent encoder (Python hashlib) that first CALIBRATED its identity layout against every row in `semirings` and refused to emit on any mismatch.",
+  "identity_prefix": "logos-core/semiring-identity/v1\n",
+  "law_bits": {
+    "idempotent": 1,
+    "bounded": 2,
+    "monotone": 4,
+    "commutative": 8,
+    "supports_retraction": 16
+  },
+  "audit_order": [
+    "carrier",
+    "add_closed",
+    "mul_closed",
+    "add_associative",
+    "add_commutative",
+    "add_identity",
+    "mul_associative",
+    "mul_identity",
+    "annihilation",
+    "distributive",
+    "idempotent",
+    "bounded",
+    "monotone",
+    "commutative",
+    "supports_retraction"
+  ],
+  "audit_sample_limit": 16,
+  "semirings": [
+    {
+      "name": "counting",
+      "kind": "core",
+      "declared_identity": {
+        "id": "logos-core/counting-semiring",
+        "version": "1.0.0",
+        "config_digest": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "laws": {
+        "idempotent": false,
+        "bounded": false,
+        "monotone": true,
+        "commutative": true,
+        "supports_retraction": true
+      },
+      "laws_byte": 28,
+      "identity_digest_hex": "69459eb0f3691cb1ad6f6a29a4720a8f7186db1fb851b8ba5e618ed2281515e8",
+      "zero": {
+        "int": 0
+      },
+      "one": {
+        "int": 1
+      }
+    },
+    {
+      "name": "counting_declared_idempotent",
+      "kind": "fixture",
+      "declared_identity": {
+        "id": "logos-core/counting-semiring",
+        "version": "1.0.0",
+        "config_digest": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "laws": {
+        "idempotent": true,
+        "bounded": false,
+        "monotone": true,
+        "commutative": true,
+        "supports_retraction": true
+      },
+      "laws_byte": 29,
+      "identity_digest_hex": "4515d1cfcf4874767a8039997df2c284b43d23a729c2811bca18aceb4d4cc701",
+      "zero": {
+        "int": 0
+      },
+      "one": {
+        "int": 1
+      }
+    },
+    {
+      "name": "boolean",
+      "kind": "fixture",
+      "declared_identity": {
+        "id": "fixture/boolean-semiring",
+        "version": "1",
+        "config_digest": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "laws": {
+        "idempotent": true,
+        "bounded": true,
+        "monotone": true,
+        "commutative": true,
+        "supports_retraction": false
+      },
+      "laws_byte": 15,
+      "identity_digest_hex": "6d735f7d91e8eb71457e11a6477322132922157a4a441e98fdbf41040fb0f245",
+      "zero": {
+        "atom": "false"
+      },
+      "one": {
+        "atom": "true"
+      }
+    },
+    {
+      "name": "left_add",
+      "kind": "fixture",
+      "declared_identity": {
+        "id": "fixture/left-projection-add",
+        "version": "1",
+        "config_digest": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "laws": {
+        "idempotent": true,
+        "bounded": true,
+        "monotone": true,
+        "commutative": true,
+        "supports_retraction": false
+      },
+      "laws_byte": 15,
+      "identity_digest_hex": "60638564709210000edcafbd167ce05a2ba779134d4c64232c73128aa6115e48",
+      "zero": {
+        "atom": "false"
+      },
+      "one": {
+        "atom": "true"
+      }
+    },
+    {
+      "name": "string_set",
+      "kind": "fixture",
+      "declared_identity": {
+        "id": "fixture/string-set-semiring",
+        "version": "1",
+        "config_digest": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "laws": {
+        "idempotent": true,
+        "bounded": false,
+        "monotone": true,
+        "commutative": true,
+        "supports_retraction": false
+      },
+      "laws_byte": 13,
+      "identity_digest_hex": "fdbf1020a3eb2e7887227dbb9c7c53e87b58eb8db5aed0e62d6b7a6f556d9698",
+      "zero": {
+        "tuple": []
+      },
+      "one": {
+        "tuple": [
+          {
+            "atom": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "stopping",
+      "kind": "fixture",
+      "declared_identity": {
+        "id": "fixture/stopping-semiring",
+        "version": "1",
+        "config_digest": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "laws": {
+        "idempotent": false,
+        "bounded": false,
+        "monotone": true,
+        "commutative": true,
+        "supports_retraction": true
+      },
+      "laws_byte": 28,
+      "identity_digest_hex": "4a7c73b75dffb77db582b4934c6e0ae39e183855ec8046b7a949e16c31088c0f",
+      "zero": {
+        "int": 0
+      },
+      "one": {
+        "int": 1
+      }
+    },
+    {
+      "name": "tropical",
+      "kind": "core",
+      "declared_identity": {
+        "id": "logos-core/tropical-semiring",
+        "version": "1.0.0",
+        "config_digest": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "laws": {
+        "idempotent": true,
+        "bounded": true,
+        "monotone": true,
+        "commutative": true,
+        "supports_retraction": false
+      },
+      "laws_byte": 15,
+      "identity_digest_hex": "7e7853f26dfe3e642adb475f787ee8b3ff8242cda4fb8517f9435f650c2d7b58",
+      "zero": {
+        "atom": "inf"
+      },
+      "one": {
+        "decimal": [
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "probability",
+      "kind": "core",
+      "declared_identity": {
+        "id": "logos-core/probability-semiring",
+        "version": "1.0.0",
+        "config_digest": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "laws": {
+        "idempotent": false,
+        "bounded": false,
+        "monotone": true,
+        "commutative": true,
+        "supports_retraction": true
+      },
+      "laws_byte": 28,
+      "identity_digest_hex": "961e1561c4280e6d6718fa37e5ee2c838830de1df6560c7d2b27d10d798d7997",
+      "zero": {
+        "decimal": [
+          0,
+          0
+        ]
+      },
+      "one": {
+        "decimal": [
+          1,
+          0
+        ]
+      }
+    },
+    {
+      "name": "noisy_or",
+      "kind": "fixture",
+      "declared_identity": {
+        "id": "fixture/noisy-or-semiring",
+        "version": "1",
+        "config_digest": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "laws": {
+        "idempotent": false,
+        "bounded": false,
+        "monotone": true,
+        "commutative": true,
+        "supports_retraction": false
+      },
+      "laws_byte": 12,
+      "identity_digest_hex": "075a482a0f9661f978759f50dc9a68bdd0a517944de2806580e585c4fb8720cf",
+      "zero": {
+        "decimal": [
+          0,
+          0
+        ]
+      },
+      "one": {
+        "decimal": [
+          1,
+          0
+        ]
+      }
+    },
+    {
+      "name": "provenance",
+      "kind": "core",
+      "declared_identity": {
+        "id": "logos-core/provenance-semiring",
+        "version": "1.0.0",
+        "config_digest": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "laws": {
+        "idempotent": false,
+        "bounded": false,
+        "monotone": true,
+        "commutative": true,
+        "supports_retraction": true
+      },
+      "laws_byte": 28,
+      "identity_digest_hex": "703c444bdda8151e520ce4cc980d2f098fdf51d5af3b5823f60f5411ad704a02",
+      "zero": {
+        "tuple": []
+      },
+      "one": {
+        "tuple": [
+          {
+            "tuple": [
+              {
+                "int": 1
+              },
+              {
+                "tuple": []
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "elements": [
+    {
+      "name": "counting_zero",
+      "semiring": "counting",
+      "value": {
+        "int": 0
+      },
+      "expected": true
+    },
+    {
+      "name": "counting_seven",
+      "semiring": "counting",
+      "value": {
+        "int": 7
+      },
+      "expected": true
+    },
+    {
+      "name": "counting_beyond_i128",
+      "semiring": "counting",
+      "value": {
+        "bigint": "340282366920938463463374607431768211456"
+      },
+      "expected": true
+    },
+    {
+      "name": "counting_negative",
+      "semiring": "counting",
+      "value": {
+        "int": -1
+      },
+      "expected": false
+    },
+    {
+      "name": "counting_number_shaped_atom",
+      "semiring": "counting",
+      "value": {
+        "atom": "7"
+      },
+      "expected": false
+    },
+    {
+      "name": "counting_empty_tuple",
+      "semiring": "counting",
+      "value": {
+        "tuple": []
+      },
+      "expected": false
+    },
+    {
+      "name": "tropical_infinity",
+      "semiring": "tropical",
+      "value": {
+        "atom": "inf"
+      },
+      "expected": true
+    },
+    {
+      "name": "tropical_zero_cost",
+      "semiring": "tropical",
+      "value": {
+        "decimal": [
+          0,
+          0
+        ]
+      },
+      "expected": true
+    },
+    {
+      "name": "tropical_fraction",
+      "semiring": "tropical",
+      "value": {
+        "decimal": [
+          25,
+          -1
+        ]
+      },
+      "expected": true
+    },
+    {
+      "name": "tropical_negative",
+      "semiring": "tropical",
+      "value": {
+        "decimal": [
+          -5,
+          0
+        ]
+      },
+      "expected": false
+    },
+    {
+      "name": "tropical_int_embedding",
+      "semiring": "tropical",
+      "value": {
+        "int": 5
+      },
+      "expected": false
+    },
+    {
+      "name": "tropical_non_canonical",
+      "semiring": "tropical",
+      "value": {
+        "decimal": [
+          150,
+          -2
+        ]
+      },
+      "expected": false
+    },
+    {
+      "name": "tropical_other_atom",
+      "semiring": "tropical",
+      "value": {
+        "atom": "infinity"
+      },
+      "expected": false
+    },
+    {
+      "name": "probability_half",
+      "semiring": "probability",
+      "value": {
+        "decimal": [
+          5,
+          -1
+        ]
+      },
+      "expected": true
+    },
+    {
+      "name": "probability_above_one",
+      "semiring": "probability",
+      "value": {
+        "decimal": [
+          15,
+          -1
+        ]
+      },
+      "expected": true
+    },
+    {
+      "name": "probability_infinity_atom",
+      "semiring": "probability",
+      "value": {
+        "atom": "inf"
+      },
+      "expected": false
+    },
+    {
+      "name": "probability_int_one",
+      "semiring": "probability",
+      "value": {
+        "int": 1
+      },
+      "expected": false
+    },
+    {
+      "name": "probability_negative",
+      "semiring": "probability",
+      "value": {
+        "decimal": [
+          -5,
+          -1
+        ]
+      },
+      "expected": false
+    },
+    {
+      "name": "probability_zero_with_an_exponent",
+      "semiring": "probability",
+      "value": {
+        "decimal": [
+          0,
+          1
+        ]
+      },
+      "expected": false
+    },
+    {
+      "name": "provenance_zero",
+      "semiring": "provenance",
+      "value": {
+        "tuple": []
+      },
+      "expected": true
+    },
+    {
+      "name": "provenance_one",
+      "semiring": "provenance",
+      "value": {
+        "tuple": [
+          {
+            "tuple": [
+              {
+                "int": 1
+              },
+              {
+                "tuple": []
+              }
+            ]
+          }
+        ]
+      },
+      "expected": true
+    },
+    {
+      "name": "provenance_variable",
+      "semiring": "provenance",
+      "value": {
+        "tuple": [
+          {
+            "tuple": [
+              {
+                "int": 1
+              },
+              {
+                "tuple": [
+                  {
+                    "atom": "a"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "expected": true
+    },
+    {
+      "name": "provenance_terms_in_order",
+      "semiring": "provenance",
+      "value": {
+        "tuple": [
+          {
+            "tuple": [
+              {
+                "int": 1
+              },
+              {
+                "tuple": [
+                  {
+                    "atom": "a"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "tuple": [
+              {
+                "int": 1
+              },
+              {
+                "tuple": [
+                  {
+                    "atom": "b"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "expected": true
+    },
+    {
+      "name": "provenance_lower_degree_first",
+      "semiring": "provenance",
+      "value": {
+        "tuple": [
+          {
+            "tuple": [
+              {
+                "int": 1
+              },
+              {
+                "tuple": [
+                  {
+                    "atom": "b"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "tuple": [
+              {
+                "int": 1
+              },
+              {
+                "tuple": [
+                  {
+                    "atom": "a"
+                  },
+                  {
+                    "atom": "a"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "expected": true
+    },
+    {
+      "name": "provenance_terms_out_of_order",
+      "semiring": "provenance",
+      "value": {
+        "tuple": [
+          {
+            "tuple": [
+              {
+                "int": 1
+              },
+              {
+                "tuple": [
+                  {
+                    "atom": "b"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "tuple": [
+              {
+                "int": 1
+              },
+              {
+                "tuple": [
+                  {
+                    "atom": "a"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "expected": false
+    },
+    {
+      "name": "provenance_repeated_monomial",
+      "semiring": "provenance",
+      "value": {
+        "tuple": [
+          {
+            "tuple": [
+              {
+                "int": 1
+              },
+              {
+                "tuple": [
+                  {
+                    "atom": "a"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "tuple": [
+              {
+                "int": 1
+              },
+              {
+                "tuple": [
+                  {
+                    "atom": "a"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "expected": false
+    },
+    {
+      "name": "provenance_zero_coefficient",
+      "semiring": "provenance",
+      "value": {
+        "tuple": [
+          {
+            "tuple": [
+              {
+                "int": 0
+              },
+              {
+                "tuple": [
+                  {
+                    "atom": "a"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "expected": false
+    },
+    {
+      "name": "provenance_variables_out_of_order",
+      "semiring": "provenance",
+      "value": {
+        "tuple": [
+          {
+            "tuple": [
+              {
+                "int": 1
+              },
+              {
+                "tuple": [
+                  {
+                    "atom": "b"
+                  },
+                  {
+                    "atom": "a"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "expected": false
+    },
+    {
+      "name": "provenance_int_is_not_a_polynomial",
+      "semiring": "provenance",
+      "value": {
+        "int": 1
+      },
+      "expected": false
+    }
+  ],
+  "ops": [
+    {
+      "name": "counting_add",
+      "semiring": "counting",
+      "op": "add",
+      "a": {
+        "int": 2
+      },
+      "b": {
+        "int": 3
+      },
+      "expected": {
+        "int": 5
+      }
+    },
+    {
+      "name": "counting_mul",
+      "semiring": "counting",
+      "op": "mul",
+      "a": {
+        "int": 2
+      },
+      "b": {
+        "int": 3
+      },
+      "expected": {
+        "int": 6
+      }
+    },
+    {
+      "name": "counting_add_zero",
+      "semiring": "counting",
+      "op": "add",
+      "a": {
+        "int": 0
+      },
+      "b": {
+        "int": 7
+      },
+      "expected": {
+        "int": 7
+      }
+    },
+    {
+      "name": "counting_mul_zero_annihilates",
+      "semiring": "counting",
+      "op": "mul",
+      "a": {
+        "int": 0
+      },
+      "b": {
+        "int": 7
+      },
+      "expected": {
+        "int": 0
+      }
+    },
+    {
+      "name": "counting_add_beyond_i64",
+      "semiring": "counting",
+      "op": "add",
+      "a": {
+        "bigint": "18446744073709551616"
+      },
+      "b": {
+        "bigint": "18446744073709551616"
+      },
+      "expected": {
+        "bigint": "36893488147419103232"
+      }
+    },
+    {
+      "name": "counting_mul_beyond_i128",
+      "semiring": "counting",
+      "op": "mul",
+      "a": {
+        "bigint": "18446744073709551616"
+      },
+      "b": {
+        "bigint": "18446744073709551616"
+      },
+      "expected": {
+        "bigint": "340282366920938463463374607431768211456"
+      }
+    },
+    {
+      "name": "counting_add_negative_operand",
+      "semiring": "counting",
+      "op": "add",
+      "a": {
+        "int": -1
+      },
+      "b": {
+        "int": 1
+      },
+      "expected": "not_an_element"
+    },
+    {
+      "name": "counting_mul_atom_operand",
+      "semiring": "counting",
+      "op": "mul",
+      "a": {
+        "atom": "x"
+      },
+      "b": {
+        "int": 1
+      },
+      "expected": "not_an_element"
+    },
+    {
+      "name": "stopping_add_stops",
+      "semiring": "stopping",
+      "op": "add",
+      "a": {
+        "int": 0
+      },
+      "b": {
+        "int": 0
+      },
+      "expected": {
+        "stopped": {
+          "kind": "capacity",
+          "scope": "literal"
+        }
+      }
+    },
+    {
+      "name": "stopping_mul_stops",
+      "semiring": "stopping",
+      "op": "mul",
+      "a": {
+        "int": 1
+      },
+      "b": {
+        "int": 2
+      },
+      "expected": {
+        "stopped": {
+          "kind": "capacity",
+          "scope": "literal"
+        }
+      }
+    },
+    {
+      "name": "stopping_add_negative_operand",
+      "semiring": "stopping",
+      "op": "add",
+      "a": {
+        "int": -1
+      },
+      "b": {
+        "int": 0
+      },
+      "expected": "not_an_element"
+    },
+    {
+      "name": "tropical_add_is_min",
+      "semiring": "tropical",
+      "op": "add",
+      "a": {
+        "decimal": [
+          25,
+          -1
+        ]
+      },
+      "b": {
+        "decimal": [
+          3,
+          0
+        ]
+      },
+      "expected": {
+        "decimal": [
+          25,
+          -1
+        ]
+      }
+    },
+    {
+      "name": "tropical_add_infinity_is_identity",
+      "semiring": "tropical",
+      "op": "add",
+      "a": {
+        "atom": "inf"
+      },
+      "b": {
+        "decimal": [
+          3,
+          0
+        ]
+      },
+      "expected": {
+        "decimal": [
+          3,
+          0
+        ]
+      }
+    },
+    {
+      "name": "tropical_mul_is_sum",
+      "semiring": "tropical",
+      "op": "mul",
+      "a": {
+        "decimal": [
+          25,
+          -1
+        ]
+      },
+      "b": {
+        "decimal": [
+          3,
+          0
+        ]
+      },
+      "expected": {
+        "decimal": [
+          55,
+          -1
+        ]
+      }
+    },
+    {
+      "name": "tropical_mul_infinity_absorbs",
+      "semiring": "tropical",
+      "op": "mul",
+      "a": {
+        "decimal": [
+          3,
+          0
+        ]
+      },
+      "b": {
+        "atom": "inf"
+      },
+      "expected": {
+        "atom": "inf"
+      }
+    },
+    {
+      "name": "tropical_mul_past_the_alignment_cap_stops",
+      "semiring": "tropical",
+      "op": "mul",
+      "a": {
+        "decimal": [
+          1,
+          40000
+        ]
+      },
+      "b": {
+        "decimal": [
+          1,
+          -40000
+        ]
+      },
+      "expected": {
+        "stopped": {
+          "kind": "capacity",
+          "scope": "literal"
+        }
+      }
+    },
+    {
+      "name": "tropical_mul_int_operand",
+      "semiring": "tropical",
+      "op": "mul",
+      "a": {
+        "int": 3
+      },
+      "b": {
+        "decimal": [
+          3,
+          0
+        ]
+      },
+      "expected": "not_an_element"
+    },
+    {
+      "name": "probability_add",
+      "semiring": "probability",
+      "op": "add",
+      "a": {
+        "decimal": [
+          5,
+          -1
+        ]
+      },
+      "b": {
+        "decimal": [
+          25,
+          -2
+        ]
+      },
+      "expected": {
+        "decimal": [
+          75,
+          -2
+        ]
+      }
+    },
+    {
+      "name": "probability_add_canonicalizes",
+      "semiring": "probability",
+      "op": "add",
+      "a": {
+        "decimal": [
+          5,
+          -1
+        ]
+      },
+      "b": {
+        "decimal": [
+          5,
+          -1
+        ]
+      },
+      "expected": {
+        "decimal": [
+          1,
+          0
+        ]
+      }
+    },
+    {
+      "name": "probability_add_exceeds_one",
+      "semiring": "probability",
+      "op": "add",
+      "a": {
+        "decimal": [
+          75,
+          -2
+        ]
+      },
+      "b": {
+        "decimal": [
+          75,
+          -2
+        ]
+      },
+      "expected": {
+        "decimal": [
+          15,
+          -1
+        ]
+      }
+    },
+    {
+      "name": "probability_mul",
+      "semiring": "probability",
+      "op": "mul",
+      "a": {
+        "decimal": [
+          5,
+          -1
+        ]
+      },
+      "b": {
+        "decimal": [
+          25,
+          -2
+        ]
+      },
+      "expected": {
+        "decimal": [
+          125,
+          -3
+        ]
+      }
+    },
+    {
+      "name": "probability_mul_out_of_band_stops",
+      "semiring": "probability",
+      "op": "mul",
+      "a": {
+        "decimal": [
+          1,
+          -40000
+        ]
+      },
+      "b": {
+        "decimal": [
+          1,
+          -40000
+        ]
+      },
+      "expected": {
+        "stopped": {
+          "kind": "capacity",
+          "scope": "literal"
+        }
+      }
+    },
+    {
+      "name": "probability_add_past_the_alignment_cap_stops",
+      "semiring": "probability",
+      "op": "add",
+      "a": {
+        "decimal": [
+          1,
+          40000
+        ]
+      },
+      "b": {
+        "decimal": [
+          1,
+          -40000
+        ]
+      },
+      "expected": {
+        "stopped": {
+          "kind": "capacity",
+          "scope": "literal"
+        }
+      }
+    },
+    {
+      "name": "probability_add_negative_operand",
+      "semiring": "probability",
+      "op": "add",
+      "a": {
+        "decimal": [
+          -5,
+          -1
+        ]
+      },
+      "b": {
+        "decimal": [
+          5,
+          -1
+        ]
+      },
+      "expected": "not_an_element"
+    },
+    {
+      "name": "provenance_add_merges_terms",
+      "semiring": "provenance",
+      "op": "add",
+      "a": {
+        "tuple": [
+          {
+            "tuple": [
+              {
+                "int": 1
+              },
+              {
+                "tuple": [
+                  {
+                    "atom": "a"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "b": {
+        "tuple": [
+          {
+            "tuple": [
+              {
+                "int": 1
+              },
+              {
+                "tuple": [
+                  {
+                    "atom": "b"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "tuple": [
+          {
+            "tuple": [
+              {
+                "int": 1
+              },
+              {
+                "tuple": [
+                  {
+                    "atom": "a"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "tuple": [
+              {
+                "int": 1
+              },
+              {
+                "tuple": [
+                  {
+                    "atom": "b"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "provenance_add_sums_coefficients",
+      "semiring": "provenance",
+      "op": "add",
+      "a": {
+        "tuple": [
+          {
+            "tuple": [
+              {
+                "int": 1
+              },
+              {
+                "tuple": [
+                  {
+                    "atom": "a"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "b": {
+        "tuple": [
+          {
+            "tuple": [
+              {
+                "int": 1
+              },
+              {
+                "tuple": [
+                  {
+                    "atom": "a"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "tuple": [
+          {
+            "tuple": [
+              {
+                "int": 2
+              },
+              {
+                "tuple": [
+                  {
+                    "atom": "a"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "provenance_mul_joins_monomials",
+      "semiring": "provenance",
+      "op": "mul",
+      "a": {
+        "tuple": [
+          {
+            "tuple": [
+              {
+                "int": 1
+              },
+              {
+                "tuple": [
+                  {
+                    "atom": "b"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "b": {
+        "tuple": [
+          {
+            "tuple": [
+              {
+                "int": 1
+              },
+              {
+                "tuple": [
+                  {
+                    "atom": "a"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "tuple": [
+          {
+            "tuple": [
+              {
+                "int": 1
+              },
+              {
+                "tuple": [
+                  {
+                    "atom": "a"
+                  },
+                  {
+                    "atom": "b"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "provenance_mul_squares_a_sum",
+      "semiring": "provenance",
+      "op": "mul",
+      "a": {
+        "tuple": [
+          {
+            "tuple": [
+              {
+                "int": 1
+              },
+              {
+                "tuple": [
+                  {
+                    "atom": "a"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "tuple": [
+              {
+                "int": 1
+              },
+              {
+                "tuple": [
+                  {
+                    "atom": "b"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "b": {
+        "tuple": [
+          {
+            "tuple": [
+              {
+                "int": 1
+              },
+              {
+                "tuple": [
+                  {
+                    "atom": "a"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "tuple": [
+              {
+                "int": 1
+              },
+              {
+                "tuple": [
+                  {
+                    "atom": "b"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "tuple": [
+          {
+            "tuple": [
+              {
+                "int": 1
+              },
+              {
+                "tuple": [
+                  {
+                    "atom": "a"
+                  },
+                  {
+                    "atom": "a"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "tuple": [
+              {
+                "int": 2
+              },
+              {
+                "tuple": [
+                  {
+                    "atom": "a"
+                  },
+                  {
+                    "atom": "b"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "tuple": [
+              {
+                "int": 1
+              },
+              {
+                "tuple": [
+                  {
+                    "atom": "b"
+                  },
+                  {
+                    "atom": "b"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "provenance_mul_by_one",
+      "semiring": "provenance",
+      "op": "mul",
+      "a": {
+        "tuple": [
+          {
+            "tuple": [
+              {
+                "int": 1
+              },
+              {
+                "tuple": []
+              }
+            ]
+          }
+        ]
+      },
+      "b": {
+        "tuple": [
+          {
+            "tuple": [
+              {
+                "int": 3
+              },
+              {
+                "tuple": [
+                  {
+                    "atom": "a"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "tuple": [
+          {
+            "tuple": [
+              {
+                "int": 3
+              },
+              {
+                "tuple": [
+                  {
+                    "atom": "a"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "provenance_add_int_operand",
+      "semiring": "provenance",
+      "op": "add",
+      "a": {
+        "int": 1
+      },
+      "b": {
+        "tuple": []
+      },
+      "expected": "not_an_element"
+    }
+  ],
+  "audits": [
+    {
+      "name": "counting_no_counterexample",
+      "semiring": "counting",
+      "samples": [
+        {
+          "int": 2
+        },
+        {
+          "int": 3
+        }
+      ],
+      "verdict": {
+        "no_counterexample": {
+          "laws": [
+            {
+              "law": "carrier",
+              "decided": 4,
+              "undecided": 0
+            },
+            {
+              "law": "add_closed",
+              "decided": 16,
+              "undecided": 0
+            },
+            {
+              "law": "mul_closed",
+              "decided": 16,
+              "undecided": 0
+            },
+            {
+              "law": "add_associative",
+              "decided": 64,
+              "undecided": 0
+            },
+            {
+              "law": "add_commutative",
+              "decided": 16,
+              "undecided": 0
+            },
+            {
+              "law": "add_identity",
+              "decided": 4,
+              "undecided": 0
+            },
+            {
+              "law": "mul_associative",
+              "decided": 64,
+              "undecided": 0
+            },
+            {
+              "law": "mul_identity",
+              "decided": 4,
+              "undecided": 0
+            },
+            {
+              "law": "annihilation",
+              "decided": 4,
+              "undecided": 0
+            },
+            {
+              "law": "distributive",
+              "decided": 64,
+              "undecided": 0
+            },
+            {
+              "law": "monotone",
+              "decided": 16,
+              "undecided": 0
+            },
+            {
+              "law": "commutative",
+              "decided": 16,
+              "undecided": 0
+            },
+            {
+              "law": "supports_retraction",
+              "decided": 64,
+              "undecided": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "boolean_no_counterexample",
+      "semiring": "boolean",
+      "samples": [],
+      "verdict": {
+        "no_counterexample": {
+          "laws": [
+            {
+              "law": "carrier",
+              "decided": 2,
+              "undecided": 0
+            },
+            {
+              "law": "add_closed",
+              "decided": 4,
+              "undecided": 0
+            },
+            {
+              "law": "mul_closed",
+              "decided": 4,
+              "undecided": 0
+            },
+            {
+              "law": "add_associative",
+              "decided": 8,
+              "undecided": 0
+            },
+            {
+              "law": "add_commutative",
+              "decided": 4,
+              "undecided": 0
+            },
+            {
+              "law": "add_identity",
+              "decided": 2,
+              "undecided": 0
+            },
+            {
+              "law": "mul_associative",
+              "decided": 8,
+              "undecided": 0
+            },
+            {
+              "law": "mul_identity",
+              "decided": 2,
+              "undecided": 0
+            },
+            {
+              "law": "annihilation",
+              "decided": 2,
+              "undecided": 0
+            },
+            {
+              "law": "distributive",
+              "decided": 8,
+              "undecided": 0
+            },
+            {
+              "law": "idempotent",
+              "decided": 2,
+              "undecided": 0
+            },
+            {
+              "law": "bounded",
+              "decided": 2,
+              "undecided": 0
+            },
+            {
+              "law": "monotone",
+              "decided": 4,
+              "undecided": 0
+            },
+            {
+              "law": "commutative",
+              "decided": 4,
+              "undecided": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "left_add_refuted_by_the_add_commutative_axiom",
+      "semiring": "left_add",
+      "samples": [],
+      "verdict": {
+        "counterexample": {
+          "law": "add_commutative",
+          "witness": [
+            {
+              "atom": "false"
+            },
+            {
+              "atom": "true"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "string_set_refuted_by_its_declared_commutative_law",
+      "semiring": "string_set",
+      "samples": [
+        {
+          "tuple": [
+            {
+              "atom": "a"
+            }
+          ]
+        },
+        {
+          "tuple": [
+            {
+              "atom": "b"
+            }
+          ]
+        }
+      ],
+      "verdict": {
+        "counterexample": {
+          "law": "commutative",
+          "witness": [
+            {
+              "tuple": [
+                {
+                  "atom": "a"
+                }
+              ]
+            },
+            {
+              "tuple": [
+                {
+                  "atom": "b"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "counting_declared_idempotent_refuted",
+      "semiring": "counting_declared_idempotent",
+      "samples": [
+        {
+          "int": 2
+        },
+        {
+          "int": 3
+        }
+      ],
+      "verdict": {
+        "counterexample": {
+          "law": "idempotent",
+          "witness": [
+            {
+              "int": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "counting_sample_outside_the_carrier",
+      "semiring": "counting",
+      "samples": [
+        {
+          "int": 2
+        },
+        {
+          "int": -1
+        }
+      ],
+      "verdict": {
+        "counterexample": {
+          "law": "carrier",
+          "witness": [
+            {
+              "int": -1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "counting_sample_limit",
+      "semiring": "counting",
+      "samples": [
+        {
+          "int": 1
+        },
+        {
+          "int": 2
+        },
+        {
+          "int": 3
+        },
+        {
+          "int": 4
+        },
+        {
+          "int": 5
+        },
+        {
+          "int": 6
+        },
+        {
+          "int": 7
+        },
+        {
+          "int": 8
+        },
+        {
+          "int": 9
+        },
+        {
+          "int": 10
+        },
+        {
+          "int": 11
+        },
+        {
+          "int": 12
+        },
+        {
+          "int": 13
+        },
+        {
+          "int": 14
+        },
+        {
+          "int": 15
+        },
+        {
+          "int": 16
+        },
+        {
+          "int": 17
+        }
+      ],
+      "verdict": {
+        "sample_limit": {
+          "given": 17,
+          "limit": 16
+        }
+      }
+    },
+    {
+      "name": "stopping_every_operation_at_the_bound_is_vacuous",
+      "semiring": "stopping",
+      "samples": [
+        {
+          "int": 2
+        }
+      ],
+      "verdict": {
+        "vacuous": {
+          "laws": [
+            {
+              "law": "carrier",
+              "decided": 3,
+              "undecided": 0
+            },
+            {
+              "law": "add_closed",
+              "decided": 0,
+              "undecided": 9
+            },
+            {
+              "law": "mul_closed",
+              "decided": 0,
+              "undecided": 9
+            },
+            {
+              "law": "add_associative",
+              "decided": 0,
+              "undecided": 27
+            },
+            {
+              "law": "add_commutative",
+              "decided": 0,
+              "undecided": 9
+            },
+            {
+              "law": "add_identity",
+              "decided": 0,
+              "undecided": 3
+            },
+            {
+              "law": "mul_associative",
+              "decided": 0,
+              "undecided": 27
+            },
+            {
+              "law": "mul_identity",
+              "decided": 0,
+              "undecided": 3
+            },
+            {
+              "law": "annihilation",
+              "decided": 0,
+              "undecided": 3
+            },
+            {
+              "law": "distributive",
+              "decided": 0,
+              "undecided": 27
+            },
+            {
+              "law": "monotone",
+              "decided": 3,
+              "undecided": 6
+            },
+            {
+              "law": "commutative",
+              "decided": 0,
+              "undecided": 9
+            },
+            {
+              "law": "supports_retraction",
+              "decided": 9,
+              "undecided": 18
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "tropical_no_counterexample",
+      "semiring": "tropical",
+      "samples": [
+        {
+          "decimal": [
+            25,
+            -1
+          ]
+        },
+        {
+          "decimal": [
+            3,
+            0
+          ]
+        }
+      ],
+      "verdict": {
+        "no_counterexample": {
+          "laws": [
+            {
+              "law": "carrier",
+              "decided": 4,
+              "undecided": 0
+            },
+            {
+              "law": "add_closed",
+              "decided": 16,
+              "undecided": 0
+            },
+            {
+              "law": "mul_closed",
+              "decided": 16,
+              "undecided": 0
+            },
+            {
+              "law": "add_associative",
+              "decided": 64,
+              "undecided": 0
+            },
+            {
+              "law": "add_commutative",
+              "decided": 16,
+              "undecided": 0
+            },
+            {
+              "law": "add_identity",
+              "decided": 4,
+              "undecided": 0
+            },
+            {
+              "law": "mul_associative",
+              "decided": 64,
+              "undecided": 0
+            },
+            {
+              "law": "mul_identity",
+              "decided": 4,
+              "undecided": 0
+            },
+            {
+              "law": "annihilation",
+              "decided": 4,
+              "undecided": 0
+            },
+            {
+              "law": "distributive",
+              "decided": 64,
+              "undecided": 0
+            },
+            {
+              "law": "idempotent",
+              "decided": 4,
+              "undecided": 0
+            },
+            {
+              "law": "bounded",
+              "decided": 4,
+              "undecided": 0
+            },
+            {
+              "law": "monotone",
+              "decided": 16,
+              "undecided": 0
+            },
+            {
+              "law": "commutative",
+              "decided": 16,
+              "undecided": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "probability_no_counterexample",
+      "semiring": "probability",
+      "samples": [
+        {
+          "decimal": [
+            5,
+            -1
+          ]
+        },
+        {
+          "decimal": [
+            25,
+            -2
+          ]
+        }
+      ],
+      "verdict": {
+        "no_counterexample": {
+          "laws": [
+            {
+              "law": "carrier",
+              "decided": 4,
+              "undecided": 0
+            },
+            {
+              "law": "add_closed",
+              "decided": 16,
+              "undecided": 0
+            },
+            {
+              "law": "mul_closed",
+              "decided": 16,
+              "undecided": 0
+            },
+            {
+              "law": "add_associative",
+              "decided": 64,
+              "undecided": 0
+            },
+            {
+              "law": "add_commutative",
+              "decided": 16,
+              "undecided": 0
+            },
+            {
+              "law": "add_identity",
+              "decided": 4,
+              "undecided": 0
+            },
+            {
+              "law": "mul_associative",
+              "decided": 64,
+              "undecided": 0
+            },
+            {
+              "law": "mul_identity",
+              "decided": 4,
+              "undecided": 0
+            },
+            {
+              "law": "annihilation",
+              "decided": 4,
+              "undecided": 0
+            },
+            {
+              "law": "distributive",
+              "decided": 64,
+              "undecided": 0
+            },
+            {
+              "law": "monotone",
+              "decided": 16,
+              "undecided": 0
+            },
+            {
+              "law": "commutative",
+              "decided": 16,
+              "undecided": 0
+            },
+            {
+              "law": "supports_retraction",
+              "decided": 64,
+              "undecided": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "noisy_or_is_not_a_semiring",
+      "semiring": "noisy_or",
+      "samples": [
+        {
+          "decimal": [
+            5,
+            -1
+          ]
+        }
+      ],
+      "verdict": {
+        "counterexample": {
+          "law": "distributive",
+          "witness": [
+            {
+              "decimal": [
+                1,
+                0
+              ]
+            },
+            {
+              "decimal": [
+                1,
+                0
+              ]
+            },
+            {
+              "decimal": [
+                5,
+                -1
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "provenance_no_counterexample",
+      "semiring": "provenance",
+      "samples": [
+        {
+          "tuple": [
+            {
+              "tuple": [
+                {
+                  "int": 1
+                },
+                {
+                  "tuple": [
+                    {
+                      "atom": "a"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tuple": [
+            {
+              "tuple": [
+                {
+                  "int": 1
+                },
+                {
+                  "tuple": [
+                    {
+                      "atom": "b"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "verdict": {
+        "no_counterexample": {
+          "laws": [
+            {
+              "law": "carrier",
+              "decided": 4,
+              "undecided": 0
+            },
+            {
+              "law": "add_closed",
+              "decided": 16,
+              "undecided": 0
+            },
+            {
+              "law": "mul_closed",
+              "decided": 16,
+              "undecided": 0
+            },
+            {
+              "law": "add_associative",
+              "decided": 64,
+              "undecided": 0
+            },
+            {
+              "law": "add_commutative",
+              "decided": 16,
+              "undecided": 0
+            },
+            {
+              "law": "add_identity",
+              "decided": 4,
+              "undecided": 0
+            },
+            {
+              "law": "mul_associative",
+              "decided": 64,
+              "undecided": 0
+            },
+            {
+              "law": "mul_identity",
+              "decided": 4,
+              "undecided": 0
+            },
+            {
+              "law": "annihilation",
+              "decided": 4,
+              "undecided": 0
+            },
+            {
+              "law": "distributive",
+              "decided": 64,
+              "undecided": 0
+            },
+            {
+              "law": "monotone",
+              "decided": 16,
+              "undecided": 0
+            },
+            {
+              "law": "commutative",
+              "decided": 16,
+              "undecided": 0
+            },
+            {
+              "law": "supports_retraction",
+              "decided": 64,
+              "undecided": 0
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "decimal_parts": [
+    {
+      "name": "strips_trailing_zeros",
+      "parts": [
+        150,
+        -2
+      ],
+      "expected": {
+        "decimal": [
+          15,
+          -1
+        ]
+      }
+    },
+    {
+      "name": "zero_has_one_spelling",
+      "parts": [
+        0,
+        7
+      ],
+      "expected": {
+        "decimal": [
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "negative_strips_too",
+      "parts": [
+        -1200,
+        0
+      ],
+      "expected": {
+        "decimal": [
+          -12,
+          2
+        ]
+      }
+    },
+    {
+      "name": "canonical_unchanged",
+      "parts": [
+        7,
+        0
+      ],
+      "expected": {
+        "decimal": [
+          7,
+          0
+        ]
+      }
+    },
+    {
+      "name": "strips_to_the_band_edge",
+      "parts": [
+        10,
+        65535
+      ],
+      "expected": {
+        "decimal": [
+          1,
+          65536
+        ]
+      }
+    },
+    {
+      "name": "strips_past_the_band",
+      "parts": [
+        10,
+        65536
+      ],
+      "expected": "out_of_band"
+    },
+    {
+      "name": "below_the_band",
+      "parts": [
+        1,
+        -65537
+      ],
+      "expected": "out_of_band"
+    }
+  ],
+  "decimal_decode": [
+    {
+      "name": "canonical_decodes",
+      "value": {
+        "decimal": [
+          15,
+          -1
+        ]
+      },
+      "expected": {
+        "decimal": [
+          15,
+          -1
+        ]
+      }
+    },
+    {
+      "name": "zero_decodes",
+      "value": {
+        "decimal": [
+          0,
+          0
+        ]
+      },
+      "expected": {
+        "decimal": [
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "negative_decodes",
+      "value": {
+        "decimal": [
+          -15,
+          -1
+        ]
+      },
+      "expected": {
+        "decimal": [
+          -15,
+          -1
+        ]
+      }
+    },
+    {
+      "name": "trailing_zero_refused",
+      "value": {
+        "decimal": [
+          150,
+          -2
+        ]
+      },
+      "expected": "not_a_canonical_decimal"
+    },
+    {
+      "name": "zero_with_an_exponent_refused",
+      "value": {
+        "decimal": [
+          0,
+          1
+        ]
+      },
+      "expected": "not_a_canonical_decimal"
+    },
+    {
+      "name": "past_the_band_refused",
+      "value": {
+        "decimal": [
+          1,
+          65537
+        ]
+      },
+      "expected": "not_a_canonical_decimal"
+    },
+    {
+      "name": "int_is_not_a_decimal",
+      "value": {
+        "int": 5
+      },
+      "expected": "not_a_canonical_decimal"
+    }
+  ],
+  "product_identity_prefix": "logos-core/product-semiring/v1\n",
+  "products": [
+    {
+      "name": "counting_x_counting",
+      "kind": "core",
+      "members": [
+        "counting",
+        "counting"
+      ],
+      "declared_identity": {
+        "id": "logos-core/product-semiring",
+        "version": "1.0.0",
+        "config_digest": "15a694337ca646fa1dd45ea217a7bb41462636efdbef518317577e851f56ae70"
+      },
+      "laws": {
+        "idempotent": false,
+        "bounded": false,
+        "monotone": true,
+        "commutative": true,
+        "supports_retraction": true
+      },
+      "laws_byte": 28,
+      "identity_digest_hex": "5521d7e4ccab2628db3605e8e11eabdf47c8bbd5e895b82b61db4f3d3a127e15",
+      "zero": {
+        "tuple": [
+          {
+            "int": 0
+          },
+          {
+            "int": 0
+          }
+        ]
+      },
+      "one": {
+        "tuple": [
+          {
+            "int": 1
+          },
+          {
+            "int": 1
+          }
+        ]
+      }
+    },
+    {
+      "name": "counting_x_tropical",
+      "kind": "core",
+      "members": [
+        "counting",
+        "tropical"
+      ],
+      "declared_identity": {
+        "id": "logos-core/product-semiring",
+        "version": "1.0.0",
+        "config_digest": "fe7da83535726c7fe2abb00d5ffa796b57a6190c88b46578740b7d2bbb92003f"
+      },
+      "laws": {
+        "idempotent": false,
+        "bounded": false,
+        "monotone": true,
+        "commutative": true,
+        "supports_retraction": false
+      },
+      "laws_byte": 12,
+      "identity_digest_hex": "05a8a48a5a9cfd1604f15041fb61248cb0e2d021060d2b45c92172d881acd2a9",
+      "zero": {
+        "tuple": [
+          {
+            "int": 0
+          },
+          {
+            "atom": "inf"
+          }
+        ]
+      },
+      "one": {
+        "tuple": [
+          {
+            "int": 1
+          },
+          {
+            "decimal": [
+              0,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "counting_x_probability",
+      "kind": "core",
+      "members": [
+        "counting",
+        "probability"
+      ],
+      "declared_identity": {
+        "id": "logos-core/product-semiring",
+        "version": "1.0.0",
+        "config_digest": "fb6a1a5649ccc78ef2a20cd8a4bcff81a676a1eab8b0b33a54b773647a2c499a"
+      },
+      "laws": {
+        "idempotent": false,
+        "bounded": false,
+        "monotone": true,
+        "commutative": true,
+        "supports_retraction": true
+      },
+      "laws_byte": 28,
+      "identity_digest_hex": "2a10b0d425ff80de49249a648eff30174f256e4248d56101749c83a424f44082",
+      "zero": {
+        "tuple": [
+          {
+            "int": 0
+          },
+          {
+            "decimal": [
+              0,
+              0
+            ]
+          }
+        ]
+      },
+      "one": {
+        "tuple": [
+          {
+            "int": 1
+          },
+          {
+            "decimal": [
+              1,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "counting_x_provenance",
+      "kind": "core",
+      "members": [
+        "counting",
+        "provenance"
+      ],
+      "declared_identity": {
+        "id": "logos-core/product-semiring",
+        "version": "1.0.0",
+        "config_digest": "2fbf687f3a81945cd0744aa2f3331711073db8b944c1368a3004de44801d9bd1"
+      },
+      "laws": {
+        "idempotent": false,
+        "bounded": false,
+        "monotone": true,
+        "commutative": true,
+        "supports_retraction": true
+      },
+      "laws_byte": 28,
+      "identity_digest_hex": "0ec1982d16c857a4b8505bc4f2e3e99cc0a4b66fa997c0874aa0cce147e83376",
+      "zero": {
+        "tuple": [
+          {
+            "int": 0
+          },
+          {
+            "tuple": []
+          }
+        ]
+      },
+      "one": {
+        "tuple": [
+          {
+            "int": 1
+          },
+          {
+            "tuple": [
+              {
+                "tuple": [
+                  {
+                    "int": 1
+                  },
+                  {
+                    "tuple": []
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "tropical_x_counting",
+      "kind": "core",
+      "members": [
+        "tropical",
+        "counting"
+      ],
+      "declared_identity": {
+        "id": "logos-core/product-semiring",
+        "version": "1.0.0",
+        "config_digest": "5e881a8c2078509297d21d7aa3736f111d7762d21b540a911578ac91477cfc0d"
+      },
+      "laws": {
+        "idempotent": false,
+        "bounded": false,
+        "monotone": true,
+        "commutative": true,
+        "supports_retraction": false
+      },
+      "laws_byte": 12,
+      "identity_digest_hex": "8ba156f2b1086a0dc07cba81ab7edd256466403d413833853f6f7ac9d13e7676",
+      "zero": {
+        "tuple": [
+          {
+            "atom": "inf"
+          },
+          {
+            "int": 0
+          }
+        ]
+      },
+      "one": {
+        "tuple": [
+          {
+            "decimal": [
+              0,
+              0
+            ]
+          },
+          {
+            "int": 1
+          }
+        ]
+      }
+    },
+    {
+      "name": "tropical_x_tropical",
+      "kind": "core",
+      "members": [
+        "tropical",
+        "tropical"
+      ],
+      "declared_identity": {
+        "id": "logos-core/product-semiring",
+        "version": "1.0.0",
+        "config_digest": "ed84218b4f51864d564fd45e8e5c80e34c9d5be82c449b6d09a38a9742b20ef6"
+      },
+      "laws": {
+        "idempotent": true,
+        "bounded": true,
+        "monotone": true,
+        "commutative": true,
+        "supports_retraction": false
+      },
+      "laws_byte": 15,
+      "identity_digest_hex": "c057ca5cac5d9e9ced5bedb00642bc731ce8b9e5ff150913ff63c507931d9120",
+      "zero": {
+        "tuple": [
+          {
+            "atom": "inf"
+          },
+          {
+            "atom": "inf"
+          }
+        ]
+      },
+      "one": {
+        "tuple": [
+          {
+            "decimal": [
+              0,
+              0
+            ]
+          },
+          {
+            "decimal": [
+              0,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "tropical_x_probability",
+      "kind": "core",
+      "members": [
+        "tropical",
+        "probability"
+      ],
+      "declared_identity": {
+        "id": "logos-core/product-semiring",
+        "version": "1.0.0",
+        "config_digest": "f70bda044f2d89f2a9909135b7f7fe1d1271cbec06569d1ff0045c6fd1625941"
+      },
+      "laws": {
+        "idempotent": false,
+        "bounded": false,
+        "monotone": true,
+        "commutative": true,
+        "supports_retraction": false
+      },
+      "laws_byte": 12,
+      "identity_digest_hex": "6ec0c62cf99d300bf4d4e25243d44ba0f1e31a6f683ddf3baa62f4ace3ebc1f0",
+      "zero": {
+        "tuple": [
+          {
+            "atom": "inf"
+          },
+          {
+            "decimal": [
+              0,
+              0
+            ]
+          }
+        ]
+      },
+      "one": {
+        "tuple": [
+          {
+            "decimal": [
+              0,
+              0
+            ]
+          },
+          {
+            "decimal": [
+              1,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "tropical_x_provenance",
+      "kind": "core",
+      "members": [
+        "tropical",
+        "provenance"
+      ],
+      "declared_identity": {
+        "id": "logos-core/product-semiring",
+        "version": "1.0.0",
+        "config_digest": "7980a4b82b47ce72ad281e15de40ab6d29182ebcdc3bfb1e0a570f84479204f8"
+      },
+      "laws": {
+        "idempotent": false,
+        "bounded": false,
+        "monotone": true,
+        "commutative": true,
+        "supports_retraction": false
+      },
+      "laws_byte": 12,
+      "identity_digest_hex": "03c40b3672bad7e93253f27f7bc3542d21b8d57069a227fde9fc3e83307c2bfd",
+      "zero": {
+        "tuple": [
+          {
+            "atom": "inf"
+          },
+          {
+            "tuple": []
+          }
+        ]
+      },
+      "one": {
+        "tuple": [
+          {
+            "decimal": [
+              0,
+              0
+            ]
+          },
+          {
+            "tuple": [
+              {
+                "tuple": [
+                  {
+                    "int": 1
+                  },
+                  {
+                    "tuple": []
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "probability_x_counting",
+      "kind": "core",
+      "members": [
+        "probability",
+        "counting"
+      ],
+      "declared_identity": {
+        "id": "logos-core/product-semiring",
+        "version": "1.0.0",
+        "config_digest": "ef776f1fe4103b9eca1d276d803edcf6caa33ab3e37dc33a7153f72677dce016"
+      },
+      "laws": {
+        "idempotent": false,
+        "bounded": false,
+        "monotone": true,
+        "commutative": true,
+        "supports_retraction": true
+      },
+      "laws_byte": 28,
+      "identity_digest_hex": "ccaf620becd76a6e4a6b97f54eaa6d423d19c35fea58f373fc03bf2785380f6a",
+      "zero": {
+        "tuple": [
+          {
+            "decimal": [
+              0,
+              0
+            ]
+          },
+          {
+            "int": 0
+          }
+        ]
+      },
+      "one": {
+        "tuple": [
+          {
+            "decimal": [
+              1,
+              0
+            ]
+          },
+          {
+            "int": 1
+          }
+        ]
+      }
+    },
+    {
+      "name": "probability_x_tropical",
+      "kind": "core",
+      "members": [
+        "probability",
+        "tropical"
+      ],
+      "declared_identity": {
+        "id": "logos-core/product-semiring",
+        "version": "1.0.0",
+        "config_digest": "88d0c562e5804ccfbdfdf611bb1582a3fa7ba26dbd59231ba4241b5f7511ccd9"
+      },
+      "laws": {
+        "idempotent": false,
+        "bounded": false,
+        "monotone": true,
+        "commutative": true,
+        "supports_retraction": false
+      },
+      "laws_byte": 12,
+      "identity_digest_hex": "371da12c86fc44d19dee0486f814c585032aea33f77e663d15cf3239a3856fff",
+      "zero": {
+        "tuple": [
+          {
+            "decimal": [
+              0,
+              0
+            ]
+          },
+          {
+            "atom": "inf"
+          }
+        ]
+      },
+      "one": {
+        "tuple": [
+          {
+            "decimal": [
+              1,
+              0
+            ]
+          },
+          {
+            "decimal": [
+              0,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "probability_x_probability",
+      "kind": "core",
+      "members": [
+        "probability",
+        "probability"
+      ],
+      "declared_identity": {
+        "id": "logos-core/product-semiring",
+        "version": "1.0.0",
+        "config_digest": "7113e523cc690b496986ac7875cb707003afe86660491d5674a9bb742290dd04"
+      },
+      "laws": {
+        "idempotent": false,
+        "bounded": false,
+        "monotone": true,
+        "commutative": true,
+        "supports_retraction": true
+      },
+      "laws_byte": 28,
+      "identity_digest_hex": "4563b41ec2d52a42980474ce3be73bcb92f2fe77f5e1a0641a1a355dc362bb79",
+      "zero": {
+        "tuple": [
+          {
+            "decimal": [
+              0,
+              0
+            ]
+          },
+          {
+            "decimal": [
+              0,
+              0
+            ]
+          }
+        ]
+      },
+      "one": {
+        "tuple": [
+          {
+            "decimal": [
+              1,
+              0
+            ]
+          },
+          {
+            "decimal": [
+              1,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "probability_x_provenance",
+      "kind": "core",
+      "members": [
+        "probability",
+        "provenance"
+      ],
+      "declared_identity": {
+        "id": "logos-core/product-semiring",
+        "version": "1.0.0",
+        "config_digest": "d11e4ca95f5b2df674450b2d29cd3dc4800bc048acd3e5110766f45397e355e7"
+      },
+      "laws": {
+        "idempotent": false,
+        "bounded": false,
+        "monotone": true,
+        "commutative": true,
+        "supports_retraction": true
+      },
+      "laws_byte": 28,
+      "identity_digest_hex": "92c0d0c0075d1d31abbeae9685e6a587a323fbc2a71165024075f37cfd80127d",
+      "zero": {
+        "tuple": [
+          {
+            "decimal": [
+              0,
+              0
+            ]
+          },
+          {
+            "tuple": []
+          }
+        ]
+      },
+      "one": {
+        "tuple": [
+          {
+            "decimal": [
+              1,
+              0
+            ]
+          },
+          {
+            "tuple": [
+              {
+                "tuple": [
+                  {
+                    "int": 1
+                  },
+                  {
+                    "tuple": []
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "provenance_x_counting",
+      "kind": "core",
+      "members": [
+        "provenance",
+        "counting"
+      ],
+      "declared_identity": {
+        "id": "logos-core/product-semiring",
+        "version": "1.0.0",
+        "config_digest": "91d507abc32de3a19c58cd04555e8663e48b16035bbfcffdc54b8629e1c3724f"
+      },
+      "laws": {
+        "idempotent": false,
+        "bounded": false,
+        "monotone": true,
+        "commutative": true,
+        "supports_retraction": true
+      },
+      "laws_byte": 28,
+      "identity_digest_hex": "841600dfa0d8edb493e01ac415c6ccaf2135f6c98d4a62dd905a2bfaac8e2590",
+      "zero": {
+        "tuple": [
+          {
+            "tuple": []
+          },
+          {
+            "int": 0
+          }
+        ]
+      },
+      "one": {
+        "tuple": [
+          {
+            "tuple": [
+              {
+                "tuple": [
+                  {
+                    "int": 1
+                  },
+                  {
+                    "tuple": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "int": 1
+          }
+        ]
+      }
+    },
+    {
+      "name": "provenance_x_tropical",
+      "kind": "core",
+      "members": [
+        "provenance",
+        "tropical"
+      ],
+      "declared_identity": {
+        "id": "logos-core/product-semiring",
+        "version": "1.0.0",
+        "config_digest": "e61f15cb23ac7e7166afb1a754e9838770ac42763fca94dbe9e59b599c20c133"
+      },
+      "laws": {
+        "idempotent": false,
+        "bounded": false,
+        "monotone": true,
+        "commutative": true,
+        "supports_retraction": false
+      },
+      "laws_byte": 12,
+      "identity_digest_hex": "453d316f137a361decbc6d4b1b64861a9b14ba3221b09ee04eaa5fb727e155ef",
+      "zero": {
+        "tuple": [
+          {
+            "tuple": []
+          },
+          {
+            "atom": "inf"
+          }
+        ]
+      },
+      "one": {
+        "tuple": [
+          {
+            "tuple": [
+              {
+                "tuple": [
+                  {
+                    "int": 1
+                  },
+                  {
+                    "tuple": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "decimal": [
+              0,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "provenance_x_probability",
+      "kind": "core",
+      "members": [
+        "provenance",
+        "probability"
+      ],
+      "declared_identity": {
+        "id": "logos-core/product-semiring",
+        "version": "1.0.0",
+        "config_digest": "c0735e882fec5416becc19b0eb207f520abf3db1348f9cebd097028bf59e4780"
+      },
+      "laws": {
+        "idempotent": false,
+        "bounded": false,
+        "monotone": true,
+        "commutative": true,
+        "supports_retraction": true
+      },
+      "laws_byte": 28,
+      "identity_digest_hex": "0e5368421e9ed51b3fdd1de59f3b8e802b2f02d7f205de86dd8cc1198ff7badb",
+      "zero": {
+        "tuple": [
+          {
+            "tuple": []
+          },
+          {
+            "decimal": [
+              0,
+              0
+            ]
+          }
+        ]
+      },
+      "one": {
+        "tuple": [
+          {
+            "tuple": [
+              {
+                "tuple": [
+                  {
+                    "int": 1
+                  },
+                  {
+                    "tuple": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "decimal": [
+              1,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "provenance_x_provenance",
+      "kind": "core",
+      "members": [
+        "provenance",
+        "provenance"
+      ],
+      "declared_identity": {
+        "id": "logos-core/product-semiring",
+        "version": "1.0.0",
+        "config_digest": "e3680142263f930f7909b4f164d9922c10cd50ff52cb5b2bd492d66f21025f74"
+      },
+      "laws": {
+        "idempotent": false,
+        "bounded": false,
+        "monotone": true,
+        "commutative": true,
+        "supports_retraction": true
+      },
+      "laws_byte": 28,
+      "identity_digest_hex": "8cf918dcd7af1a91b1dd3270a3973d9167eef76931730584fa7c3afc6589a5d8",
+      "zero": {
+        "tuple": [
+          {
+            "tuple": []
+          },
+          {
+            "tuple": []
+          }
+        ]
+      },
+      "one": {
+        "tuple": [
+          {
+            "tuple": [
+              {
+                "tuple": [
+                  {
+                    "int": 1
+                  },
+                  {
+                    "tuple": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "tuple": [
+              {
+                "tuple": [
+                  {
+                    "int": 1
+                  },
+                  {
+                    "tuple": []
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "counting_x_tropical_declared_bounded",
+      "kind": "fixture",
+      "members": [
+        "counting",
+        "tropical"
+      ],
+      "declares_also": [
+        "bounded"
+      ],
+      "declared_identity": {
+        "id": "logos-core/product-semiring",
+        "version": "1.0.0",
+        "config_digest": "fe7da83535726c7fe2abb00d5ffa796b57a6190c88b46578740b7d2bbb92003f"
+      },
+      "laws": {
+        "idempotent": false,
+        "bounded": true,
+        "monotone": true,
+        "commutative": true,
+        "supports_retraction": false
+      },
+      "laws_byte": 14,
+      "identity_digest_hex": "438e455cde633a51d831ac268e8dba60663694eec4aa767ca16e57ae84bd808e",
+      "zero": {
+        "tuple": [
+          {
+            "int": 0
+          },
+          {
+            "atom": "inf"
+          }
+        ]
+      },
+      "one": {
+        "tuple": [
+          {
+            "int": 1
+          },
+          {
+            "decimal": [
+              0,
+              0
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "product_ops": [
+    {
+      "name": "counting_x_provenance_add_is_componentwise",
+      "product": "counting_x_provenance",
+      "op": "add",
+      "a": {
+        "tuple": [
+          {
+            "int": 2
+          },
+          {
+            "tuple": [
+              {
+                "tuple": [
+                  {
+                    "int": 1
+                  },
+                  {
+                    "tuple": [
+                      {
+                        "atom": "a"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "b": {
+        "tuple": [
+          {
+            "int": 3
+          },
+          {
+            "tuple": [
+              {
+                "tuple": [
+                  {
+                    "int": 1
+                  },
+                  {
+                    "tuple": [
+                      {
+                        "atom": "b"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "tuple": [
+          {
+            "int": 5
+          },
+          {
+            "tuple": [
+              {
+                "tuple": [
+                  {
+                    "int": 1
+                  },
+                  {
+                    "tuple": [
+                      {
+                        "atom": "a"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "tuple": [
+                  {
+                    "int": 1
+                  },
+                  {
+                    "tuple": [
+                      {
+                        "atom": "b"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "counting_x_provenance_mul_is_componentwise",
+      "product": "counting_x_provenance",
+      "op": "mul",
+      "a": {
+        "tuple": [
+          {
+            "int": 2
+          },
+          {
+            "tuple": [
+              {
+                "tuple": [
+                  {
+                    "int": 1
+                  },
+                  {
+                    "tuple": [
+                      {
+                        "atom": "b"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "b": {
+        "tuple": [
+          {
+            "int": 3
+          },
+          {
+            "tuple": [
+              {
+                "tuple": [
+                  {
+                    "int": 1
+                  },
+                  {
+                    "tuple": [
+                      {
+                        "atom": "a"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "tuple": [
+          {
+            "int": 6
+          },
+          {
+            "tuple": [
+              {
+                "tuple": [
+                  {
+                    "int": 1
+                  },
+                  {
+                    "tuple": [
+                      {
+                        "atom": "a"
+                      },
+                      {
+                        "atom": "b"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "tropical_x_tropical_add_is_componentwise",
+      "product": "tropical_x_tropical",
+      "op": "add",
+      "a": {
+        "tuple": [
+          {
+            "decimal": [
+              25,
+              -1
+            ]
+          },
+          {
+            "atom": "inf"
+          }
+        ]
+      },
+      "b": {
+        "tuple": [
+          {
+            "decimal": [
+              3,
+              0
+            ]
+          },
+          {
+            "decimal": [
+              3,
+              0
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "tuple": [
+          {
+            "decimal": [
+              25,
+              -1
+            ]
+          },
+          {
+            "decimal": [
+              3,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "tropical_x_counting_mul_stops_on_its_first_member",
+      "product": "tropical_x_counting",
+      "op": "mul",
+      "a": {
+        "tuple": [
+          {
+            "decimal": [
+              1,
+              40000
+            ]
+          },
+          {
+            "int": 2
+          }
+        ]
+      },
+      "b": {
+        "tuple": [
+          {
+            "decimal": [
+              1,
+              -40000
+            ]
+          },
+          {
+            "int": 3
+          }
+        ]
+      },
+      "expected": {
+        "stopped": {
+          "kind": "capacity",
+          "scope": "literal"
+        }
+      }
+    },
+    {
+      "name": "counting_x_tropical_mul_stops_on_its_second_member",
+      "product": "counting_x_tropical",
+      "op": "mul",
+      "a": {
+        "tuple": [
+          {
+            "int": 2
+          },
+          {
+            "decimal": [
+              1,
+              40000
+            ]
+          }
+        ]
+      },
+      "b": {
+        "tuple": [
+          {
+            "int": 3
+          },
+          {
+            "decimal": [
+              1,
+              -40000
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "stopped": {
+          "kind": "capacity",
+          "scope": "literal"
+        }
+      }
+    },
+    {
+      "name": "counting_x_provenance_add_a_non_pair_is_not_an_element",
+      "product": "counting_x_provenance",
+      "op": "add",
+      "a": {
+        "int": 1
+      },
+      "b": {
+        "tuple": [
+          {
+            "int": 3
+          },
+          {
+            "tuple": [
+              {
+                "tuple": [
+                  {
+                    "int": 1
+                  },
+                  {
+                    "tuple": [
+                      {
+                        "atom": "b"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "expected": "not_an_element"
+    },
+    {
+      "name": "counting_x_tropical_mul_a_member_non_element_is_not_an_element",
+      "product": "counting_x_tropical",
+      "op": "mul",
+      "a": {
+        "tuple": [
+          {
+            "int": 2
+          },
+          {
+            "int": 3
+          }
+        ]
+      },
+      "b": {
+        "tuple": [
+          {
+            "int": 1
+          },
+          {
+            "decimal": [
+              3,
+              0
+            ]
+          }
+        ]
+      },
+      "expected": "not_an_element"
+    },
+    {
+      "name": "counting_x_counting_add_a_triple_is_not_an_element",
+      "product": "counting_x_counting",
+      "op": "add",
+      "a": {
+        "tuple": [
+          {
+            "int": 1
+          },
+          {
+            "int": 2
+          },
+          {
+            "int": 3
+          }
+        ]
+      },
+      "b": {
+        "tuple": [
+          {
+            "int": 1
+          },
+          {
+            "int": 1
+          }
+        ]
+      },
+      "expected": "not_an_element"
+    }
+  ],
+  "product_audits": [
+    {
+      "name": "counting_x_counting_no_counterexample",
+      "product": "counting_x_counting",
+      "samples": [
+        {
+          "tuple": [
+            {
+              "int": 2
+            },
+            {
+              "int": 3
+            }
+          ]
+        },
+        {
+          "tuple": [
+            {
+              "int": 3
+            },
+            {
+              "int": 2
+            }
+          ]
+        }
+      ],
+      "verdict": {
+        "no_counterexample": {
+          "laws": [
+            {
+              "law": "carrier",
+              "decided": 4,
+              "undecided": 0
+            },
+            {
+              "law": "add_closed",
+              "decided": 16,
+              "undecided": 0
+            },
+            {
+              "law": "mul_closed",
+              "decided": 16,
+              "undecided": 0
+            },
+            {
+              "law": "add_associative",
+              "decided": 64,
+              "undecided": 0
+            },
+            {
+              "law": "add_commutative",
+              "decided": 16,
+              "undecided": 0
+            },
+            {
+              "law": "add_identity",
+              "decided": 4,
+              "undecided": 0
+            },
+            {
+              "law": "mul_associative",
+              "decided": 64,
+              "undecided": 0
+            },
+            {
+              "law": "mul_identity",
+              "decided": 4,
+              "undecided": 0
+            },
+            {
+              "law": "annihilation",
+              "decided": 4,
+              "undecided": 0
+            },
+            {
+              "law": "distributive",
+              "decided": 64,
+              "undecided": 0
+            },
+            {
+              "law": "monotone",
+              "decided": 16,
+              "undecided": 0
+            },
+            {
+              "law": "commutative",
+              "decided": 16,
+              "undecided": 0
+            },
+            {
+              "law": "supports_retraction",
+              "decided": 64,
+              "undecided": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "counting_x_tropical_declared_bounded_refuted_by_bounded",
+      "product": "counting_x_tropical_declared_bounded",
+      "samples": [],
+      "verdict": {
+        "counterexample": {
+          "law": "bounded",
+          "witness": [
+            {
+              "tuple": [
+                {
+                  "int": 1
+                },
+                {
+                  "decimal": [
+                    0,
+                    0
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

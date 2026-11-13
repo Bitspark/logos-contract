@@ -3,6 +3,7 @@ package contract
 import (
 	"testing"
 
+	"github.com/Bitspark/logos-contract/contract/go/completion"
 	core "github.com/bitspark/ontos/core/go"
 )
 
@@ -11,7 +12,7 @@ import (
 // The two that matter are the NEGATIVE ones:
 //   - TestEmptyResultDoesNotPromiseAcceptance — an empty result means no capability refusal
 //     will occur, NOT that Check will accept.
-//   - TestNeverCallsDecide — proven by a theory whose Decide panics.
+//   - TestNeverCallsDecideGround — proven by a theory whose DecideGround panics.
 
 // --------------------------------- theories ---------------------------------
 
@@ -19,33 +20,33 @@ import (
 type pcUnboundTheory struct{}
 
 func (pcUnboundTheory) Owns(pred Symbol) bool { return false }
-func (pcUnboundTheory) Decide(atom GroundLiteral) TheoryOutcome {
-	return TheoryNotMine{}
+func (pcUnboundTheory) DecideGround(atom GroundLiteral) completion.TheoryGround {
+	return completion.TheoryGroundDisowned()
 }
 
 // test-double: consumer(owns every predicate and holds it)
 type pcOwningTheory struct{}
 
 func (pcOwningTheory) Owns(pred Symbol) bool { return true }
-func (pcOwningTheory) Decide(atom GroundLiteral) TheoryOutcome {
-	return TheoryHolds{}
+func (pcOwningTheory) DecideGround(atom GroundLiteral) completion.TheoryGround {
+	return completion.TheoryGroundHolds()
 }
 
 // test-double: consumer(owns exactly one named predicate and holds it)
 type pcOwnsOnly struct{ name string }
 
 func (t pcOwnsOnly) Owns(pred Symbol) bool { return pred.String() == t.name }
-func (pcOwnsOnly) Decide(atom GroundLiteral) TheoryOutcome {
-	return TheoryHolds{}
+func (pcOwnsOnly) DecideGround(atom GroundLiteral) completion.TheoryGround {
+	return completion.TheoryGroundHolds()
 }
 
-// Owns everything and PANICS if asked to decide — the query must never call Decide.
+// Owns everything and PANICS if asked to decide — the query must never call DecideGround.
 // test-double: adversarial(panics if asked to decide)
 type pcExplodingTheory struct{}
 
 func (pcExplodingTheory) Owns(pred Symbol) bool { return true }
-func (pcExplodingTheory) Decide(atom GroundLiteral) TheoryOutcome {
-	panic("the pre-check query must not call Decide()")
+func (pcExplodingTheory) DecideGround(atom GroundLiteral) completion.TheoryGround {
+	panic("the pre-check query must not call DecideGround()")
 }
 
 // ---------------------------------- leaves ----------------------------------
@@ -174,14 +175,14 @@ func TestEmptyResultDoesNotPromiseAcceptance(t *testing.T) {
 	if out.IsAccept() {
 		t.Fatal("expected a structural rejection: an empty capability report does not make an overlapping account valid")
 	}
-	if out.Code() != PredicatePartitionViolation {
-		t.Fatalf("want predicate_partition_violation, got %v", out.Code())
+	if out.Verdict.Code() != PredicatePartitionViolation {
+		t.Fatalf("want predicate_partition_violation, got %v", out.Verdict.Code())
 	}
 }
 
 // The query is total and side-effect-free: it consults Owns only. Proven rather than
-// asserted — this theory panics if Decide is ever reached.
-func TestNeverCallsDecide(t *testing.T) {
+// asserted — this theory panics if DecideGround is ever reached.
+func TestNeverCallsDecideGround(t *testing.T) {
 	p := pcProfile(pcExplodingTheory{}, pcEmptyLeaves())
 	d := pcDeriv("=:=", ">", "<")
 	if got := UnownedBuiltinPredicates(d, p); len(got) != 0 {

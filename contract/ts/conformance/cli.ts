@@ -7,7 +7,9 @@
 // asserts each line against the hand-authored oracle.
 //
 //   check   : in  {program, cases:[{name, claim, derivation, limits?}]}
-//             out {"name":…,"outcome":"accept"|{"reject":"<code>"}}
+//             out {"name":…,"outcome":"accept"|{"reject":"<code>"},"report":{…}}, the report
+//                 being check()'s work counters by their snake_case names (#4206; the negation
+//                 family emits the same shape)
 //   account : in  {clauses:[{name, head, body}]}
 //             out {"name":…,"id":"<hex>"}
 //
@@ -42,7 +44,6 @@ import {
   ClosedModelCert,
   ComponentIdentity,
   CompoundTheory,
-  decideGround,
   DecisionCompletion,
   Derivation,
   edbTableHash,
@@ -65,20 +66,23 @@ import {
   RelationTable,
   type Premise,
   StratumPrefix,
-  type Subst,
+  Subst,
   type SupportEdge,
   SupportEdge as SupportEdgeClass,
   type SupportRef,
   SupportRef as SupportRefOps,
   Symbol,
   Term,
+  VarId,
   TermTheory,
   TextTheory,
   type Theory,
-  TheoryOutcome,
+  TheoryGround,
   type CertSizeDecl,
   type CheckLimits,
   type CheckProfile,
+  type CheckReport,
+  ReportCount,
   defaultLimits,
   BuiltinNode,
   LeafNode,
@@ -106,15 +110,15 @@ class LtTheory implements Theory {
   completion(_pred: Symbol): DecisionCompletion {
     return DecisionCompletion.StopsAreTyped;
   }
-  decide(atom: GroundLiteral): TheoryOutcome {
+  decideGround(atom: GroundLiteral): TheoryGround {
     const args = atom.args;
-    if (args.length !== 2) return TheoryOutcome.Fails("lt_arity");
+    if (args.length !== 2) return TheoryGround.fails("lt_arity");
     const a = args[0]!;
     const b = args[1]!;
     if (a.kind === "atom" && b.kind === "atom" && bytesLess(a.bytes(), b.bytes())) {
-      return TheoryOutcome.Holds;
+      return TheoryGround.holds();
     }
-    return TheoryOutcome.Fails("not_less_than");
+    return TheoryGround.fails("not_less_than");
   }
 }
 
@@ -223,9 +227,9 @@ function groundFromJson(j: any): GroundLiteral {
 }
 
 function substFromJson(j: any): Subst {
-  const subst: Subst = new Map();
+  const subst = new Subst();
   for (const [varName, term] of Object.entries(j)) {
-    subst.set(varName, termFromJson(term));
+    subst.set(new VarId(varName), termFromJson(term));
   }
   return subst;
 }
@@ -262,6 +266,32 @@ function programFromJson(j: any): MapProgram {
 
 // ================================ families ===================================
 
+// check()'s report as the harness reads it (#4206): counters_version and the 17 counters by their
+// snake_case names, each a count, or null where this core does not count it.
+function reportJson(r: CheckReport): Record<string, number | null> {
+  const count = (c: ReportCount): number | null => ReportCount.get(c) ?? null;
+  return {
+    counters_version: r.countersVersion,
+    nodes_walked: count(r.nodesWalked),
+    rule_nodes: count(r.ruleNodes),
+    builtin_nodes: count(r.builtinNodes),
+    leaf_nodes: count(r.leafNodes),
+    premises_pos: count(r.premisesPos),
+    premises_neg: count(r.premisesNeg),
+    theory_decisions: count(r.theoryDecisions),
+    leaf_verifications: count(r.leafVerifications),
+    admissibility_checks: count(r.admissibilityChecks),
+    certs_verified: count(r.certsVerified),
+    certs_memo_hits: count(r.certsMemoHits),
+    cert_tables_read: count(r.certTablesRead),
+    cert_rows_read: count(r.certRowsRead),
+    join_steps_used: count(r.joinStepsUsed),
+    groundings_enumerated: count(r.groundingsEnumerated),
+    max_depth_reached: count(r.maxDepthReached),
+    max_term_depth_reached: count(r.maxTermDepthReached),
+  };
+}
+
 function runCheck(doc: any): void {
   const program = programFromJson(doc.program);
   for (const c of doc.cases) {
@@ -270,8 +300,9 @@ function runCheck(doc: any): void {
     const deriv = new Derivation(nodes, Number(c.derivation.root));
     const limits = limitsFromJson(c.limits);
     const got = check(program, claim, deriv, undefined, demoProfile(limits));
-    const outcome = Outcome.isAccept(got) ? "accept" : { reject: (got as { code: string }).code };
-    process.stdout.write(`${JSON.stringify({ name: c.name, outcome })}\n`);
+    const outcome = got.verdict.kind === "accept" ? "accept" : { reject: got.verdict.code };
+    const report = reportJson(got.report);
+    process.stdout.write(`${JSON.stringify({ name: c.name, outcome, report })}\n`);
   }
 }
 
@@ -568,8 +599,9 @@ function runNegation(doc: any): void {
           : base;
       got = checkWithCertContext(program, claim, deriv, undefined, profile, context);
     }
-    const outcome = Outcome.isAccept(got) ? "accept" : { reject: (got as { code: string }).code };
-    process.stdout.write(`${JSON.stringify({ name: c.name, outcome })}\n`);
+    const outcome = got.verdict.kind === "accept" ? "accept" : { reject: got.verdict.code };
+    const report = reportJson(got.report);
+    process.stdout.write(`${JSON.stringify({ name: c.name, outcome, report })}\n`);
   }
 }
 
@@ -643,7 +675,7 @@ function runTheory(name: string, doc: any): void {
   for (const d of doc.decisions as any[]) {
     const args = (d.args as any[]).map(buildTheoryArg);
     // #3126: the ground verdict, which can say "not decided" ({"not_completed": <kind>}).
-    const got = decideGround(theory, GroundLiteral.of(String(d.pred), args));
+    const got = theory.decideGround(GroundLiteral.of(String(d.pred), args));
     let outcome: unknown;
     if (got.kind === "completed") {
       outcome = got.value.kind === "holds" ? "holds" : { fails: got.value.code };

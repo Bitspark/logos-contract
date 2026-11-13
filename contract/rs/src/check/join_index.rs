@@ -17,9 +17,9 @@
 //!
 //! ⛔ **VALID ONLY WHILE CLOSURE UNIFICATION IS STRUCTURAL.** A key position is compared by `Term`
 //! equality and hashing, which is exactly the relation `unify_ground` applies to a bound variable
-//! or a constant: structural, blind to the profile's `TermIdentity` (seat:caa's condition on
-//! #2516). If the closure join ever unifies under a term identity (reified lists, say), the key
-//! must be canonicalized the same way. Otherwise the index skips a row the unifier would accept,
+//! or a constant: structural (seat:caa's condition on #2516; the term identity it once had to be
+//! blind to was deleted in checker SPI v2, #3111). If the closure join ever unifies under a term
+//! identity (reified lists, say), the key must be canonicalized the same way. Otherwise the index skips a row the unifier would accept,
 //! a satisfied grounding goes unchecked, and the checker accepts a certificate that is not closed.
 
 use std::cell::OnceCell;
@@ -240,7 +240,7 @@ mod differential {
     use crate::check::CheckLimits;
     use crate::literal::{Goal, GroundLiteral, Symbol};
     use crate::program::{Clause, MapProgram};
-    use crate::spi::{Theory, TheoryOutcome};
+    use crate::spi::{Theory, TheoryGround};
     use crate::term::{Subst, Term, VarId};
     use ontos_core::Value;
 
@@ -254,8 +254,8 @@ mod differential {
         fn owns(&self, _: &Symbol) -> bool {
             false
         }
-        fn decide(&self, _: &GroundLiteral) -> TheoryOutcome {
-            TheoryOutcome::NotMine
+        fn decide_ground(&self, _: &GroundLiteral) -> TheoryGround {
+            TheoryGround::disowned()
         }
     }
 

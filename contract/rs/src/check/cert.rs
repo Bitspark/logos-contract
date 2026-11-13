@@ -13,7 +13,8 @@
 use super::cert_stack::{resolve_lower_seals, CertView};
 use super::cert_support::check_cert_support;
 use super::cert_truth::{body_continues, filter_outcome, truth};
-use super::{builtin_not_decided, CertContext, CheckLimits, CheckProfile, Outcome, RejectionCode};
+use super::report::Tally;
+use super::{builtin_not_decided, CertContext, CheckLimits, CheckProfile, RejectionCode, Verdict};
 use crate::cert::{CertId, CertSizeDecl, ClosedModelCert, Hash, NonMemberProof, SupportRef};
 use crate::completion::{self, Completion, GroundOutcome};
 use crate::derivation::{Derivation, GroundFilter};
@@ -111,6 +112,13 @@ impl<'a> WorldProgram<'a> {
             })
             .as_ref()
     }
+
+    /// The captured inventory as the trusted enumeration, `None` for a program with none. The
+    /// annotated check (ADR 0031 D5, [`super::annotated`]) reads its scope clauses here, so they
+    /// are the clauses the boolean verdict over the same inventory was reached on.
+    pub(super) fn inventory(&self) -> Option<&dyn CompleteProgram> {
+        self.complete().map(|p| p as &dyn CompleteProgram)
+    }
 }
 
 struct CheckedProgram<'a> {
@@ -160,7 +168,10 @@ pub(super) fn verify_cert<C>(
     ctx: &C,
     cert_context: &CertContext,
     limits: &CheckLimits,
+    tally: &mut Tally,
 ) -> CertStatus {
+    // certs_verified: this certificate's verification runs, whatever status it ends in.
+    tally.certs_verified += 1;
     let theory = profile.theory.as_ref();
     // 1. BUDGET GATE — first, before any scan.
     if let Err((code, detail)) = check_cert_budget(cert, limits) {
@@ -175,7 +186,7 @@ pub(super) fn verify_cert<C>(
     //     here, bounded by the budget just validated, before any gate consults a
     //     lookup. Each defect carries the code its silent defeat would otherwise
     //     have fabricated, with a detail naming the real cause.
-    if let Err((code, detail)) = check_cert_canonical_form(cert) {
+    if let Err((code, detail)) = check_cert_canonical_form(cert, tally) {
         return CertStatus::Invalid(code, detail);
     }
     let Some(program) = source.complete() else {
@@ -222,40 +233,49 @@ pub(super) fn verify_cert<C>(
         Ok(view) => view,
         Err((code, detail)) => return CertStatus::Invalid(code, detail),
     };
+    let gates = verify_gates(&view, place, program, profile, ctx, limits, tally);
+    // theory_decisions: the `decide_ground` calls the support and closure gates made, which the
+    // view counted where they were made.
+    tally.theory_decisions += view.theory_decisions();
+    match gates {
+        // 8. exact.
+        Ok(()) => CertStatus::Valid,
+        Err((code, detail)) => CertStatus::Invalid(code, detail),
+    }
+}
+
+/// Steps 3 to 7 of [`verify_cert`], over the view step 2b resolved: the first gate the
+/// certificate fails, or `Ok` when it is exact.
+fn verify_gates<C>(
+    view: &CertView<'_>,
+    place: CertPlace,
+    program: &CheckedProgram<'_>,
+    profile: &CheckProfile<C>,
+    ctx: &C,
+    limits: &CheckLimits,
+    tally: &mut Tally,
+) -> Result<(), (RejectionCode, String)> {
+    let theory = profile.theory.as_ref();
     // 3. SCOPE DOWNWARD-CLOSURE (§3.2) — the sealed prefix must be self-contained:
     //    every defining clause of a sealed head touches only sealed, theory-owned or
     //    lower-sealed (2b) predicates, and an intra-scope `\+` is forbidden. Establishes the
     //    invariant that `eval_body_literal` can decide every in-scope body literal.
-    if let Err((code, detail)) = check_scope_downward_closed(&view, program, theory) {
-        return CertStatus::Invalid(code, detail);
-    }
+    check_scope_downward_closed(view, program, theory)?;
     // 4. DOMAIN COVERAGE (§3.4) — every value reachable through the cert (extension
     //    rows, support refs, subst images) must lie in ∪domains, so every tuple the
     //    closure join emits is a point of the finite space a self-enumeration over
     //    ∪domains would have visited (the join demands nothing more, #1829).
-    if let Err((code, detail)) = check_cert_domain_coverage(cert, program) {
-        return CertStatus::Invalid(code, detail);
-    }
+    check_cert_domain_coverage(view.cert, program)?;
     // 5. SUPPORT (§3.5) — E ⊆ least model (no junk; rank-consistent strict descent).
     //    Extensional (EDB) facts are the base case: vouched by the §3.6 EDB snapshot
     //    gate, not by support edges, so support exempts them.
-    if let Err((code, detail)) =
-        check_cert_support(&view, place, program, theory, profile.leaves.extensional())
-    {
-        return CertStatus::Invalid(code, detail);
-    }
+    check_cert_support(view, place, program, theory, profile.leaves.extensional())?;
     // 6. CLOSURE (§3.3) — least model ⊆ E, driven by the TRUSTED enumerated defining
     //    clauses of the sealed scope (NOT the support witness's cited clauses).
-    if let Err((code, detail)) = check_cert_closure(&view, program, theory, limits) {
-        return CertStatus::Invalid(code, detail);
-    }
+    check_cert_closure(view, program, theory, limits, tally)?;
     // 7. EDB BINDING (§3.6) — every sealed extensional predicate's table must equal
     //    the live EDB snapshot the bound LeafVerifier attests.
-    if let Err((code, detail)) = check_cert_edb(cert, &*profile.leaves, ctx) {
-        return CertStatus::Invalid(code, detail);
-    }
-    // 8. exact.
-    CertStatus::Valid
+    check_cert_edb(view.cert, &*profile.leaves, ctx)
 }
 
 /// 1c. PARTIAL SUB-SCOPE (ADR 0030 D1). A cert with `partial_scope: None` passes untouched —
@@ -350,7 +370,13 @@ fn check_cert_partial_scope(
 /// with every correct value in the list. Reject deterministically instead, with the
 /// code that collection's defeated search would have fabricated and a detail that
 /// names the canonicalizing constructor.
-fn check_cert_canonical_form(cert: &ClosedModelCert) -> Result<(), (RejectionCode, String)> {
+///
+/// `cert_tables_read` / `cert_rows_read` are counted here, as each table is begun: this gate is
+/// the first to read a table's rows.
+fn check_cert_canonical_form(
+    cert: &ClosedModelCert,
+    tally: &mut Tally,
+) -> Result<(), (RejectionCode, String)> {
     if !cert.scope.is_canonical() {
         return Err((
             RejectionCode::CertScopeIncomplete,
@@ -370,6 +396,9 @@ fn check_cert_canonical_form(cert: &ClosedModelCert) -> Result<(), (RejectionCod
         }
     }
     for table in &cert.extensions {
+        // cert_tables_read / cert_rows_read: this gate begins the table and reads every row.
+        tally.cert_tables_read += 1;
+        tally.cert_rows_read += table.rows.len() as u64;
         if !table.is_canonical() {
             return Err((
                 RejectionCode::CertUnsupported,
@@ -904,6 +933,7 @@ fn check_cert_closure(
     program: &dyn CompleteProgram,
     theory: &dyn Theory,
     limits: &CheckLimits,
+    tally: &mut Tally,
 ) -> Result<(), (RejectionCode, String)> {
     let cert = view.cert;
     let mut groundings: usize = 0;
@@ -940,6 +970,10 @@ fn check_cert_closure(
             err = Some(e);
         }
     });
+    // join_steps_used / groundings_enumerated: what this closure spent against its two budget
+    // meters, as they stand when it ends (a tripped meter at the count it tripped at).
+    tally.join_steps_used += joins as u64;
+    tally.groundings_enumerated += groundings as u64;
     match err {
         Some(e) => Err(e),
         None => Ok(()),
@@ -1110,6 +1144,19 @@ struct JoinPlan<'a> {
     /// #2511: each binder's candidate index, keyed on the positions its earlier binders bound.
     /// It changes which rows the join VISITS, never which it COUNTS (see `join_index`).
     indexes: Vec<super::join_index::BinderIndex>,
+    /// ADR 0031 D5 (P9 I5a): where the annotated check records each grounding the join emits.
+    /// `None` on every boolean path, where the join reads exactly as it did without it.
+    record: Option<&'a std::cell::RefCell<Vec<Emitted>>>,
+}
+
+/// One grounding the closure join emitted, as the annotated check records it (ADR 0031 D5): the
+/// substitution every binder bound, and whether the body is decided (`false` for a body a theory
+/// stop holds open, which the boolean check admits only through a present head).
+pub(super) struct Emitted {
+    /// The substitution at the emission point.
+    pub(super) subst: crate::term::Subst,
+    /// The body's truth is established.
+    pub(super) decided: bool,
 }
 
 /// One step of a closure join that is not a binder: a filter literal, or (#2258 L3.3b) a count
@@ -1159,6 +1206,7 @@ fn plan_join<'a>(
         leading: Vec::new(),
         binders: Vec::new(),
         indexes: Vec::new(),
+        record: None,
     };
     // The variables bound once binder `i` has bound: the cumulative union, in declared order.
     let mut bound_after: Vec<Vec<crate::term::VarId>> = Vec::new();
@@ -1280,7 +1328,42 @@ fn join_groundings(
     groundings: &mut usize,
     joins: &mut usize,
 ) -> Result<(), (RejectionCode, String)> {
-    let plan = plan_join(clause, view, theory)?;
+    join_recorded(
+        clause, view, theory, limits, verify, groundings, joins, None,
+    )
+}
+
+/// ADR 0031 D5 (P9 I5a): the body-true groundings the closure join emits for one sealed clause,
+/// in emission order, on the count-only path (`verify = false`). Clause, plan, binders, filters
+/// and counters are [`check_cert_closure`]'s; only the record is added, at the emission point.
+/// `counts` carries the `(groundings, join steps)` counters across a scope's clauses.
+pub(super) fn closure_groundings(
+    clause: &Clause,
+    view: &CertView<'_>,
+    theory: &dyn Theory,
+    limits: &CheckLimits,
+    counts: &mut (usize, usize),
+) -> Result<Vec<Emitted>, (RejectionCode, String)> {
+    let record = std::cell::RefCell::new(Vec::new());
+    let (groundings, joins, to) = (&mut counts.0, &mut counts.1, Some(&record));
+    join_recorded(clause, view, theory, limits, false, groundings, joins, to)?;
+    Ok(record.into_inner())
+}
+
+/// [`join_groundings`], recording each emitted grounding into `record` when one is given.
+#[allow(clippy::too_many_arguments)]
+fn join_recorded(
+    clause: &Clause,
+    view: &CertView<'_>,
+    theory: &dyn Theory,
+    limits: &CheckLimits,
+    verify: bool,
+    groundings: &mut usize,
+    joins: &mut usize,
+    record: Option<&std::cell::RefCell<Vec<Emitted>>>,
+) -> Result<(), (RejectionCode, String)> {
+    let mut plan = plan_join(clause, view, theory)?;
+    plan.record = record;
     let mut subst: crate::term::Subst = std::collections::BTreeMap::new();
     // What a leading count binds stays bound for the whole clause, so nothing is undone.
     let mut leading_bound: Vec<crate::term::VarId> = Vec::new();
@@ -1336,6 +1419,13 @@ fn join_stage(
                     *groundings, limits.max_rule_groundings
                 ),
             ));
+        }
+        // ADR 0031 D5 (P9 I5a): the annotated check's record of this grounding, taken where it is
+        // emitted. Every boolean path carries no record, so nothing below reads differently.
+        if let Some(record) = plan.record {
+            let decided = !matches!(body, Completion::NotCompleted(_));
+            let subst = subst.clone();
+            record.borrow_mut().push(Emitted { subst, decided });
         }
         if !verify {
             return Ok(());
@@ -1595,10 +1685,10 @@ pub(super) fn verify_neg_premise(
     head_pred: &Symbol,
     deriv: &Derivation,
     cert_status: &[CertStatus],
-) -> Outcome {
+) -> Verdict {
     // 1. cert index in range: a protocol index, an offset only if it names a carried cert (#2735).
     let Some(idx) = cert_id.offset(deriv.closed_world.len()) else {
-        return Outcome::reject(
+        return Verdict::reject(
             RejectionCode::CertOutOfRange,
             format!(
                 "neg premise cites cert {} out of range {}",
@@ -1611,7 +1701,7 @@ pub(super) fn verify_neg_premise(
 
     // 2. the cert must be Valid (reuse the memoized status).
     if let CertStatus::Invalid(code, detail) = &cert_status[idx] {
-        return Outcome::Reject {
+        return Verdict::Reject {
             code: *code,
             detail: detail.clone(),
         };
@@ -1619,7 +1709,7 @@ pub(super) fn verify_neg_premise(
 
     // 3. predicate sealed by the cert scope.
     if !cert.scope.seals(&atom.pred) {
-        return Outcome::reject(
+        return Verdict::reject(
             RejectionCode::NegAtomNotSealed,
             "negated predicate is not sealed by the cited certificate",
         );
@@ -1630,7 +1720,7 @@ pub(super) fn verify_neg_premise(
     //     derive the atom. Sealed, but not sealed exactly, sits between "not sealed" (3)
     //     and "not lower" (4).
     if cert.is_partial(&atom.pred) {
-        return Outcome::reject(
+        return Verdict::reject(
             RejectionCode::NegAtomPartial,
             "negated predicate's sealed table is marked PARTIAL (a lower bound) — absence from it proves nothing (ADR 0030 D2)",
         );
@@ -1639,7 +1729,7 @@ pub(super) fn verify_neg_premise(
     // 4. strictly lower stratum: the RULE HEAD predicate must NOT be in the cert's
     //    (lower) scope — negation may only depend on a strictly lower stratum.
     if cert.scope.seals(head_pred) {
-        return Outcome::reject(
+        return Verdict::reject(
             RejectionCode::NegStratumNotLower,
             "rule head predicate is in the same (or lower) sealed stratum as the negated atom",
         );
@@ -1649,7 +1739,7 @@ pub(super) fn verify_neg_premise(
     //    must lie in some domain).
     for arg in &atom.args {
         if cert.domain_containing(arg).is_none() {
-            return Outcome::reject(
+            return Verdict::reject(
                 RejectionCode::NegAtomIllTyped,
                 "negated atom argument is outside the certificate's finite domain",
             );
@@ -1659,19 +1749,19 @@ pub(super) fn verify_neg_premise(
     // 6. ABSENT from the sealed relation (else `\+` fails — the atom IS present).
     let Some(table) = cert.table(&atom.pred) else {
         // Sealed by scope (step 3) but no extension table ⇒ ill-formed cert.
-        return Outcome::reject(
+        return Verdict::reject(
             RejectionCode::NegAtomNotSealed,
             "negated predicate sealed but has no extension table",
         );
     };
     if table.contains(atom) {
-        return Outcome::reject(
+        return Verdict::reject(
             RejectionCode::NegAtomPresent,
             "negated atom IS present in the sealed relation",
         );
     }
 
-    Outcome::Accept
+    Verdict::Accept
 }
 
 /// Verify a single `Count { pred, filter, project, k, cert }` premise against the
@@ -1705,10 +1795,10 @@ pub(super) fn verify_count_premise(
     head_pred: &Symbol,
     deriv: &Derivation,
     cert_status: &[CertStatus],
-) -> Outcome {
+) -> Verdict {
     // 1. cert index in range: a protocol index, an offset only if it names a carried cert (#2735).
     let Some(idx) = cert_id.offset(deriv.closed_world.len()) else {
-        return Outcome::reject(
+        return Verdict::reject(
             RejectionCode::CertOutOfRange,
             format!(
                 "count premise cites cert {} out of range {}",
@@ -1722,7 +1812,7 @@ pub(super) fn verify_count_premise(
     // 2. the cert must be Valid (reuse the memoized status — support+closure already
     //    proved the sealed relation EXACT; the count does not re-prove exactness).
     if let CertStatus::Invalid(code, detail) = &cert_status[idx] {
-        return Outcome::Reject {
+        return Verdict::Reject {
             code: *code,
             detail: detail.clone(),
         };
@@ -1730,7 +1820,7 @@ pub(super) fn verify_count_premise(
 
     // 3. predicate sealed by the cert scope (matched by name; arity is checked in 5).
     if !cert.scope.seals(&pred.pred) {
-        return Outcome::reject(
+        return Verdict::reject(
             RejectionCode::NegAtomNotSealed,
             "counted predicate is not sealed by the cited certificate",
         );
@@ -1739,7 +1829,7 @@ pub(super) fn verify_count_premise(
     // 3b. sealed EXACTLY (ADR 0030 D2): a cardinality over a lower bound is itself a lower
     //     bound, never the claimed `k` — the count twin of `neg_atom_partial`.
     if cert.is_partial(&pred.pred) {
-        return Outcome::reject(
+        return Verdict::reject(
             RejectionCode::CountOverPartial,
             "counted predicate's sealed table is marked PARTIAL (a lower bound) — a count over it is a lower bound, never the claimed k (ADR 0030 D2)",
         );
@@ -1748,7 +1838,7 @@ pub(super) fn verify_count_premise(
     // 4. strictly lower stratum: the RULE HEAD predicate must NOT be sealed by the
     //    cert's (lower) scope — a count may only depend on a strictly lower stratum.
     if cert.scope.seals(head_pred) {
-        return Outcome::reject(
+        return Verdict::reject(
             RejectionCode::CountStratumNotLower,
             "rule head predicate is in the same (or lower) sealed stratum as the counted relation",
         );
@@ -1757,7 +1847,7 @@ pub(super) fn verify_count_premise(
     // 5. recompute n over the sealed table.
     let Some(table) = cert.table(&pred.pred) else {
         // Sealed by scope (step 3) but no extension table ⇒ ill-formed cert.
-        return Outcome::reject(
+        return Verdict::reject(
             RejectionCode::NegAtomNotSealed,
             "counted predicate sealed but has no extension table",
         );
@@ -1770,7 +1860,7 @@ pub(super) fn verify_count_premise(
     //     `count_attr_out_of_range` (the filter/project positions are interpreted against
     //     the claimed arity; a mismatch makes every position suspect).
     if pred.arity as usize != arity {
-        return Outcome::reject(
+        return Verdict::reject(
             RejectionCode::CountAttrOutOfRange,
             format!(
                 "count predicate arity {} does not match the sealed table arity {arity}",
@@ -1783,13 +1873,13 @@ pub(super) fn verify_count_premise(
     //     within the cert's finite domain.
     for (pos, val) in filter {
         if (*pos as usize) >= arity {
-            return Outcome::reject(
+            return Verdict::reject(
                 RejectionCode::CountAttrOutOfRange,
                 format!("count filter position {pos} is outside predicate arity {arity}"),
             );
         }
         if cert.domain_containing(val).is_none() {
-            return Outcome::reject(
+            return Verdict::reject(
                 RejectionCode::NegAtomIllTyped,
                 "count filter value is outside the certificate's finite domain",
             );
@@ -1799,7 +1889,7 @@ pub(super) fn verify_count_premise(
     // 5b. projection/fold attr (count_distinct / sum / min / max) within arity.
     if let Some(attr) = project.attr() {
         if (attr as usize) >= arity {
-            return Outcome::reject(
+            return Verdict::reject(
                 RejectionCode::CountAttrOutOfRange,
                 format!("aggregate projection attr {attr} is outside predicate arity {arity}"),
             );
@@ -1817,18 +1907,18 @@ pub(super) fn verify_count_premise(
         project,
     ) {
         Ok(n) => n,
-        Err((code, detail)) => return Outcome::reject(code, detail),
+        Err((code, detail)) => return Verdict::reject(code, detail),
     };
 
     // 5d. compare the recomputed fold against the claimed k (the canonical int embedding).
     let Some(claimed) = BigInt::from_int_term(&Term::from_value(k)) else {
-        return Outcome::reject(
+        return Verdict::reject(
             RejectionCode::CountMismatch,
             "aggregate premise k is not a canonical int value",
         );
     };
     if recomputed != claimed {
-        return Outcome::reject(
+        return Verdict::reject(
             RejectionCode::CountMismatch,
             format!(
                 "claimed aggregate {} != recomputed aggregate {}",
@@ -1838,5 +1928,5 @@ pub(super) fn verify_count_premise(
         );
     }
 
-    Outcome::Accept
+    Verdict::Accept
 }

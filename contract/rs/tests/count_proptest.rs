@@ -28,7 +28,7 @@ use logos_contract::{
     CountLit, Derivation, Evidence, FiniteDomain, Goal, GroundLiteral, Hash, LeafOutcome,
     LeafVerifier, MapProgram, Node, NodeMeta, Outcome, PredicateRef, PredicateSet, Premise,
     ProjectSpec, RelationTable, StratumPrefix, Subst, SupportWitness, Symbol, Term, Theory,
-    TheoryOutcome,
+    TheoryGround, Verdict,
 };
 use ontos_core::Value;
 use proptest::prelude::*;
@@ -45,10 +45,8 @@ impl Theory for NoTheory {
     fn owns(&self, _pred: &Symbol) -> bool {
         false
     }
-    fn decide(&self, _atom: &GroundLiteral) -> TheoryOutcome {
-        TheoryOutcome::Fails {
-            code: "no_theory".into(),
-        }
+    fn decide_ground(&self, _atom: &GroundLiteral) -> TheoryGround {
+        TheoryGround::fails("no_theory")
     }
 }
 
@@ -337,13 +335,13 @@ proptest! {
 }
 
 fn assert_count_mismatch(outcome: &Outcome, claimed: i128, actual: i128, which: &str) {
-    match outcome {
-        Outcome::Reject { code, .. } => assert_eq!(
+    match &outcome.verdict {
+        Verdict::Reject { code, .. } => assert_eq!(
             code.code(),
             "count_mismatch",
             "{which}: tampered k={claimed} (actual {actual}) must be count_mismatch, got {}",
             code.code()
         ),
-        Outcome::Accept => panic!("{which}: tampered k={claimed} (actual {actual}) was ACCEPTED — the gate failed to recompute"),
+        Verdict::Accept => panic!("{which}: tampered k={claimed} (actual {actual}) was ACCEPTED — the gate failed to recompute"),
     }
 }

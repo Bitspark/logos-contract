@@ -8,7 +8,7 @@ use logos_contract::{
     CertId, CertSizeDecl, CheckLimits, CheckProfile, Clause, ClauseId, ClosedModelCert,
     ClosureWitness, Derivation, Evidence, FiniteDomain, Goal, GroundLiteral, Hash, LeafOutcome,
     LeafVerifier, MapProgram, Node, NodeMeta, NonMemberProof, Outcome, PredicateSet, Premise,
-    RelationTable, StratumPrefix, Subst, SupportWitness, Symbol, Term,
+    RelationTable, StratumPrefix, Subst, SupportWitness, Symbol, Term, Verdict,
 };
 use ontos_core::Value;
 use std::collections::BTreeMap;
@@ -71,9 +71,9 @@ fn profile(extensional: &[&str], rows: Vec<GroundLiteral>) -> CheckProfile<()> {
 }
 
 fn verdict(outcome: &Outcome) -> &'static str {
-    match outcome {
-        Outcome::Accept => "ACCEPT",
-        Outcome::Reject { code, .. } => code.code(),
+    match &outcome.verdict {
+        Verdict::Accept => "ACCEPT",
+        Verdict::Reject { code, .. } => code.code(),
     }
 }
 

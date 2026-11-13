@@ -17,8 +17,12 @@ grammar or provide a typed kernel execution route.
 
 **Status:** shipped and stable. The **account layer is FIRM**
 ([ADR 0001](../architecture/decisions/0001-account-grammar-invariant.md), *accepted*)
-and the **checker-facing SPI is STABLE v1, additive-only**
-([ADR 0003](../architecture/decisions/0003-checker-spi-v1-stable.md), *accepted*);
+and the **checker-facing SPI is STABLE v2, additive-only**
+([ADR 0003](../architecture/decisions/0003-checker-spi-v1-stable.md), *accepted*; v2 declared by
+[ADR 0036](../architecture/decisions/0036-certified-claims-are-exact.md) D8, delivered by
+[#3111](https://github.com/Bitspark/logos/issues/3111); **unreleased until the 0.27.0 family**:
+v2 breaks v1 signatures, so the next release after it is a minor, never a 0.26.x patch, which
+`scripts/declared-break-check.sh` enforces from its `Declared-break:` trailer);
 the FIRM account ships **certified stratified negation**
 ([ADR 0007](../architecture/decisions/0007-certifiable-stratified-negation.md)) as a
 backward-compatible additive amendment — the node set `Rule | Builtin | Leaf` is
@@ -45,8 +49,9 @@ consumer's request on [logos#2], and the expert consultation in
   codes of §4 are firm. This is the **trust artifact**: stronger than API
   stability, because checkability depends on finite, local, positive derivations.
 
-- **[STABLE v1] — B. the checker-facing SPI** (`logos-checker-spi v1`,
-  [ADR 0003](../architecture/decisions/0003-checker-spi-v1-stable.md), *accepted*):
+- **[STABLE v2] — B. the checker-facing SPI** (`logos-checker-spi v2`,
+  [ADR 0003](../architecture/decisions/0003-checker-spi-v1-stable.md), *accepted*; v2 is
+  [ADR 0036](../architecture/decisions/0036-certified-claims-are-exact.md) D8's five changes):
   the surface a **check-only** consumer (arche first) compiles against — `check`
   (§4), `Theory` (§5), `LeafVerifier` (§6), `RuleAdmissibility` (§5a), `Context`
   (§4.1), `CheckLimits` (§4.3), `Outcome`. **Promise:** no breaking signature or
@@ -75,10 +80,10 @@ consumer's request on [logos#2], and the expert consultation in
   store/server) ADR 0002 governs. **Revisable**; the migrated plexis/logos engine
   is the non-arche exerciser that will validate this layer.
 
-Each section below is tagged **[FIRM]**, **[STABLE v1]**, or **[PROPOSED]**. A
+Each section below is tagged **[FIRM]**, **[STABLE v2]**, or **[PROPOSED]**. A
 **[FIRM]** change reopens ADR 0001 (breaks SDKs + arche replay + vectors at once);
-a **[STABLE v1]** change is additive-only until a named v2 (breaking it breaks
-arche's compiled code); a **[PROPOSED]** change is cheap until an implementer
+a **[STABLE v2]** change is additive-only until a named v3 (breaking it breaks
+consumers' compiled code); a **[PROPOSED]** change is cheap until an implementer
 commits to it.
 
 > **The deadlock this resolves.** "arche can't proceed until ADR 0002 ratifies" was
@@ -110,7 +115,7 @@ project's review (logos#3) names is **lift the concept, not the name**: every se
 below carries a generic concept, and a non-arche fixture must exercise it so
 genericity is *demonstrated*, not asserted. Everything consumer-specific enters
 through the **extension points** (Theory, Leaf, RuleAdmissibility, Context —
-STABLE v1 checker-facing seams, §4.1/§5/§5a/§6). The proof that the surface is
+STABLE v2 checker-facing seams, §4.1/§5/§5a/§6). The proof that the surface is
 right is dual:
 
 - **Implementable by the incumbent:** arche-core's existing checker
@@ -335,7 +340,7 @@ its own field boundary. In Go, the program codec's named errors are comparable c
 `errors.Is(err, contract.ErrProgramReservedPredicate)` also matches the wrapped refusal
 that supplies the offending clause and predicate.
 
-## 2a. Reification: `quote` / `reify`  [STABLE v1 shape · byte form FROZEN v1]
+## 2a. Reification: `quote` / `reify`  [STABLE v2 shape · byte form FROZEN v1]
 
 Storing or transmitting a *rule* (a clause with variables) as ordinary data
 requires turning a term-with-holes into a ground ontos value and back. This is
@@ -353,7 +358,7 @@ fn reify(v: &ontos::Value) -> Option<Term>;  // partial inverse of quote
   This is how a variable becomes a *being* without logos reserving a label in the
   consumer's data namespace.
 - **Both tiers now frozen (§9 settled, 2026-06-01):** the *semantic shape* (that
-  `quote` exists, is total, and round-trips via `reify`) is **[STABLE v1]**, and the
+  `quote` exists, is total, and round-trips via `reify`) is **[STABLE v2]**, and the
   *exact canonical bytes* (the 1-byte tags `0x00` Atom / `0x01` Tuple / `0x02` Var,
   with a `Var` carrying its **name verbatim — syntactic**) are now **FROZEN v1**.
   This is the account codec (`logos-contract` `account.rs`): `quote → ontos-codec`
@@ -686,7 +691,7 @@ refused by name, never narrowed and never bounded by a platform's integer width 
   builtin's arity, §5), stratum ids, stack-reference ordinals, variants and ranks, and Wasm
   session and admission handles (design 0012's `Admitted` selection).
 - **index and count fields**, `0..=INDEX_MAX`: the fields above, and the seam's indices.
-- **`u64` fields**, `0..=2^64 - 1`: a duration in nanoseconds, a search budget (`RunLimits`),
+- **`u64` fields**, `0..=2^64 - 1`: a duration in nanoseconds, a request bound (`RunLimits`),
   an epoch, a counter. Proof budgets (§4.3) and certificate declarations use the index range.
 - **`int` values**: every integer. A term's integer VALUE (an argument a theory evaluates, an
   aggregate's column, a count premise's claimed result) is unbounded (ADR 0022 §5: an integer is
@@ -817,11 +822,11 @@ checker tier's `fragment::ScopeGraph` (go and ts `ScopeGraph`, row A15). The pro
 (`SealPlan::sealed_compounds`) is the one computation the resolver derives the
 `sealed_acyclic`/`all` function-symbol level from, so a producer declines
 `compound_in_sealed_clause` exactly where the fragment ends, and the resolver refuses such a program
-at admission. **Until #3022 lands, a certified COMPLETE SET over a sealed compound (`sealed_acyclic`)
-is admitted under the `exact` term identity only** (`seat:caa`'s ruling on #2759): under the default
-`reify_lists` the resolver refuses it at admission, by name, since research 0028 measured that
-identity's label-tolerant comparisons disagreeing with the closed world. #3022's change removes the
-condition. Outside it — **unrestricted operational NAF / SLDNF** and programs with
+at admission. A certified COMPLETE SET over a sealed compound (`sealed_acyclic`) is admitted
+under the one structural comparison every certified claim uses: #2759's interim condition (such a
+set only under an opt-in `exact` term identity, since research 0028 measured the default's
+label-tolerant comparisons disagreeing with the closed world) was removed by #3022, and the
+identity itself by checker SPI v2 ([#3111](https://github.com/Bitspark/logos/issues/3111)). Outside it — **unrestricted operational NAF / SLDNF** and programs with
 function symbols whose intended model can be non-r.e. — stays an **untrusted engine
 strategy** (§7): the engine may run it, but its answers must arrive with a positive
 derivation **plus** the closed-model certificates; *failure-as-evidence is never
@@ -919,7 +924,7 @@ dual-conformance obligation.
 
 <a id="checker-spi"></a>
 
-## 4. Checker SPI  (the P0 deliverable arche depends on)  [FIRM core obligations · STABLE v1 seam params]
+## 4. Checker SPI  (the P0 deliverable arche depends on)  [FIRM core obligations · STABLE v2 seam params]
 
 ```rust
 fn check<C>(
@@ -955,6 +960,12 @@ The checker owns the meaning of its verdicts. A component owns the theory,
 leaf or admission decision it supplies through the SPI. Reading a verdict or
 using a public decision constructor must preserve what other invocations of
 the same checker and components decide.
+
+What the checker gives a component, how it reads a component's decision and
+evidence, and what retention, reentrancy, concurrency, faults and budgets mean
+during a component call are stated once, for `Theory` (§5), `RuleAdmissibility`
+(§5a), `LeafVerifier` (§6) and `Program`, in the callback contract of
+[ADR 0040](../architecture/decisions/0040-the-public-boundary-contract.md) D4.
 
 `check` is **total** and performs **no search**. It verifies, in one pass over the
 DAG, that every node is locally valid and that the root concludes `claim`. The
@@ -1017,21 +1028,20 @@ API mismatch, where a `TheoryConfig` appeared in the prose but not the signature
    certification-semantics element, deferred until a consumer requests closed-world claims under
    a non-structural identity (research 0028 A3).
 
-   **The term identity is INERT** (added by [#2226](https://github.com/Bitspark/logos/issues/2226);
-   made inert by [#3022](https://github.com/Bitspark/logos/issues/3022)).
-   `CheckLimits.term_identity`, `reify_lists` (the default) or `exact`, changes nothing `check`
-   decides: `check` ignores it, and the check-profile digest does not fold it (§5), so two
-   profiles that differ only there give identical verdicts and share one digest. The contracts'
-   `exact_identity_2226` tests check under each identity, and each core's completeness gate replays
-   `vectors/exact_answer_set.json` under each, to pin that. #3022's step 5 removed it from every
-   layer outside the checker SPI ([ADR 0036](../architecture/decisions/0036-certified-claims-are-exact.md)
-   D2): no negotiated spec, request or offer carries it (§4.1). The contract field itself is deleted
-   by checker SPI v2 ([#3111](https://github.com/Bitspark/logos/issues/3111)). It does not move to
+   **There is no term identity to choose.** [#2226](https://github.com/Bitspark/logos/issues/2226)
+   added one to `CheckLimits` (`reify_lists` by default, or `exact`); [#3022](https://github.com/Bitspark/logos/issues/3022)
+   made it inert (`check` ignored it and the check-profile digest never folded it) and its step 5
+   removed it from every layer outside the checker SPI
+   ([ADR 0036](../architecture/decisions/0036-certified-claims-are-exact.md) D2): no negotiated
+   spec, request or offer carries it (§4.1). Checker SPI v2
+   ([#3111](https://github.com/Bitspark/logos/issues/3111), ADR 0036 D8 change 1) deleted the
+   contract field and its type. Each core's completeness gate replays
+   `vectors/exact_answer_set.json` under the one profile. Nothing moves to
    the representation axis: how a list is spelled on display is the consumer's rendering choice,
    not a property of what is certified.
 3. **Builtin** node: route by ownership — the unique theory with
-   `profile.theory.owns(conclusion.pred)` decides it via `decide(conclusion, cfg)`
-   (§5), where `cfg` is the **theory's own config, not the live `ctx`** (a theory
+   `profile.theory.owns(conclusion.pred)` decides it via `decide_ground(conclusion)`
+   under its config `cfg` (§5, §5.2), where `cfg` is the **theory's own config, not the live `ctx`** (a theory
    verdict is config-pinned and pure). If no theory owns the predicate →
    `predicate_partition_violation`.
 4. **Leaf** node: enforce **sealing** (§4.2), then delegate *all* leaf admission —
@@ -1344,7 +1354,7 @@ account contract:
   This band is **structural / FIRM** — closed and kernel-emitted, *not* a host-extension
   seam — so unlike the host-extension band below it carries no consumer sub-codes.
 
-- **[STABLE v1, open set] Host-extension band** — verdicts a delegated extension
+- **[STABLE v2, open set] Host-extension band** — verdicts a delegated extension
   point raises. The *mechanism* (codes are namespaced to their seam; delegated
   sub-codes are additive) is part of the stable v1 contract; the *set itself stays
   open* — a consumer registers its own (arche's projection/leaf/attestation
@@ -1381,7 +1391,7 @@ account contract:
 
 <a id="context"></a>
 
-### 4.1 Context — and the placement-predicate the checker MUST enforce  [STABLE v1 · pin hardest]
+### 4.1 Context — and the placement-predicate the checker MUST enforce  [STABLE v2 · pin hardest]
 
 `Context` is a consumer-defined value the core **threads**. It carries whatever
 the Theory, LeafVerifier, and RuleAdmissibility need beyond the node itself.
@@ -1594,18 +1604,17 @@ policy. Until #2731, rs's decoder refused any quoted value past 256 VALUE levels
 term levels), so a derivation between about 129 and 256 term levels deep was accepted by go and
 ts and refused by rs, and this promise was false at the defaults.
 
-**Term identity (`term_identity`; INERT, [#2226](https://github.com/Bitspark/logos/issues/2226), [#3022](https://github.com/Bitspark/logos/issues/3022)).**
-`CheckLimits` also carries the term identity, so the type holds more than budgets; it keeps its
-name. Since #3022 the identity is inert: `check` ignores it, since every site is structural (§4
-obligation 2), and the check-profile digest does not fold it (§5). Checker SPI v2 deletes it
-([#3111](https://github.com/Bitspark/logos/issues/3111)). No negotiation wire carries it since
+**No term identity (deleted by checker SPI v2, [#3111](https://github.com/Bitspark/logos/issues/3111); history [#2226](https://github.com/Bitspark/logos/issues/2226), [#3022](https://github.com/Bitspark/logos/issues/3022)).**
+`CheckLimits` holds budgets only. Its tenth field, #2226's term identity, was inert since #3022
+(every site is structural, §4 obligation 2, and the check-profile digest never folded it, §5), and
+checker SPI v2 deleted it with its type. No negotiation wire has carried it since
 #3022's step 5 ([ADR 0036](../architecture/decisions/0036-certified-claims-are-exact.md) D2):
 `CheckLimitsSpec` is `record[max_nodes, max_depth]`, a pinned offer's `OfferPins` is
 `record[theories, feature_set, limits_floor]`, and a request's host-gate `CheckLimits` record
 carries the nine budgets. Each decoder refuses any other arity, so the forms that carried the
 identity (a third `CheckLimitsSpec` element, a served-identity set second in `OfferPins`, a tenth
 element in the request's record) are refused rather than mis-read. A kernel that builds a
-contract `CheckLimits` from a decoded record leaves the field at its default.
+contract `CheckLimits` from a decoded record sets its nine budgets.
 
 ### 4.2 Sealing (generic soundness invariant, consumer-parameterized)
 
@@ -1688,7 +1697,7 @@ extensional∩intensional = ∅ case, §4.2).
 
 <a id="answer-set"></a>
 
-### 4.5 G4: the answer-set comparison  [STABLE v1 · #3023]
+### 4.5 G4: the answer-set comparison  [STABLE v2 · #3023]
 
 A delivered closed-world answer is a SET: the emitted answers claim to be every answer to the goal.
 The completeness gate (design 0008) checks that claim in four steps. The last, **G4**, is a contract
@@ -1725,19 +1734,16 @@ through this entry point in all three cores.
 
 <a id="theory-spi"></a>
 
-## 5. Theory SPI  (builtins / decidable atoms)  [STABLE v1]
+## 5. Theory SPI  (builtins / decidable atoms)  [STABLE v2]
 
 ```rust
 trait Theory {                                       // NOT generic over Context — see purity below
     fn owns(&self, pred: &Symbol) -> bool;
-    fn decide(&self, atom: &GroundLiteral) -> TheoryOutcome;  // pure, total, deterministic; config closed over at construction
-    fn decide_ground(&self, atom: &GroundLiteral) -> Completion<TheoryDecision, NoCallerLimit> {  // additive (ADR 0003, #3126): can say "not decided"; see §5.2
-        ground_from_legacy(self.decide(atom))
-    }
+    fn decide_ground(&self, atom: &GroundLiteral) -> TheoryGround;  // REQUIRED (checker SPI v2, #3111): pure, total, deterministic; config closed over at construction; can say "not decided", see §5.2
     fn identity(&self) -> ComponentIdentity { ComponentIdentity::unidentified() }  // additive (ADR 0003): the (id, version, config_digest) attestation triple
     fn completion(&self, pred: &Symbol) -> DecisionCompletion { DecisionCompletion::Undeclared { decider: self.identity() } }  // additive (ADR 0003, #3142): is every stop on pred typed, so its Fails is a decided false?
 }
-enum TheoryOutcome { Holds, Fails { code: String }, NotMine }
+type TheoryGround = Completion<TheoryDecision, NoCallerLimit>;  // TheoryGround::holds() | ::fails(code) | ::disowned()
 enum TheoryDecision { Holds, Fails { code: String } }  // completion.rs: a theory's own decision, its code kept as data
 enum DecisionCompletion { StopsAreTyped, MayNotComplete { decider: ComponentIdentity, cause: String }, Undeclared { decider: ComponentIdentity } }
 ```
@@ -1754,8 +1760,10 @@ clauses reach a decider that does not declare `StopsAreTyped` (the undeclared de
 closed). The standard theories declare `StopsAreTyped`: arithmetic since #3313 typed its work cap,
 and text, term and list, which never stop. Host builtins stay `MayNotComplete` until the host's own
 decider declares its completion (#3506): #3374 typed only the guest's side, and the claim belongs to
-the decider at check time. The declaration retires at v2: ADR 0036 D8 makes `decide_ground`
-required and deletes `decide`, and `completion` goes with them. Go spells it as the optional
+the decider at check time. Checker SPI v2 (ADR 0036 D8 change 3, #3111) made `decide_ground`
+required and deleted `decide`. The declaration stays (decided on #3111, 2026-11-12): a required
+`decide_ground` gives every theory the typed channel, not proof that it uses it for every stop, and
+only the theory can say that. Its retirement is not among ADR 0036 D8's changes. Go spells it as the optional
 `CompletionDeclared` interface and ts as the optional `completion` member, the idioms the seams
 below use.
 
@@ -1791,7 +1799,7 @@ by anyone. The operational test (a recommended vector): *same facts + same confi
 config-derived pure function, that is a **property regression to surface**, not
 something to assert by silence.
 
-#### 5.1 The native-predicate purity invariant (load-bearing for "authorization is a checkable query")  [STABLE v1]
+#### 5.1 The native-predicate purity invariant (load-bearing for "authorization is a checkable query")  [STABLE v2]
 
 The purity of a native predicate a `Theory` decides is **not a stylistic nicety —
 it is the precondition for the FIRM "check() re-derives the same proof" property,
@@ -1804,7 +1812,7 @@ invariant a `Theory` (and its search-side dual `BuiltinSolver`) MUST satisfy:
 > reducible to a **config-parameterized pure function** of its ground arguments —
 > **pure, total, deterministic, config-reproducible, and free of I/O / clock /
 > mutable-state / ledger / network access.** It is a *parameterized fact*, **not a
-> live oracle**. Equivalently: `decide(atom)` is a mathematical function of `(atom,
+> live oracle**. Equivalently: `decide_ground(atom)` is a mathematical function of `(atom,
 > config)` alone, where `config` is fixed at construction.
 
 The realized seam restricts which inputs Logos passes to a theory; the
@@ -1813,16 +1821,16 @@ implemented Rust signatures (trait excerpt; other methods and bodies omitted):
 
 ```rust
 pub trait Theory {
-    fn decide(&self, atom: &GroundLiteral) -> TheoryOutcome;
-    fn decide_ground(&self, atom: &GroundLiteral) -> Completion<TheoryDecision, NoCallerLimit>;
+    fn decide_ground(&self, atom: &GroundLiteral) -> TheoryGround;
     fn identity(&self) -> ComponentIdentity;
 }
 ```
 
 The application implements this trait, and Logos invokes it during native
-predicate checking and verification binding. `decide` is the legacy decision
-surface; Logos's checking paths use `decide_ground`, which can also report
-non-completion. Neither operation receives the verification context.
+predicate checking and verification binding. `decide_ground` is the one decision
+surface, and it can also report non-completion (§5.2); it does not receive the
+verification context. *(Until checker SPI v2 (#3111) a v1 `decide` sat beside it as
+the legacy decision surface; v2 deleted it.)*
 
 - The component MUST hold its semantic configuration fixed for the verification
   lifetime. The absence of a `Context` argument does not prevent interior
@@ -1853,15 +1861,15 @@ non-completion. Neither operation receives the verification context.
   `BuiltinSolver` seam
   ([`contract/rs/src/engine.rs`](https://github.com/Bitspark/logos/blob/main/contract/rs/src/engine.rs))
   may *bind* a variable (`?- X is 2+3`), but each substitution it returns, deep-
-  applied, MUST ground the goal to an atom the **paired `Theory::decide` also
-  accepts** (`Holds`) — the engine re-runs `decide` as a gate before emitting the
+  applied, MUST ground the goal to an atom the **paired `Theory::decide_ground` also
+  accepts** (`Holds`) — the engine re-runs `decide_ground` as a gate before emitting the
   `Builtin` node. So an impure or config-divergent solver cannot smuggle an
   unsound `Builtin` node past `check`; its proposed solution is simply dropped.
 
 **Why it is load-bearing.** `check` is `total` and performs **no search**: for a
-`Builtin` node it routes by `owns` and asks `decide(conclusion)` (§4 obligation 3,
+`Builtin` node it routes by `owns` and asks `decide_ground(conclusion)` (§4 obligation 3,
 [`check.rs`](https://github.com/Bitspark/logos/blob/main/contract/rs/src/check.rs)).
-If `decide` consulted a clock, a ledger, or any live state, then **two checkers
+If `decide_ground` consulted a clock, a ledger, or any live state, then **two checkers
 re-deriving the same proof from the same program + config could disagree** — the
 very property "anyone can re-check, trusting none of the search" (ADR 0001) would
 collapse, and an "authorized" verdict would mean only "authorized *at the instant
@@ -1876,9 +1884,9 @@ operational test is realized as a Rust conformance vector that pins the
 [`conformance/rs/tests/theory_purity.rs`](https://github.com/Bitspark/logos/blob/main/conformance/rs/tests/theory_purity.rs)
 encodes a `Builtin`-bearing derivation through the **frozen `ontos-codec`** (the
 account codec, §2a/§9) and asserts the digest is stable across repeated decisions
-and independently-constructed theories — the concrete witness that `decide` is a
+and independently-constructed theories — the concrete witness that `decide_ground` is a
 function of `(atom, config)` alone. (`vectors/arithmetic.json` already pins the
-`decide` *verdict* tri-core; this adds the *derivation-byte* reproducibility the
+`decide_ground` *verdict* tri-core; this adds the *derivation-byte* reproducibility the
 invariant names.)
 
 **The search-side counterpart of a Theory, across a wire (#1604; `seat:caa`'s ruling).** A
@@ -1916,21 +1924,23 @@ first, then the declared identities in first-use order, deduplicated — and `Ch
 list is order-bearing, so the request negotiates only when the host's requested profile is exactly
 that fold; the same bindings in another order are refused. Neither the go nor the ts host can compute
 the fold from the guest, so each states it (`kernel/go/wasm` `AdvertisedCheckProfileSpecWith` /
-`kernel/ts` `advertisedCheckProfileSpecWith`). `Theory::decide` is
-untouched — STABLE v1, additive only. Pinned tri-host by
+`kernel/ts` `advertisedCheckProfileSpecWith`). `Theory::decide_ground` is
+untouched by it. Pinned tri-host by
 [`vectors/wasm_host_builtins.json`](https://github.com/Bitspark/logos/blob/main/vectors/wasm_host_builtins.json).
 
 > **Realization erratum (STABLE v1; see [ADR 0003](../architecture/decisions/0003-checker-spi-v1-stable.md)
 > "seam realization notes").** The `type Config` + `decide(atom, cfg)` pseudocode
 > above cannot coexist with §4's mandated `theory: Box<dyn Theory>` — an associated
 > type is not object-safe. The canonical, binding-visible shape every `{rs,ts,go}`
-> realization pins is therefore **`fn decide(&self, atom: &GroundLiteral) ->
-> TheoryOutcome`** with the theory's **config closed over at construction** (e.g.
+> realization pins is therefore **`fn decide_ground(&self, atom: &GroundLiteral) ->
+> TheoryGround`** with the theory's **config closed over at construction** (e.g.
 > `IsRoot::new(pubkey)`), not threaded per call. This *strengthens* purity (the
-> live `ctx` cannot reach `decide`, so the leak vector named above is structurally
+> live `ctx` cannot reach `decide_ground`, so the leak vector named above is structurally
 > impossible) at the cost of per-call config parameterization. A config-fingerprint
-> hook, if the byte-identical-derivation vector is ever promoted, is an additive v1
-> change.
+> hook, if the byte-identical-derivation vector is ever promoted, is an additive
+> change. *(Until checker SPI v2 (#3111) the pinned shape was a v1
+> `fn decide(&self, atom: &GroundLiteral) -> TheoryOutcome`; v2 deleted it, and the
+> config-closed-over shape carried over unchanged.)*
 
 **The standard `ArithmeticTheory` (normative semantics; ADR [0014](../architecture/decisions/0014-checkable-theories-in-contract.md) · [0022](../architecture/decisions/0022-decimal-arithmetic-semantics.md)).**
 The contract tier ships one standard checkable `Theory` whose semantics are normative and
@@ -2063,11 +2073,11 @@ throws a `RangeError`. Named component fields and pins retain owned bytes.
 [LOGOS-ACX-017](../architecture/cases/0017-native-octet-identities.md).
 
 **What a matching `CheckProfileDigest` implies — and what it does not (issue #955).**
-The digest folds the theory / leaves / admit component bindings and **two** of the ten
-`CheckLimits` fields (`max_nodes`, `max_depth`). #2226's `term_identity` is NOT folded (#3022,
-`seat:caa`'s ruling): every certified claim is exact, so the identity cannot change what a check
+The digest folds the theory / leaves / admit component bindings and **two** of the nine
+`CheckLimits` fields (`max_nodes`, `max_depth`). #2226's term identity was never folded (#3022,
+`seat:caa`'s ruling): every certified claim is exact, so the identity could not change what a check
 certifies, and an element that cannot change certification is not in the certification binding.
-Since #3022's step 5 the negotiated spec carries no term identity at all (ADR 0036 D2), and
+Checker SPI v2 deleted it (#3111). Since #3022's step 5 the negotiated spec carries no term identity at all (ADR 0036 D2), and
 every spec's digest is byte-identical to its digest before, because the wire encoded the default
 identity by absence. So:
 
@@ -2199,7 +2209,6 @@ changes its row in the same change.
 | `CheckProfileDigest` | `admit` | moves |
 | `CheckProfileDigest` | `max_nodes` | moves |
 | `CheckProfileDigest` | `max_depth` | moves |
-| `CheckProfileDigest` | `term_identity` | holds |
 | `CheckProfileDigest` | `feature_set` | moves |
 | `CheckProfileDigest` | `max_term_depth` | holds |
 | `CheckProfileDigest` | `max_cert_bytes` | holds |
@@ -2212,34 +2221,38 @@ changes its row in the same change.
 | `VerdictKey` | `checker_version` | moves |
 <!-- identity-determinants:end -->
 
-#### 5.2 `decide_ground`: a theory that did not decide  [STABLE v1, additive · #3126]
+#### 5.2 `decide_ground`: a theory that did not decide  [checker SPI v2 · #3126, #3111]
 
 A decider that stops before it establishes a fact (a work cap, a capacity) has **not decided** the
 atom, and it MUST NOT report that as `Fails`: under a negation or in a certificate's closure a stop
-read as false is a false positive (research 0031). v1's `TheoryOutcome` has no "not decided" arm, so
-the channel is the additive method `decide_ground` (ADR 0003, the `identity` precedent), which
-returns a `Completion<TheoryDecision, NoCallerLimit>`: `Completed(Holds)`, `Completed(Fails { code })`
-with the theory's own code, or `NotCompleted(cause)` with a `NonCompletion` from the completion
-algebra (`contract/rs/src/completion.rs`). go carries it as the optional interface `GroundDecider`
-read through the one helper `DecideGround(theory, atom)`; ts as the optional member `decideGround`
-read through the helper `decideGround(theory, atom)`.
+read as false is a false positive (research 0031). `decide_ground` is therefore the theory's one,
+REQUIRED decision method (ADR 0036 D8 change 3). It returns a
+`TheoryGround = Completion<TheoryDecision, NoCallerLimit>`: `Completed(Holds)`,
+`Completed(Fails { code })` with the theory's own code, or `NotCompleted(cause)` with a
+`NonCompletion` from the completion algebra (`contract/rs/src/completion.rs`). The constructors are
+`TheoryGround::holds()`, `TheoryGround::fails(code)` and `TheoryGround::disowned()`. go carries it as
+the required method `DecideGround(atom) completion.TheoryGround` of `Theory` (beside `Owns`), with
+the constructors `completion.TheoryGroundHolds()`, `TheoryGroundFails(code)` and
+`TheoryGroundDisowned()`, and every reader calls the one helper `contract.DecideGround(theory, atom)`,
+which detaches the atom first. ts carries it as the required member `decideGround(atom): TheoryGround`,
+with the constructors `TheoryGround.holds()`, `.fails(code)` and `.disowned()`, and readers call the
+member.
 
-- **The default is derived from `decide`:** `Holds` and `Fails { code }` are the decision, and
-  `NotMine` is the named `inconsistent_theory` fault (`ground_from_legacy`). A theory that never
-  stops needs no change.
-- **A theory that can stop overrides it,** and derives its v1 `decide` from it through the one
-  legacy adapter (`legacy_outcome`): a not-completed answer is `NotMine` there, never `Fails`, so a
-  legacy reader, which refuses an owned atom's `NotMine` by name, fails CLOSED. The standard
-  `ArithmeticTheory` does this: the exact alignment of two in-domain decimals past
-  `MAX_DECIMAL_SCALE_SHIFT` is `NotCompleted(work_cap)` (ADR 0022).
+- **An atom the theory does not own answers `disowned()`:** the named `inconsistent_theory`
+  non-completion. `check` routes by `owns`, so a correctly routed call never returns it; an owning
+  theory that does is refused by name (`predicate_partition_violation`, detail "theory owns predicate
+  but returned NotMine", wire text kept from v1).
+- **A theory that can stop returns the stop typed.** The standard `ArithmeticTheory` does: the exact
+  alignment of two in-domain decimals past `MAX_DECIMAL_SCALE_SHIFT` is `NotCompleted(work_cap)`
+  (ADR 0022). A theory that never stops answers only `holds()` and `fails(code)` for what it owns.
 - **A wrapper FORWARDS it** to the member that owns the atom (`CompoundTheory`, and every theory
-  that wraps another), never takes the default, which would read a member's `NotMine` as a fault
-  instead of the member's own non-completion.
-- **Every logos reader calls `decide_ground`, never `decide`:** `check`'s `Builtin` nodes, a
-  support edge's builtin, the closure's literal truth, and the search registry's ground decision.
-  A census per core pins it. A fold over theory answers (the closure's body, `\+`) reaches the
-  algebra through the one conversion `decision_of`, which keeps a stop a stop; a reader that
-  reports the theory's code (`builtin_failed`'s detail) reads the `TheoryDecision` first.
+  that wraps another), so a member's own non-completion reaches the reader as itself.
+- **Every logos reader calls `decide_ground`:** `check`'s `Builtin` nodes, a support edge's builtin,
+  the closure's literal truth, and the search registry's ground decision. There is no other decision
+  method to call, so the compiler enforces it in every core. A fold over theory answers (the
+  closure's body, `\+`) reaches the algebra through the one conversion `decision_of`, which keeps a
+  stop a stop; a reader that reports the theory's code (`builtin_failed`'s detail) reads the
+  `TheoryDecision` first.
 - **`check` refuses a not-decided literal by name**, `builtin_not_decided` (host-extension band,
   the stop's kind tag as its sub-code), in every position: a positive `Builtin` node, a support
   edge's builtin, and a closure rule instance whose body is not decided and whose head is absent.
@@ -2248,11 +2261,19 @@ read through the helper `decideGround(theory, atom)`.
   [`vectors/theory_not_decided.json`](https://github.com/Bitspark/logos/blob/main/vectors/theory_not_decided.json);
   `CHECKER_VERSION` 22.
 
-ADR 0036 D8's checker SPI v2 makes `decide_ground` REQUIRED (so every theory answers the question)
-and deletes `decide` with the legacy adapter. Its v2 method returns `Completion<TheoryDecision, _>`:
-typing the theory codes is a separate question, not a reason to widen the language's `FalseCode`.
+The method returns `Completion<TheoryDecision, _>`, not the bare `GroundOutcome`: typing the theory
+codes is a separate question, not a reason to widen the language's `FalseCode`.
 
-## 5a. RuleAdmissibility SPI  (validates Rule-node metadata)  [STABLE v1]
+*(History. Until checker SPI v2 (#3111) a v1 `decide(&self, atom) -> TheoryOutcome`
+(`Holds | Fails { code } | NotMine`) was the required method, and `decide_ground` was an additive
+method (#3126) whose default was derived from it through `ground_from_legacy`. A theory that could
+stop overrode `decide_ground` and derived its `decide` through `legacy_outcome`, which answered
+`NotMine` for a stop, and a census per core (`decide_ground_census_3126`) pinned that every logos
+reader called `decide_ground`. v2 deleted `decide`, `TheoryOutcome`, both adapters (go's optional
+`GroundDecider` interface and `GroundFromLegacy`/`LegacyOutcome`, ts's `groundFromLegacy`/
+`legacyOutcome`) and the censuses, which the compiler now makes unnecessary.)*
+
+## 5a. RuleAdmissibility SPI  (validates Rule-node metadata)  [STABLE v2]
 
 The core validates a Rule node's *logical* shape (clause cited, head instantiated,
 premises matched). Whether the cited clause is *admissible in this context* — e.g.
@@ -2299,9 +2320,139 @@ program-loading precheck the consumer runs before any derivation is checked),
 **not** the per-node core. (This is where arche's `checkRuleAdmissible` /
 rule-fact head hygiene relocates.)
 
+## 5b. Semiring SPI  (annotation algebras)  [PROPOSED — ADR 0031]
+
+A semiring is the algebra an annotated evaluation combines values in: `add` (⊕) joins
+alternative derivations, `mul` (⊗) joins the premises of one derivation, `zero` is the value of
+no derivation and `one` the value of an empty conjunction. [ADR 0031](../architecture/decisions/0031-semirings-take-the-theory-path.md)
+puts it on the path §5's theories took: the checker may consult a semiring it did not link,
+because the verdict names it by identity and what it names is pure. The seam enters at
+`[PROPOSED]` (ADR 0035 D7). It is additive: no §4–§6 signature moves.
+
+```rust
+trait Semiring {
+    fn declared_identity(&self) -> ComponentIdentity;  // (id, version, config_digest) as declared
+    fn laws(&self) -> LawDeclaration;                  // the five optional laws, claimed
+    fn zero(&self) -> Value;
+    fn one(&self) -> Value;
+    fn is_element(&self, v: &Value) -> bool;
+    fn add(&self, a: &Value, b: &Value) -> SemiringAnswer;
+    fn mul(&self, a: &Value, b: &Value) -> SemiringAnswer;
+}
+enum SemiringAnswer { Element(Value), NotAnElement, Stopped(NonCompletion) }
+struct LawTally { law: SemiringLaw, decided: usize, undecided: usize }   // vacuous iff decided == 0
+struct LawDeclaration { idempotent, bounded, monotone, commutative, supports_retraction: bool }
+fn semiring_identity(s: &dyn Semiring) -> ComponentIdentity;   // computed by the contract
+fn audit_semiring(s: &dyn Semiring, samples: &[Value]) -> SemiringAudit;
+```
+
+Go (`Semiring`, `SemiringIdentity`, `AuditSemiring`) and TS (`Semiring`, `semiringIdentity`,
+`auditSemiring`) carry the same shape; `vectors/semiring.json` pins all three.
+
+- **Obligations.** An implementation is pure, deterministic and total over its carrier up to its
+  declared capacity bounds (ADR 0031 D1 as clarified 2026-11-11), with its configuration inside the
+  value, exactly as §5 requires of a theory. On elements an operation answers `Element`, or
+  `Stopped` with a capacity non-completion for a result past a bound the carrier declares: not
+  decided, never a rejection. `NotAnElement` means an operand is outside the carrier. The semiring axioms are not
+  declarable: ⊕ is associative and commutative with identity `zero`, ⊗ is associative with
+  identity `one`, `zero` annihilates, and ⊗ distributes over ⊕. `LawDeclaration` claims the
+  optional laws of consumer v2 §14.3: `idempotent` (a⊕a = a), `bounded` (one⊕a = one, the law a
+  fixpoint argument over recursion relies on), `monotone` (the natural order is antisymmetric),
+  `commutative` (⊗; ⊕ is commutative by axiom) and `supports_retraction` (⊕ is cancellative).
+- **Identity.** The identity a verdict names is computed by the contract, never reported by the
+  implementation: the declared id and version, with the digest
+  `SHA-256("logos-core/semiring-identity/v1\n" ‖ u64be(len id) ‖ id ‖ u64be(len version) ‖ version ‖ config_digest ‖ laws_byte)`.
+  The digest commits to the declared laws (ADR 0031 D1), so declaring one more law is another
+  identity.
+- **The audit refutes; it never proves.** `audit_semiring` evaluates `[zero, one, samples…]`
+  (at most 16 samples) against the ten axioms and every declared law, in one pinned order. Each
+  tuple reads in three values (strong Kleene): the law holds, fails, or is undecided because an
+  operation it names stopped. The first failing tuple is a `Counterexample` with its witness.
+  Otherwise every law tested reports a `LawTally`; a law with no decided tuple is vacuous, and
+  makes the verdict `Vacuous`, a state and never a pass. A pass is `NoCounterexample`: no
+  counterexample in these samples, which is not a proof of the laws (v2 §14.3). A failing audit
+  rejects registration (ADR 0031 D4); a passing one admits each declared law as a claim the
+  verdict names, never as a premise it hides (D5).
+- **Core semirings** (carriers ruled on #1821: exact only, no float):
+  - `Counting` (ℕ, +, ×, 0, 1) over the frozen ontos-data `int` embedding,
+    `logos-core/counting-semiring@1.0.0`.
+  - `Tropical` (ℚ≥0 ∪ {+∞}, min, +, +∞, 0) and `Probability` (ℚ≥0, +, ×, 0, 1), sum-product under
+    `Independence::Assumed` (§14.4), over CANONICAL non-negative decimals (the frozen ontos-data
+    `decimal` embedding, `vectors/semiring.json` pins its canonical form). An `int` embedding is not
+    an element; Tropical's +∞ is the atom `inf`. Both declare the decimal's bounds (the exponent band,
+    #2679, and the alignment cap, #3126): a result past them is a capacity stop.
+    `logos-core/tropical-semiring@1.0.0`, `logos-core/probability-semiring@1.0.0`.
+  - `Provenance` (ℕ[X]): polynomials over fact identities, any ground ontos values, in one
+    canonical encoding: a Tuple of terms `Tuple[int c, Tuple[x…]]` with `c ≥ 1`, variables in
+    non-decreasing ontos-codec order, terms in strictly increasing codec order of their monomials
+    (lower degree first). Coefficients are unbounded, so it never stops.
+    `logos-core/provenance-semiring@1.0.0`.
+  - `Product(first, second)` (v2 §14.2, #1821 rulings Q23 to Q28): the binary product of two
+    semirings, n-ary by nesting. An element is a bare `Tuple[a, b]`, `a` of the first member and `b`
+    of the second; zero and one are componentwise, and so are ⊕ and ⊗. A non-element operand is
+    `NotAnElement` before either member runs; the first member runs first, and the FIRST member that
+    stops gives the product's stop (the second is not consulted). Its laws are the AND of its
+    members' and are not declarable. Its declared identity is
+    `logos-core/product-semiring@1.0.0` with `config_digest = SHA-256("logos-core/product-semiring/v1\n"
+    ‖ each member's id, version and COMPUTED identity digest, in the compound layout)`, so the
+    swapped order is another identity. A product is unbound until a registry admits it (D4).
+    `vectors/semiring.json` pins it (`products`, `product_ops`, `product_audits`).
+  - The binding of a semiring on the profile (ADR 0031 D3) landed in the kernel as the requested
+    semantics' `truth_domain` parameter. D4's registry and refusal landed in the kernel (ADR 0031
+    D4's clarification): a `SemiringRegistry` the kernel is constructed with admits a semiring
+    only on an audit that finds no counterexample, and the rs `Require::Checkable` refuses an
+    unbound truth domain as `UncheckableAnnotation`, pinned by `vectors/semiring_registry.json`.
+
+### 5b.1 The annotated closed-model certificate (ADR 0031 D5)  [PROPOSED — #1821 Q14, Q15]
+
+An **`AnnotatedClosedModelCert`** is a `ClosedModelCert` annotated under one semiring:
+`{ cert, semiring, annotations }`.
+
+- **`semiring`** is the contract-computed `semiring_identity`.
+- **`annotations`** holds one `{ pred, elements }` per sealed table, in the certificate's table
+  order, with one element per row in row order.
+- **Its wire** is `Tuple[annotated_closed_model_cert, <the ClosedModelCert wire>, Tuple[id, version,
+  config_digest], Tuple[Tuple[pred, Tuple[element…]]…]]`. The decoder is closed.
+- **Its digest** is SHA-256 over `logos/negotiate/annotated-closed-model-cert/v1\n` and that wire.
+- **Additive (ADR 0003).** The boolean `ClosedModelCert`, its wire, its digest and every existing
+  `check` path are unchanged.
+
+`check_annotated_closed_model(program, annotated, ctx, profile, cert_context, semiring)` (go
+`CheckAnnotatedClosedModel`, ts `checkAnnotatedClosedModel`) runs these steps in order:
+
+1. **Identity.** The semiring's identity must equal the certificate's (`annotation_identity_mismatch`).
+   This is what makes the verdict relative to whose arithmetic it used.
+2. **The boolean check** of the certificate as a one-certificate world. A refusal there is the
+   verdict, under its own code.
+3. **Unsupported.** A partial scope (ADR 0030), a negated or count literal in a scope clause, or a
+   grounding whose body is not decided is refused `annotation_unsupported`.
+4. **Shape.** Every sealed table is annotated, in order, with one element per row, and each element
+   is in the semiring's carrier (`annotation_shape`, naming the row).
+5. **Recombination.** Every IDB row's element is recomputed as the **least solution** of
+   `a(t) = ⊕ over t's groundings of ⊗ over the grounding's positive non-theory body literals of their
+   elements`.
+   - The groundings are the closure join's own; there is no second join.
+   - Jacobi rounds run from zero, folding ⊕ in ascending codec order of `Tuple[clause id,
+     Tuple[Tuple[var, value]…]]` and ⊗ in body order.
+   - The rounds are bounded by the IDB row count plus one, and each operation is charged against
+     `max_join_steps` (`annotation_budget_exceeded`).
+   - The refusals are `annotation_not_converged`, `semiring_not_an_element` and `semiring_stopped`.
+     A computed element that differs from the claim is `annotation_mismatch`, naming the first row.
+
+**An accept names two things:**
+- the law it relied on: `kleene_least_fixpoint` when the ground dependency graph is cyclic,
+  otherwise none;
+- the extensional tables whose elements it took as **premises**. They are bound by the digest and
+  **never attested**: a verifier method that attests them is a later increment.
+
+The verdict is versioned at **`CHECKER_VERSION` 24**. A version-23 checker cannot read an annotated
+certificate, and no existing verdict moves. `vectors/annotated_closed_model.json` pins the check
+(hand-authored, tri-core), and `vectors/annotated_closed_model_cert_digest.json` pins the digest
+(generated).
+
 <a id="leaf-spi"></a>
 
-## 6. Leaf SPI  (attestation / extensional admission)  [STABLE v1]
+## 6. Leaf SPI  (attestation / extensional admission)  [STABLE v2]
 
 ```rust
 trait LeafVerifier<C> {
@@ -2325,7 +2476,7 @@ enum LeafOutcome { Admit, Reject { code: String } }
 state, or unbounded search.
 
 **Every member `check` consults, not only `verify` (#2565).** A leaf verifier, like a
-theory's `decide` (§5), MUST be a pure function of its inputs: deterministic, with no side
+theory's `decide_ground` (§5), MUST be a pure function of its inputs: deterministic, with no side
 effect visible to `check`. That holds for `extensional()` and `edb_snapshot(pred, ctx)` as
 much as for `verify`. `check`'s verdict, and any memo of it, assumes so.
 `check_with_cert_memo` (additive, contract v1) verifies a closed world once per run and
@@ -2364,14 +2515,20 @@ Three checker components — `Theory` (§5), `RuleAdmissibility` (§5a), and `Le
   EDB-snapshot-bearing). The pin is `edb_table_hash(pred, rows)` over the relation's rows,
   and **the rows are a SET** (#2279): they are sorted by the ground key and a repeated row is
   ignored, by the same key the sealed `RelationTable` dedups by, so order and multiplicity
-  never change the pin. A snapshot provider need not deduplicate its rows first.
+  never change the pin. The ground key is the codec bytes of the row's labeled compound
+  `Tuple[Atom(pred), args…]`, and keys compare as unsigned bytes in lexicographic order, a
+  proper prefix first: the one contract-owned order of
+  [ADR 0040](../architecture/decisions/0040-the-public-boundary-contract.md) D9, never a
+  host string order. A snapshot provider need not deduplicate its rows first.
 
 These are **interface-parity** seams (one tri-core interface, ADR 0012), realized with the
 idiomatic per-core shape each language affords — Rust defaulted trait methods, Go split
 interfaces (`Identified` / `EdbSnapshotProvider`), TS optional members — a divergence
 **blessed** by the parity discipline in
 [validation/0001 §rs/ts/go parity discipline](../architecture/validation/0001-consumer-fit-and-parity.md#rstsgo-parity-discipline-adopted-grounded-in-ontos):
-the *interface* is the same tri-core, only its host-idiomatic spelling differs.
+the *interface* is the same tri-core, only its host-idiomatic spelling differs. This is one of
+the declared categories of permitted divergence in
+[ADR 0040](../architecture/decisions/0040-the-public-boundary-contract.md) D5.
 
 **Decision — leaf verification is fully delegated to the `LeafVerifier` (v1).** The
 kernel `check` verifies **no** signatures itself: a signature is an *arche-style
@@ -2988,7 +3145,7 @@ attribution.lineage = { rules: [ { rule_id, clause, text, variants: [ { variant_
   is byte-identical to the pre-#1865 one (no `origin`, `schema`, or `lineage` keys), and the
   default build is unchanged.
 
-### 11.4 D4 — the execution trace (`trace_v1`)  [rs, #1864 increments 1, 2a, 2b and 2c]
+### 11.4 D4 — the execution trace (`trace_v2`)  [rs, #1864 increments 1, 2a, 2b and 2c]
 
 Every drive the `stats` record describes is a **profiling experiment** — a separate,
 read-only replay run for the diagnostic channel (§11.2's phases are timed inside those
@@ -3000,17 +3157,18 @@ only, never certified, never cross-core-pinned, never compared exactly.
 
 ```
 trace: {
-  schema: "trace_v1",  clock: "monotonic",  unit: "ns",  durations: "inclusive",
+  schema: "trace_v2",  clock: "monotonic",  unit: "ns",
   route:  "kernel" | "sldnf-direct",
   engine: <the active plan's provider> | "composed" | "sldnf-direct" | null,
   engine_note?: "no selection",             // only beside engine: null — the run chose no plan
   implementation?: { provider, variant },   plan_revision?: <n>,        // kernel route, #1936
   composition?: "single" | [ { stratum, implementation: { provider, variant } } ... ],
   fallback?: { from: { provider, variant }, to: { provider, variant }, reason } | null,
-  coverage: ["prepare", "drive", "stratum", "round", "solve"],
+  coverage: ["prepare", "drive", "stratum", "round", "solve", "ownership"],
   capture: { outcome: complete | refused | truncated | failed | unsupported, reasons: [..] },
   effective_limits: { sld_max_depth, sld_max_steps },
-  spans: [ { id, parent: id | null, kind, name, start_ns, dur_ns, index? } ... ]
+  spans: [ { id, parent: id | null, kind, name, start_ns, lifetime_ns, index?,
+              exclusive_host_ns?, inclusive_host_ns? } ... ]
 }
 ```
 
@@ -3019,8 +3177,10 @@ trace: {
   increment are `prepare` (program load + query parse + search-order analysis) and `drive`
   (the kernel spine stream, or the direct solve + check). **`coverage` names the boundaries
   the trace can observe**; a `drive` with no children means *unobserved below this*,
-  never *nothing happened*. The selected pass's `drive` on the kernel spine is still
-  unobserved below the app layer.
+  never *nothing happened*. On the kernel spine the selected pass's `drive` carries the
+  answering run's own stage spans (#1935), under one `kernel_run` span for the kernel's `Run`
+  (#4169; `trace_v1` folded the `Run` into `drive`). The direct route's `drive` has no
+  children.
 - **`stratum` and `round` spans (increment 2a)** are the bottom-up profiling drive's OWN
   boundaries: one `stratum` per stratum the scheduler sealed, one `round` per round it ran,
   nested `bottom_up_profile → eval → stratum → round`. They are reported by the scheduler
@@ -3050,18 +3210,30 @@ trace: {
   `demand_pruning`, `planning`, `eval` and `relational_drive` as its `phase` children — the
   same instants §11.2's `phases` read, so the two surfaces cannot disagree). The tree shape
   IS the claim that no diagnostic time sits inside the selected span.
-- **Durations are inclusive nanoseconds on the monotonic clock**, `start_ns` relative to the
-  trace origin. Exclusive time is derived by the consumer as `dur − Σ(children)` and is never
-  emitted. A pass is a tree: children are sequential and nested, so overlap is
-  inexpressible, and **no additive production breakdown may be inferred across passes** —
-  two passes are two executions of the same program, not two halves of one. The two
-  measured span fields, as the registry (§11.5) binds them (`id`, `parent`, `kind`, `name`
-  and `index` are metadata):
+- **Every span carries its lifetime**, `lifetime_ns` = close − open in nanoseconds on the
+  monotonic clock, with `start_ns` relative to the trace origin. **A lifetime is not inclusive
+  time** (research 0026 R1, #4169): `trace_v1` called it `dur_ns` under
+  `durations: "inclusive"`, and a consumer deriving exclusive time as `dur − Σ(children)` counted
+  a `gate` whose lifetime overlapped `solve`'s in both. **The answering run's stage spans also
+  carry what they OWNED** (`ownership` in `coverage`): the run has one logical control lane, each
+  instant of it is owned by exactly one span, `exclusive_host_ns` is the sum of the intervals a
+  span owned and `inclusive_host_ns` that plus its children's inclusive time. The intervals
+  partition the `kernel_run` span, so its subtree's `exclusive_host_ns` sum to its `lifetime_ns`
+  exactly (ε = 0, one clock and the same integer readings), and its `inclusive_host_ns` is its
+  `lifetime_ns`. Owned time is wall time per owner, not CPU time. A span the app timed itself (the
+  selected pass's own phases, every diagnostic pass) carries no owned time, and neither does a
+  capture whose ownership does not partition its run: its `capture` reads `truncated` with the
+  reason. Absent, never zero. A pass is a tree, and **no additive production breakdown may be
+  inferred across passes** — two passes are two executions of the same program, not two halves
+  of one. The measured span fields, as the registry (§11.5) binds them (`id`, `parent`, `kind`,
+  `name` and `index` are metadata):
 
   | field | unit | class | meaning |
   |---|---|---|---|
   | `start_ns` | ns | `timer` | the span's start, relative to the trace origin (the first instant the app could observe), on the monotonic clock. |
-  | `dur_ns` | ns | `timer` | the span's inclusive wall-clock — its children's time included; a span still open when the trace was rendered is closed to that instant and the capture reads `truncated`. |
+  | `lifetime_ns` | ns | `timer` | the span's lifetime, close − open on the monotonic clock: never inclusive time, since a span's lifetime can hold a sibling's work. A span still open when the trace was rendered is closed to that instant and the capture reads `truncated`. Aggregation `lifetime`. |
+  | `exclusive_host_ns` | ns | `timer` | (#4169) the time an answering-run stage span OWNED on the run's control lane: the sum of the intervals in which it held the lane. Additive: a run's spans sum to its `lifetime_ns`. **Absent** on a span the app timed itself and on a capture whose ownership does not partition its run. |
+  | `inclusive_host_ns` | ns | `timer` | (#4169) `exclusive_host_ns` plus the children's `inclusive_host_ns`: what a span and its subtree owned. Equal to `lifetime_ns` on the `kernel_run` span; less than its lifetime on a span whose lifetime held a sibling's work. **Absent** where `exclusive_host_ns` is. |
   | `first_answer_ns` | ns | `timer` | the instant the CLI rendered its first answer, relative to the trace origin, on the same monotonic clock as `start_ns` (design 0006 P16). A **delivery mark**, not a span: it has no duration by nature, so it is carried as an offset rather than as a zero-length span, which would put a non-interval into the interval population. **Absent** when the run rendered no answer — never `0`, which would mean delivered at the origin. |
   | `first_certified_answer_ns` | ns | `timer` | as `first_answer_ns`, for the first answer the gate had CERTIFIED when it was rendered. On a `Certifiable` run every streamed answer is certified and the two coincide; they are stated separately so a reader need not know the tier to read the record. **Absent** when no certified answer was rendered. |
   | `end_of_consumption_ns` | ns | `timer` | the instant the answer stream finished draining, relative to the trace origin — whether it exhausted or an early stop cut it. Distinguishes early-stop delivery from complete enumeration when read against the run's terminal. **Absent** when the stream never drained. |
@@ -3084,7 +3256,9 @@ trace: {
   `Malformed`, `PlanSearchExhausted`) reports `engine: null` with `engine_note: "no selection"`
   — a refused selection has no fabricated winner (omit-not-fake, ADR 0012).
 - **`effective_limits`** records the search budget the SLD replay ran under (the same
-  caller-set budget as the answering drive, #802), so a capture says what bounded it.
+  caller-set budget as the answering drive, #802), so a capture says what bounded it. Since
+  #3712 (b), `sld_max_steps` is in sldnf work units (family unit v0), not goal resolutions; see the
+  consumer specification's §5.2 node budget.
 - **`--stats-replay <LIST>` (#2216; requires `--stats`)** adds DIAGNOSTIC REPLAYS to a run: a
   comma list of `sld_replay`, `bottom_up_profile` or `all`. **Without it `--stats` measures the
   answering run only and executes the program ONCE** (design 0006 P6): the served engine's
@@ -3103,7 +3277,7 @@ trace: {
 
 **Overhead recipe (documented, not promised):** run the same program twice with the same
 budget, once with `--stats --trace` and once without either flag, and report the ratio of
-the selected pass's `dur_ns` to the plain run's wall-clock — never an absolute. The trace
+the selected pass's `lifetime_ns` to the plain run's wall-clock — never an absolute. The trace
 adds a handful of monotonic-clock reads around boundaries the CLI already crosses; the cost
 that dominates is the profiling replays themselves, which since #2216 run only on
 `--stats-replay` and which the trace makes visible as the diagnostic passes. Do not assert exact values in a test
@@ -3119,7 +3293,7 @@ The root `stats` record carries a **`schema`** version token right after `record
 the constant `logos_kernel::seam::observe::STATS_SCHEMA`; it went from `stats_v1` to `stats_v2` with
 #1935, P6, when the record began to describe the answering run and not only the replays), so a reader
 diffing two captures can tell a renamed field from a removed one; the sub-records keep their
-own tokens (`trace.schema = "trace_v1"`, `attribution.schema = "attribution_v1"`,
+own tokens (`trace.schema = "trace_v2"`, `attribution.schema = "attribution_v1"`,
 `plan_origin.schema = "plan_origin_v1"`). A changed
 unit, scope, aggregation or meaning of an existing key is a new token, never a reshape in
 place; adding a key with a new name is not.
@@ -3133,7 +3307,7 @@ design 0006 §2 adds — the columns a reader needs to interpret a value safely 
 | **class** | `work-count` · `analysis` · `timer` · `engine-local` · `resource` · `metadata` · `outcome` | §11's determinism classes, plus envelope/identity and verdict/flag types. Resource comparison is declared per metric, including its scope (§11.8). |
 | **scope** | `selected` · `replay` · `analysis` · `envelope` · `by-span-kind` · `by-source` · `process` | The subject the field describes. `by-source` reads the record's group source; `process` includes observer, consumer and unrelated application traffic within its stated window and claims no exclusive run attribution. A replay figure and the answering run's wall-clock describe different executions. |
 | **producer** | `seminaive` · `relational` · `sldnf` · `core::compile` · `core::symbol` · `core::analysis` · `cli` · `kernel` | the component that computed the value. |
-| **aggregation** | `counter` · `inclusive-duration` · `exclusive-duration` · `gauge` · `peak` · `enum` · `map` · `metadata` | Additive traffic, inclusive/exclusive duration, a point level, a high-water mark, token, data-keyed map, or structure. Process-lifetime peaks (§11.8) are never sums of capture or child peaks. |
+| **aggregation** | `counter` · `inclusive-duration` · `exclusive-duration` · `lifetime` · `gauge` · `peak` · `enum` · `map` · `metadata` | Additive traffic, inclusive/exclusive duration, a span's close − open (never additive across overlapping spans), a point level, a high-water mark, token, data-keyed map, or structure. Process-lifetime peaks (§11.8) are never sums of capture or child peaks. |
 | **key stability** | `revision-stable` · `artifact-local` · `not-a-key` | whether a value is a key, and whether that key names the same thing in another capture: an operator id, reason token or clause text does; a `rule_id`, `variant_id`, `ClauseId` or span id names this artifact's compiled work only (§11.3 origins). For a `map` the column describes the inner keys. |
 | **absence** | prose | what a missing key means — a pass that did not run, a program outside an engine's fragment, a flag not given — and never a measured `0` (ADR 0012). Fields that are always present say so, and say what their zero or `null` means. |
 | **section** | `11.1` … `11.8` | the subsection that defines the key. |
@@ -3328,3 +3502,240 @@ Prepared sessions (#3816/#3818) keep retained base/index/support, disposable ove
 witnesses and export/check windows distinct; shared retained state is not newly allocated per
 request. These observations neither implement native `memory_bytes` enforcement nor widen
 #3448's guest allocator budget or #3807's embedding ceiling into a total-memory bound.
+
+## 12. The run's work unit, `work_units_v1`  [PROPOSED — engine-facing; specified, not yet metered]
+
+**Status and origin.** Research 0051 row 17, adopted in the coordinator's grade on
+[#3710](https://github.com/Bitspark/logos/issues/3710) (issuecomment-6812446437): *"`work_units_v1` as the
+advice's §4.2 primitive list, specified first, in a contract-specification section that pins the
+unit, meaning, default, comparison and outcome under ADR 0012's budget clause. Metering in each
+engine follows."* This section is that specification. **No engine meters `work_units_v1` yet, and
+no request can carry it yet.** Its wire field and its offer declaration arrive with the first
+metering engine. Until then, row 18's family-specific units stand, named honestly below.
+
+ADR 0012 classifies a request budget as *contract policy or budget*: *"a declared number is not
+thereby a contract budget. It becomes one only when the contract defines its unit and what exceeding
+it means."* The five things that must agree are defined here, in order: meaning, unit, default,
+comparison and outcome.
+
+### 12.1 Meaning
+
+`work_units_v1` is the caller's **allowance of operational work for one run**: the bounded
+primitive operations (§12.2) that any engine, adapter, builtin or aggregate performs on the run's
+behalf, from preparation through search to the construction of the derivations it proposes.
+**It is consumable and run-wide.** One run has one account. Every descendant (a composed child, an
+alternation member, a nested or inner search, `findall`, negation) draws from that account through
+a grant that can never exceed the parent's remaining credit. A looser inner allowance cannot enlarge
+the outer one (research 0051 rows 6 and 16; the consumer contract's §5.2 *aggregate charging*).
+
+**What it is not**, each of which can hide arbitrarily much work behind one count (research 0051
+advice §4.2, §4.3):
+
+- not a **pulled candidate** (`search_nodes`, the drive's per-pull floor);
+- not a **proof** or an answer (`max_answers`);
+- not a **fixpoint round** (`max_rounds`, which bounds each fixpoint computation and is never a
+  run-wide account: row 7);
+- not an **estimate**: a cost estimate selects a plan, and only a meter enforces a ceiling
+  (consumer contract §5.2);
+- not **wall time** (`wall_clock`) and not a runtime's **fuel**. A unit of work need not bound the
+  time it takes, and a wasm fuel count is not this unit unless it is published as such.
+
+**v1 scope.** The kernel's own verification of a proposed derivation is bounded by `CheckLimits`
+(§4.3), a separate typed allowance, and is not charged in v1. A plan with several allowances carries
+them as a vector of typed allowances. **Incomparable units are never summed.**
+
+### 12.2 Unit: the primitives and their charges
+
+One **work unit** is one charge of one primitive below. **Each operation is charged under exactly
+one primitive**, so an engine operation and the wrapper pull that delivers its result are never two
+observations of one unit (advice §4.3). Where both should count, they are named separately.
+
+| primitive | one unit is | notes |
+|---|---|---|
+| `entry` | one stored fact, index entry or table entry **inspected** | Counted whether it then matches or not. A probe that reads 40 entries and keeps 1 is 40 units. |
+| `cell` | one term node **visited** in matching, unification, comparison, renaming or substitution | A node is an atom, a variable or a tuple header. Unification charges one unit per position pair compared and one per dereference step. An occurs-check charges one per node of the bound term. A cell includes up to 64 bytes of its atom's content. |
+| `proof_node` | one derivation node **constructed or traversed** by the engine | Every premise counts. Copying a stored derivation out of a table traverses it. |
+| `step` | one **agenda or cursor advance** | An SLD goal selection, a choice-point resumption (redo), a join-cursor advance, a delta tuple consumed by a rule evaluation, a solution yielded by an enumerating builtin. |
+| `chunk` | **64 bytes**, or a part of 64, **copied, hashed, canonicalized, serialized or compared** as bytes | An operation over *n* bytes costs ⌈*n*/64⌉ chunks, except that a cell's own first 64 bytes are inside its `cell`. |
+| `alloc` | one **allocation, or growth**, of a run-owned buffer, table or index | Growth also charges the bytes it moves as chunks. |
+
+**Builtins and aggregates have no flat charge.** Their internal work is charged through the same
+primitives: an enumerating builtin a `step` per solution, an aggregate an `entry` per tuple folded,
+big-number arithmetic `chunk`s over its magnitude bytes, `findall` its inner search plus the `cell`s
+that copy each result. **Charging one token before an arbitrarily expensive operation does not meet
+this unit** (advice §4.2; R5 (b) "every unit of work counts").
+
+**The 64-byte chunk is a v1 constant.** It is small enough that a stop lands inside a large copy or
+hash after bounded work, and large enough that metering costs a small fraction of the work it meters.
+
+### 12.3 Default
+
+**Omitted means no work allowance.** The run is not bounded in `work_units_v1`; its other bounds
+still apply. A route may declare a default only through its advertised profile, disclosed in its
+offer and in the run's terminal evidence, the way research 0051 row 22's ruling (b) treats the
+default deadline. **No core and no host may substitute a silent default** (ADR 0012, *default policy
+is part of interface parity*).
+
+**Zero means spent.** An explicit `0` is an allowance already exhausted. The run stops before its
+first charged operation, with `consumed = 0`. It is never resolved to a default.
+
+**Enforcement follows research 0051 row 19.** A `work_units_v1` bound is mandatory unless the
+request marks it advisory. A route meters this unit only if its offer declares that it does. A
+mandatory work bound on a route that does not meter it is refused at admission, by name. Until the
+first metering engine lands, that is every route.
+
+### 12.4 Comparison: authorize before performing
+
+The normative semantics is **sequential authorization per primitive**:
+
+- an operation whose charge is *c* is performed only if `consumed + c ≤ limit`, and then
+  `consumed += c`;
+- otherwise the operation is **declined, not performed**. `consumed` is left unchanged and the stop
+  is recorded.
+
+It follows that:
+
+- **`consumed ≤ limit` at every moment**, and the work actually performed never exceeds what
+  `consumed` accounts for;
+- **exact boundary:** a run whose complete work is exactly *B* units completes under a limit of *B*
+  and stops under *B* − 1;
+- **variable-cost operations are authorized in installments** of their primitive charges, so a stop
+  lands inside the operation (inside one large round, one long unification or one long builtin),
+  never after it;
+- **domain:** `limit` and `consumed` are unsigned 64-bit integers. The test is evaluated as
+  `c ≤ limit − consumed`, so it cannot overflow.
+
+An implementation may authorize in batches internally only when it is observationally equivalent at
+the boundary: the same `consumed`, the same stop point, and no extra work performed.
+
+### 12.5 Outcome
+
+Exhausting the allowance is a **request-budget stop**, owned by whoever set the budget (ADR 0012's
+`budget_exhausted(budget, limit, consumed)`, with the budget named `work_units_v1`; since #4164 the
+cause may also name its `setter`, `caller` or `deployment`, and a `forced` mark, both trailing and
+omitted when unset). It projects as
+research 0051 row 15 rules for every request-budget stop, whichever layer detects it:
+
+- answers already delivered: the outcome carries them as **truncated**, with this budget as the
+  cause;
+- no answers: **`NotCompleted(BudgetExhausted(work_units_v1, limit, consumed))`**.
+
+The exact band names are row 15's design PR's to settle. **It is never a fault, and never a
+`Solved` that claims completeness.**
+
+**A work stop is global** (row 16). Once the account is exhausted, no further charged operation runs
+anywhere in the run: no sibling branch, no proof construction, no builtin. A depth bound may prune
+one path and leave an incompleteness obligation, but exhausted work authorizes no more search.
+
+### 12.6 Versions and family units
+
+**The unit is versioned.** Changing what a primitive covers or costs, adding a primitive, or changing
+the chunk size is a new version (`work_units_v2`), never an edit of `v1` once any engine meters it. A
+budget and its consumption both name their version. **A request in a version a route does not meter
+is refused, never converted.**
+
+**Family-specific units stand until engines meter `work_units_v1`** (row 18). Each is named for what
+it counts, and none is summed with another or with `work_units_v1`:
+
+| unit | counts | where |
+|---|---|---|
+| drive pulls | candidates pulled by the drive | `search_nodes` (the kernel floor) |
+| SLD goal resolutions | `resolve_goal` entries | `max_steps`; published as `sld_goal_resolutions` (§11.1) |
+| sldnf work, v0 | goal resolutions, leaf candidates tried, builtin conclusions enumerated, proof nodes built | `max_steps`'s request-wide counter ([#3712](https://github.com/Bitspark/logos/issues/3712) (b)) |
+| fixpoint rounds | rounds of one fixpoint computation | `max_rounds` (per fixpoint, row 7) |
+
+**sldnf work v0 maps onto v1** when sldnf meters it:
+
+- a goal resolution is a `step`;
+- a leaf candidate tried is an `entry`;
+- a builtin conclusion enumerated is a `step`;
+- a proof node built is a `proof_node`.
+
+v1 also charges the `cell`s, `chunk`s and `alloc`s that v0 does not count, so for one run v0's count
+is at most v1's consumption. The metering PR states that relation as a witness, not equality.
+
+### 12.7 Witnesses a metering engine must carry
+
+From research 0051 advice §4.2 and §4.5, red first, per engine family:
+
+- **Hidden work is charged:** a shallow proof explosion, a large-term unification, one enormous
+  fixpoint round and a long builtin each consume their specified charges and stop at the defined
+  boundary.
+- **Boundaries:** limits of 0, 1, exactly the run's work *B* and *B* − 1 give the same consumption
+  and classification in every core that reports them.
+- **Global stop:** after exhaustion, independent counters for sibling search, proof construction and
+  builtins stop increasing.
+- **Construction:** a mutant that removes a checkpoint fails. `solve` and `events` agree on the
+  terminal for the same deterministic fixture.
+- **Independent measurement:** work is counted by an observer other than the engine's own meter
+  wherever possible. A test that only asks the engine whether it respected its own meter is too weak.
+
+Interface parity (ADR 0012) applies to the budget's meaning, its comparison and its outcome. **It
+does not require two engine families to spend the same units on the same query** (advice §4.3).
+SLDNF and seminaive may legitimately consume different amounts of the same currency.
+
+## 13. Request bounds: scope, phases and owner
+
+**[ADOPTED — the one statement.] Status and origin.** Research 0051 row 5, accepted with the evaluation's adaptation (*"write each
+bound's scope down first"*) and planned on [#4189](https://github.com/Bitspark/logos/issues/4189).
+**This section is the one statement of each request bound's scope.** The `RunLimits` docs in the
+three cores and the consumer contract's §5.2 point here and restate none of it. The domain is the
+`RunLimits` type itself: every field is a row below exactly once, and a test reads both
+(`kernel/rs/tests/bound_scopes_once_4189.rs`).
+
+### 13.1 Scopes and phases
+
+A bound's **scope** names the part of one run whose work it counts and can stop. There are four:
+
+| Scope | Counts and can stop |
+|---|---|
+| `search` | The engines' enumeration only: search, proof construction inside an engine, and the drive's pulls of their candidates. |
+| `run` | The run from the drive's entry, before resolution, to the terminal, at the granularity stated in its row. |
+| `guest_call` | One call into the wasm guest, from the guest's budget start to its ABI exit. No host phase. |
+| `delivery` | The answers the run delivers. A demand, not a work bound: meeting it ends the run `StoppedEarly`. |
+
+The **phases** of a run, as research 0051 advice §1.4 names them: preparation (resolution, planning,
+`prepare`, rebinding), search, builtins, verification (the gate), policy callbacks (admission, leaf
+verifiers, theory decisions), deduplication and delivery, serialization of the outcome, and cleanup.
+A search-scoped bound is coherent because it is named so (advice §1.4). A run-scoped bound must
+reach every phase its row claims, and moving work from search into another phase must not evade it.
+
+### 13.2 The bounds
+
+<!-- bound-scopes:begin -->
+| Field | Scope | Covers | Does not cover | Enforced by | Its trip names |
+|---|---|---|---|---|---|
+| `wall_clock` | `run` | Preparation (its time counts against the deadline; nothing cuts inside `prepare`), search (each engine gets the engine share and stops cooperatively; the drive cuts at every pull), delivery, verification (a Certifiable run keeps one fifth as a verification reserve, and no check starts past the deadline), cleanup (the finish drain). | An operation already in flight: one check, one builtin or one policy callback is never interrupted. The open exceptions in §13.3. | The run ledger's deadline, minted once at the drive's entry; the engines' own clocks; the wasm hosts' watchdogs, whose kill is `not_completed(budget_exhausted(wall_clock, …, forced))`. | `WallClock` |
+| `search_nodes` | `search` | The candidates the drive pulls, and the engine's own unit of search work. | Preparation, verification, policy callbacks, deduplication (a rejected or duplicate candidate still consumes it), serialization, cleanup. Its engine unit differs per engine family: #4196. | The drive's pull floor, and the engine's counter. | `SearchNodes` |
+| `max_depth` | `search` | The SLD descent depth of a top-down engine. Bottom-up engines have no depth and ignore it. | Every other phase. | The top-down engines (sldnf, wam, the symbolic tabling arm). | `SearchDepth` |
+| `max_rounds` | `search` | Fixpoint rounds. How they are counted across a composed run is the consumer contract's §5.2 (research 0051 row 7). The seed is not a round. | Proof construction after the fixpoint, verification and every other phase. Top-down engines ignore it. | The bottom-up drive. | `FixpointRounds` |
+| `max_answers` | `delivery` | The certified, distinct answers delivered to the caller, counted after the gate and after deduplication. | It bounds no work. An inner search receives no answer cap. | The drive's demand check, before each pull and after each delivery; engines that stop at the cap themselves. | No limit: the run ends `StoppedEarly`. |
+| `memory_bytes` | `guest_call` | Live allocator-requested bytes in the guest during one call: the decoded request (sampled at the budget start), resolution, search, builtins, sealing, deduplication and reply encoding. | Every host phase, including host verification and host serialization. A native Rust host has no meter and refuses the field. | The guest's allocator meter, polled cooperatively. | `MemoryBytes` |
+<!-- bound-scopes:end -->
+
+`advisory` is not a bound. It marks which of the bounds above the caller sets as advisory
+(research 0051 row 19), and it has no scope of its own.
+
+**The stop's projection has one owner.** Whichever bound trips, how the stop becomes a completion
+and a terminal band (`Truncated(limit)`, `LimitExceeded`, the `FixpointRounds` partial) is decided
+once, by the shared budget mechanism in `kernel/execution`. Its design is
+`kernel/execution/BUDGET.md` and its case is LOGOS-ACX-034. No entry point, composed scheduler or
+host chooses a different meaning.
+**A search-scoped bound names itself in its terminal by its own `LimitKind`** (`SearchNodes`,
+`SearchDepth`, `FixpointRounds`), and this table is the one place a kind is mapped to a scope.
+
+### 13.3 Open exceptions
+
+Each is a phase a row above claims, or an engine a row assumes, that the implementation does not
+yet reach. Each names its open issue, and the row's claim holds everywhere else. When an issue
+closes, its line is removed here in the same pull request.
+`scripts/tracking/bound-scope-exceptions.sh` reports any line whose issue has closed.
+
+<!-- bound-scope-exceptions:begin -->
+- `wall_clock`: the Rust composed path verifies with no run-deadline check: #4261.
+- `wall_clock`: the completeness gate runs outside the run deadline in all three cores: #4262.
+- `wall_clock`: the WAM and tabled engines never read the run's clock: #4263.
+- `wall_clock`: the Go negotiated door keeps no verification reserve and verifies past the
+  deadline: #4264.
+- `max_depth`: the tabled engine reads it as a fixpoint round cap and reports `SearchDepth`: #4265.
+<!-- bound-scope-exceptions:end -->

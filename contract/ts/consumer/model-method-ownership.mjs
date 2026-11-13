@@ -7,6 +7,8 @@ import {
   MapProgram, NegPremise, PredicateSet, RelationTable, RuleNode, ScopeGraph, SealContext, StratumPrefix, SupportEdge,
   Symbol, Term, WorldMemo, check, checkClosedModelChain, checkWithCertContext,
   checkWithWorldMemo, defaultLimits, edbTableHash, newStandardTheory, programDigestOf,
+  Subst,
+  VarId,
 } from "@bitspark/logos-contract";
 
 const a = new Atom([97]);
@@ -63,9 +65,9 @@ function tryEdit(target, key, replacement, inspect) {
 
 function refusalSurvives(run, code, target, key, replacement) {
   const expected = run();
-  assert.equal(expected.kind, "reject");
-  assert.equal(expected.code, code);
-  tryEdit(target, key, replacement, () => assert.deepEqual(run(), expected));
+  assert.equal(expected.verdict.kind, "reject");
+  assert.equal(expected.verdict.code, code);
+  tryEdit(target, key, replacement, () => assert.deepEqual(run().verdict, expected.verdict));
 }
 
 for (const [name, run] of routes) {
@@ -73,10 +75,10 @@ for (const [name, run] of routes) {
     const program = new MapProgram();
     const profile = profileFor();
     const proof = new Derivation([new LeafNode(fact, Evidence.none())], 0);
-    assert.equal(run(program, fact, proof, profile).kind, "accept");
+    assert.equal(run(program, fact, proof, profile).verdict.kind, "accept");
     refusalSurvives(() => run(program, other, proof, profile), "root_conclusion_mismatch",
       GroundLiteral.prototype, "equals", () => true);
-    assert.equal(run(program, fact, proof, profile).kind, "accept");
+    assert.equal(run(program, fact, proof, profile).verdict.kind, "accept");
   });
 
   for (const [label, target, method, replacement] of [
@@ -91,8 +93,8 @@ for (const [name, run] of routes) {
       const profile = profileFor();
       const valid = GroundLiteral.of("derived", [a]);
       const invalid = GroundLiteral.of("derived", [b]);
-      const proof = value => new Derivation([new RuleNode(value, id, new Map(), [])], 0);
-      assert.equal(run(program, valid, proof(valid), profile).kind, "accept");
+      const proof = value => new Derivation([new RuleNode(value, id, new Subst(), [])], 0);
+      assert.equal(run(program, valid, proof(valid), profile).verdict.kind, "accept");
       refusalSurvives(() => run(program, invalid, proof(invalid), profile), "instantiation_mismatch",
         target, method, replacement);
     });
@@ -105,7 +107,7 @@ for (const [name, run] of routes) {
     profile.limits.maxTermDepth = 1;
     const claim = GroundLiteral.of("derived", [a]);
     const proof = new Derivation([
-      new RuleNode(claim, id, new Map([["unused", Term.tuple([termA])]]), []),
+      new RuleNode(claim, id, new Subst([[VarId.of("unused"), Term.tuple([termA])]]), []),
     ], 0);
     refusalSurvives(() => run(program, claim, proof, profile), "term_too_deep",
       Term, "depthLe", () => true);
@@ -119,7 +121,7 @@ for (const [name, run] of routes) {
     const claim = goal.asGround();
     const profile = profileFor();
     const proof = new Derivation([
-      new LeafNode(fact), new RuleNode(claim, id, new Map(), [0]),
+      new LeafNode(fact), new RuleNode(claim, id, new Subst(), [0]),
     ], 1);
     refusalSurvives(() => run(program, claim, proof, profile), "instantiation_mismatch",
       BodyLit.prototype, "isNeg", () => false);
@@ -128,7 +130,7 @@ for (const [name, run] of routes) {
   test(name + " retains the verifier's extensional predicate partition", () => {
     const id = ClauseId.of("collision");
     const program = new MapProgram().with(id, Clause.fact(Goal.of("allowed", [termA])));
-    const proof = new Derivation([new RuleNode(fact, id, new Map(), [])], 0);
+    const proof = new Derivation([new RuleNode(fact, id, new Subst(), [])], 0);
     const profile = profileFor();
     refusalSurvives(() => run(program, fact, proof, profile), "sealed_violation",
       PredicateSet.prototype, "contains", () => false);
@@ -155,7 +157,7 @@ test("a shared finite-domain method cannot authorize duplicate domain values", (
   const profile = profileFor();
   const run = domain => checkClosedModelChain(program,
     [certificate(bound, { domains: [domain] })], undefined, profile, bound);
-  assert.equal(run(FiniteDomain.of(domainTag, [a])).kind, "accept");
+  assert.equal(run(FiniteDomain.of(domainTag, [a])).verdict.kind, "accept");
   const duplicate = new FiniteDomain(domainTag, [a, a]);
   refusalSurvives(() => run(duplicate), "cert_out_of_domain",
     FiniteDomain.prototype, "isCanonical", () => true);
@@ -170,7 +172,7 @@ test("a shared scope method cannot authorize duplicate sealed predicates", () =>
     extensions: [RelationTable.of(fact.pred, 1, [fact])],
     edbSnapshotHashes: [edbTableHash(fact.pred, [fact])],
   })], undefined, profile, bound);
-  assert.equal(run(StratumPrefix.of(0, [fact.pred])).kind, "accept");
+  assert.equal(run(StratumPrefix.of(0, [fact.pred])).verdict.kind, "accept");
   refusalSurvives(() => run(new StratumPrefix(0, [fact.pred, fact.pred])), "cert_scope_incomplete",
     StratumPrefix.prototype, "isCanonical", () => true);
 });
@@ -183,7 +185,7 @@ test("a shared relation method cannot authorize duplicate sealed rows", () => {
     scope: StratumPrefix.of(0, [fact.pred]), domains: [FiniteDomain.of(domainTag, [a])],
     extensions: [table], edbSnapshotHashes: [edbTableHash(fact.pred, [fact])],
   })], undefined, profile, bound);
-  assert.equal(run(RelationTable.of(fact.pred, 1, [fact])).kind, "accept");
+  assert.equal(run(RelationTable.of(fact.pred, 1, [fact])).verdict.kind, "accept");
   refusalSurvives(() => run(new RelationTable(fact.pred, 1, [fact, fact])), "cert_unsupported",
     RelationTable.prototype, "isCanonical", () => true);
 });
@@ -202,7 +204,7 @@ for (const [label, target, method, replacement] of [
       extensions: [RelationTable.of(row.pred, 1, [row])],
       edbSnapshotHashes: [edbTableHash(row.pred, [row])],
     })], undefined, profile, bound);
-    assert.equal(run(FiniteDomain.of(domainTag, [b])).kind, "accept");
+    assert.equal(run(FiniteDomain.of(domainTag, [b])).verdict.kind, "accept");
     refusalSurvives(() => run(FiniteDomain.of(domainTag, [a])), "cert_out_of_domain",
       target, method, replacement);
   });
@@ -217,13 +219,13 @@ test("a shared table membership method cannot hide a missing derived fact", () =
   const run = complete => checkClosedModelChain(program, [certificate(bound, {
     scope: StratumPrefix.of(0, [claim.pred]), domains: [FiniteDomain.of(domainTag, [a])],
     extensions: [RelationTable.of(claim.pred, 1, complete ? [claim] : [])],
-    supports: complete ? [new SupportEdge(claim, id, new Map(), [], 0)] : [],
+    supports: complete ? [new SupportEdge(claim, id, new Subst(), [], 0)] : [],
   })], undefined, profile, bound);
-  assert.equal(run(true).kind, "accept");
+  assert.equal(run(true).verdict.kind, "accept");
   const expected = run(false);
-  assert.equal(expected.kind, "reject");
+  assert.equal(expected.verdict.kind, "reject");
   tryEdit(RelationTable.prototype, "contains", () => true,
-    () => assert.deepEqual(run(false), expected));
+    () => assert.deepEqual(run(false).verdict, expected.verdict));
 });
 
 test("an importer cannot supply an implicit certificate context through the default factory", () => {
@@ -240,9 +242,9 @@ test("an importer cannot supply an implicit certificate context through the defa
     extensions: [RelationTable.of(absent.pred, 1, [])],
   });
   const proof = new Derivation([
-    new RuleNode(claim, id, new Map(), [new NegPremise(absent, 0)]),
+    new RuleNode(claim, id, new Subst(), [new NegPremise(absent, 0)]),
   ], 0, [seal]);
-  assert.equal(checkWithCertContext(program, claim, proof, undefined, profile, bound).kind, "accept");
+  assert.equal(checkWithCertContext(program, claim, proof, undefined, profile, bound).verdict.kind, "accept");
   refusalSurvives(() => check(program, claim, proof, undefined, profile), "cert_context_unbound",
     CertContext, "zero", () => bound);
 });
@@ -265,8 +267,8 @@ test("independent receipt verification keeps its evidence and claim authority", 
   const profile = profileFor(receiptVerifier);
   const program = new MapProgram();
   const proof = token => new Derivation([new LeafNode(fact, Evidence.of(new Atom([token])))], 0);
-  assert.equal(check(program, fact, proof(7), context, profile).kind, "accept");
-  assert.equal(check(program, fact, proof(8), context, profile).code, "leaf_rejected");
+  assert.equal(check(program, fact, proof(7), context, profile).verdict.kind, "accept");
+  assert.equal(check(program, fact, proof(8), context, profile).verdict.code, "leaf_rejected");
   refusalSurvives(() => check(program, other, proof(7), context, profile), "root_conclusion_mismatch",
     GroundLiteral.prototype, "equals", () => true);
 });
@@ -292,10 +294,10 @@ for (const [label, target, method, replacement] of [
       });
       return checkClosedModelChain(program, [seal], undefined, profileFor(), bound);
     };
-    assert.equal(run(false).kind, "accept");
+    assert.equal(run(false).verdict.kind, "accept");
     const expected = run(true);
-    assert.equal(expected.kind, "reject");
-    tryEdit(target, method, replacement, () => assert.deepEqual(run(true), expected));
+    assert.equal(expected.verdict.kind, "reject");
+    tryEdit(target, method, replacement, () => assert.deepEqual(run(true).verdict, expected.verdict));
   });
 }
 
@@ -313,10 +315,10 @@ test("a shared seal context cannot authorize an unresolved relation", () => {
     });
     return checkClosedModelChain(program, [seal], undefined, profileFor(), bound);
   };
-  assert.equal(run(true).kind, "accept");
+  assert.equal(run(true).verdict.kind, "accept");
   const expected = run(false);
-  assert.equal(expected.kind, "reject");
-  tryEdit(SealContext.prototype, "seals", () => true, () => assert.deepEqual(run(false), expected));
+  assert.equal(expected.verdict.kind, "reject");
+  tryEdit(SealContext.prototype, "seals", () => true, () => assert.deepEqual(run(false).verdict, expected.verdict));
 });
 
 test("checking a sealed relation selects its snapshot implementation once", () => {
@@ -340,7 +342,7 @@ test("checking a sealed relation selects its snapshot implementation once", () =
     };
   } });
   const result = checkClosedModelChain(program, [cert], undefined, profileFor(leaves), bound);
-  assert.equal(result.kind, "accept");
+  assert.equal(result.verdict.kind, "accept");
   assert.equal(selections, 1);
   assert.equal(calls, 1);
 });

@@ -1,8 +1,9 @@
 // #3022 step 4 (research 0028 A8), the negative witness uabszqyzof asked for on #3037: a
 // closed-model certificate's closure reads a theory-owned body literal through theoryTruth, and a
-// theory that OWNS the predicate but decides NotMine is refused predicate_partition_violation,
-// never read as false. Both polarities are planted, each against its control, a theory that
-// decides Fails, which is what NotMine used to be read as. The same four cases are pinned in
+// theory that OWNS the predicate but disowns the atom (completion.TheoryGroundDisowned, the v1
+// NotMine) is refused predicate_partition_violation, never read as false. Both polarities are
+// planted, each against its control, a theory that decides Fails, which is what NotMine used to be
+// read as. The same four cases are pinned in
 // contract/rs (tests/closure_theory_not_mine_3022.rs) and contract/ts
 // (test/closure_theory_not_mine_3022.test.ts).
 //
@@ -15,14 +16,15 @@ package contract
 import (
 	"testing"
 
+	"github.com/Bitspark/logos-contract/contract/go/completion"
 	core "github.com/bitspark/ontos/core/go"
 )
 
 // test-double: consumer(owns q and decides it with one fixed outcome)
-type ctnmTheory struct{ outcome TheoryOutcome }
+type ctnmTheory struct{ outcome completion.TheoryGround }
 
 func (ctnmTheory) Owns(p Symbol) bool { return p.Equal(SymbolFromString("q")) }
-func (t ctnmTheory) Decide(GroundLiteral) TheoryOutcome {
+func (t ctnmTheory) DecideGround(GroundLiteral) completion.TheoryGround {
 	return t.outcome
 }
 
@@ -46,7 +48,7 @@ func ctnmLit(pred string) GroundLiteral {
 
 // ctnmChain verifies one certificate sealing {d, r} (d = {d(a)}, r = rRows, with edges) over
 // program, under a theory that decides q with outcome.
-func ctnmChain(program *MapProgram, rRows []GroundLiteral, edges []SupportEdge, outcome TheoryOutcome) Outcome {
+func ctnmChain(program *MapProgram, rRows []GroundLiteral, edges []SupportEdge, outcome completion.TheoryGround) Outcome {
 	d, r := SymbolFromString("d"), SymbolFromString("r")
 	pin := Hash{7}
 	cert := ClosedModelCert{
@@ -77,7 +79,7 @@ func ctnmChain(program *MapProgram, rRows []GroundLiteral, edges []SupportEdge, 
 }
 
 // The positive polarity: q(a) filters the only clause, and r is sealed empty.
-func ctnmPositive(outcome TheoryOutcome) Outcome {
+func ctnmPositive(outcome completion.TheoryGround) Outcome {
 	x := Var("X")
 	program := NewMapProgram().With(NewClauseId("r_q"),
 		NewClauseLits(NewGoal("r", x), PosLit(NewGoal("d", x)), PosLit(NewGoal("q", x))))
@@ -86,7 +88,7 @@ func ctnmPositive(outcome TheoryOutcome) Outcome {
 
 // The negated polarity: `\+ q(a)` filters the second clause, and r(a) is sealed, supported by the
 // first.
-func ctnmNegated(outcome TheoryOutcome) Outcome {
+func ctnmNegated(outcome completion.TheoryGround) Outcome {
 	x := Var("X")
 	program := NewMapProgram().
 		With(NewClauseId("r_d"), NewClauseLits(NewGoal("r", x), PosLit(NewGoal("d", x)))).
@@ -105,26 +107,27 @@ func ctnmVerdict(o Outcome) string {
 	if o.IsAccept() {
 		return "accept"
 	}
-	return o.Code().Code()
+	return o.Verdict.Code().Code()
 }
 
-func TestClosureTheoryNotMineIsRefusedInEitherPolarity3022(t *testing.T) {
-	fails := TheoryFails{Code: "q_does_not_hold"}
+func TestClosureTheoryDisowningIsRefusedInEitherPolarity3022(t *testing.T) {
+	fails := completion.TheoryGroundFails("q_does_not_hold")
 	for _, c := range []struct {
 		name string
 		got  Outcome
 		want string
 	}{
 		{"positive control: q decides Fails", ctnmPositive(fails), "accept"},
-		{"positive witness: q owned, decides NotMine", ctnmPositive(TheoryNotMine{}), "predicate_partition_violation"},
+		{"positive witness: q owned, decides NotMine", ctnmPositive(completion.TheoryGroundDisowned()), "predicate_partition_violation"},
 		{"negated control: q decides Fails", ctnmNegated(fails), "accept"},
-		{"negated witness: q owned, decides NotMine", ctnmNegated(TheoryNotMine{}), "predicate_partition_violation"},
-		// Go alone can return no outcome at all (a nil interface); rs's enum and ts's union cannot.
-		{"positive witness: q owned, returns no outcome", ctnmPositive(nil), "predicate_partition_violation"},
-		{"negated witness: q owned, returns no outcome", ctnmNegated(nil), "predicate_partition_violation"},
+		{"negated witness: q owned, decides NotMine", ctnmNegated(completion.TheoryGroundDisowned()), "predicate_partition_violation"},
+		// Go alone can return an outcome no constructor built (the zero TheoryGround); rs's enum and
+		// ts's union cannot.
+		{"positive witness: q owned, returns no outcome", ctnmPositive(completion.TheoryGround{}), "predicate_partition_violation"},
+		{"negated witness: q owned, returns no outcome", ctnmNegated(completion.TheoryGround{}), "predicate_partition_violation"},
 	} {
 		if got := ctnmVerdict(c.got); got != c.want {
-			t.Errorf("%s: %s (%s), want %s", c.name, got, c.got.Detail(), c.want)
+			t.Errorf("%s: %s (%s), want %s", c.name, got, c.got.Verdict.Detail(), c.want)
 		}
 	}
 }

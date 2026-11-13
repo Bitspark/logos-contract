@@ -46,6 +46,7 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/Bitspark/logos-contract/contract/go/completion"
 	core "github.com/bitspark/ontos/core/go"
 	data "github.com/bitspark/ontos/data/go"
 )
@@ -180,25 +181,25 @@ type parityTheory struct{}
 // a non-holding atom, never a panic, mirroring ArithmeticTheory's owns-by-name).
 func (parityTheory) Owns(pred Symbol) bool { return pred.String() == predSameParity }
 
-// Decide decides a ground same_parity atom. Pure / total / deterministic.
-func (parityTheory) Decide(atom GroundLiteral) TheoryOutcome {
+// DecideGround decides a ground same_parity atom. Pure / total / deterministic.
+func (parityTheory) DecideGround(atom GroundLiteral) completion.TheoryGround {
 	if atom.Pred.String() != predSameParity {
-		return TheoryNotMine{}
+		return completion.TheoryGroundDisowned()
 	}
 	if len(atom.Args) != 2 {
-		return TheoryFails{Code: "same_parity_bad_arity"}
+		return completion.TheoryGroundFails("same_parity_bad_arity")
 	}
 	m, err1 := data.ReadInt(atom.Args[0])
 	n, err2 := data.ReadInt(atom.Args[1])
 	if err1 != nil || err2 != nil {
-		return TheoryFails{Code: "same_parity_not_int"}
+		return completion.TheoryGroundFails("same_parity_not_int")
 	}
 	// Bit(0) is the low bit of the magnitude — parity is sign-independent, which is all
 	// we need (and matches a "both even or both odd" reading).
 	if m.Bit(0) == n.Bit(0) {
-		return TheoryHolds{}
+		return completion.TheoryGroundHolds()
 	}
-	return TheoryFails{Code: "same_parity_does_not_hold"}
+	return completion.TheoryGroundFails("same_parity_does_not_hold")
 }
 
 // Identity exposes the canonical unidentified identity (parityTheory has no config to
@@ -431,11 +432,11 @@ func TestNetreach_RejectsLeafNotInSnapshot(t *testing.T) {
 	if out.IsAccept() {
 		t.Fatal("expected Reject (link not in snapshot), got Accept")
 	}
-	if out.Code() != LeafRejected {
-		t.Fatalf("expected leaf_rejected, got %s", out.Code().Code())
+	if out.Verdict.Code() != LeafRejected {
+		t.Fatalf("expected leaf_rejected, got %s", out.Verdict.Code().Code())
 	}
-	if out.Detail() != "link_not_in_snapshot" {
-		t.Fatalf("expected sub-code link_not_in_snapshot, got %q", out.Detail())
+	if out.Verdict.Detail() != "link_not_in_snapshot" {
+		t.Fatalf("expected sub-code link_not_in_snapshot, got %q", out.Verdict.Detail())
 	}
 }
 
@@ -464,11 +465,11 @@ func TestNetreach_ParityTheoryDecidesCustomRelation(t *testing.T) {
 	if out.IsAccept() {
 		t.Fatal("same_parity(2,3): expected Reject, got Accept")
 	}
-	if out.Code() != BuiltinFailed {
-		t.Fatalf("expected builtin_failed, got %s", out.Code().Code())
+	if out.Verdict.Code() != BuiltinFailed {
+		t.Fatalf("expected builtin_failed, got %s", out.Verdict.Code().Code())
 	}
-	if out.Detail() != "same_parity_does_not_hold" {
-		t.Fatalf("expected sub-code same_parity_does_not_hold, got %q", out.Detail())
+	if out.Verdict.Detail() != "same_parity_does_not_hold" {
+		t.Fatalf("expected sub-code same_parity_does_not_hold, got %q", out.Verdict.Detail())
 	}
 }
 
@@ -495,11 +496,11 @@ func TestNetreach_CustomRuleAdmissibilityGates(t *testing.T) {
 	if out.IsAccept() {
 		t.Fatal("expected Reject (disallowed rule tag), got Accept")
 	}
-	if out.Code() != RuleInadmissible {
-		t.Fatalf("expected rule_inadmissible, got %s", out.Code().Code())
+	if out.Verdict.Code() != RuleInadmissible {
+		t.Fatalf("expected rule_inadmissible, got %s", out.Verdict.Code().Code())
 	}
-	if out.Detail() != "disallowed_rule_tag" {
-		t.Fatalf("expected sub-code disallowed_rule_tag, got %q", out.Detail())
+	if out.Verdict.Detail() != "disallowed_rule_tag" {
+		t.Fatalf("expected sub-code disallowed_rule_tag, got %q", out.Verdict.Detail())
 	}
 
 	// (b) an allowed tag ("prod") and the untagged form both pass under the same policy.
@@ -541,10 +542,10 @@ func TestNetreach_StructuralBandStillFires(t *testing.T) {
 	if out.IsAccept() {
 		t.Fatal("expected Reject (instantiation mismatch), got Accept")
 	}
-	if out.Code() != InstantiationMismatch {
-		t.Fatalf("expected instantiation_mismatch, got %s", out.Code().Code())
+	if out.Verdict.Code() != InstantiationMismatch {
+		t.Fatalf("expected instantiation_mismatch, got %s", out.Verdict.Code().Code())
 	}
-	if !out.Code().IsStructural() {
+	if !out.Verdict.Code().IsStructural() {
 		t.Fatal("instantiation_mismatch should be in the FIRM structural band")
 	}
 }
@@ -569,8 +570,8 @@ func TestNetreach_SealingRejectsLeafOnIntensionalPred(t *testing.T) {
 	if out.IsAccept() {
 		t.Fatal("expected Reject (sealed violation), got Accept")
 	}
-	if out.Code() != SealedViolation {
-		t.Fatalf("expected sealed_violation, got %s", out.Code().Code())
+	if out.Verdict.Code() != SealedViolation {
+		t.Fatalf("expected sealed_violation, got %s", out.Verdict.Code().Code())
 	}
 }
 
@@ -592,8 +593,8 @@ func TestNetreach_PartitionRejectsBuiltinOnUnownedPred(t *testing.T) {
 	if out.IsAccept() {
 		t.Fatal("expected Reject (partition violation), got Accept")
 	}
-	if out.Code() != PredicatePartitionViolation {
-		t.Fatalf("expected predicate_partition_violation, got %s", out.Code().Code())
+	if out.Verdict.Code() != PredicatePartitionViolation {
+		t.Fatalf("expected predicate_partition_violation, got %s", out.Verdict.Code().Code())
 	}
 }
 

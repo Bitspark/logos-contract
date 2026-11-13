@@ -1,7 +1,7 @@
 {
   "spi": "logos-checker-spi v1",
   "profile": "negation_v1",
-  "note": "Language-agnostic conformance vectors for ADR 0007 certifiable stratified negation (SOUND redesign). Polarity-tagged body literals, Neg premises discharged against sealed closed-model certificates, the closed_world cert list, AND the sound-verifier obligations: a DERIVED bound context (recomputed program_hash + fixed non-zero profile/ctx/theory pins), an EDB-of-record snapshot binding (s3.6), trusted whole-program closure (s3.3), scope downward-closure (s3.2), domain coverage (s3.4), rank consistency (s3.5). Authored by hand from ADR 0007 + the 6 adversarial exploits (each MUST reject). NOTATION (extends check.json): body literal = bare goal {pred,args} (positive) | {neg:<goal>}. premise = bare int (positive node) | {neg:{atom:<lit>, cert:<int>, nonmember:'direct_lookup'}}. A derivation carries closed_world:[cert...]; each cert = {scope:{level,predicates:[pred...]}, domains:[{type_tag,values:[term...]}], extensions:[{pred,arity,rows:[lit...]}], supports:[{fact,clause,subst,body_refs:[{same_stratum:{fact,rank}}|{lower_stratum:{cert,atom}}|{builtin:{atom}}|{neg_lower:{cert,atom}}],rank}], limits_decl:{...}}. CONTEXT BINDING (driven by the CLI): the bound context is DERIVED from the live program (recomputed program_hash) + fixed pins; each cert is auto-bound to it UNLESS the cert sets an explicit program_hash/profile_hash/ctx_hash/theory_config_hash (the mismatch cases). A case with 'plain_check':true calls the plain check() (unbound zero context) for cert_context_unbound. A case may set 'cert_context':{pin overrides}. Top-level 'extensional' lists EDB predicates; 'edb' supplies their EDB-of-record rows (the s3.6 snapshot). The negation_v1 profile: lt theory (lt(a,b) Holds iff a<b bytewise); EDB leaves = the 'extensional' set; Context = unit.",
+  "note": "Language-agnostic conformance vectors for ADR 0007 certifiable stratified negation (SOUND redesign). Polarity-tagged body literals, Neg premises discharged against sealed closed-model certificates, the closed_world cert list, AND the sound-verifier obligations: a DERIVED bound context (recomputed program_hash + fixed non-zero profile/ctx/theory pins), an EDB-of-record snapshot binding (s3.6), trusted whole-program closure (s3.3), scope downward-closure (s3.2), domain coverage (s3.4), rank consistency (s3.5). Authored by hand from ADR 0007 + the 6 adversarial exploits (each MUST reject). NOTATION (extends check.json): body literal = bare goal {pred,args} (positive) | {neg:<goal>}. premise = bare int (positive node) | {neg:{atom:<lit>, cert:<int>, nonmember:'direct_lookup'}}. A derivation carries closed_world:[cert...]; each cert = {scope:{level,predicates:[pred...]}, domains:[{type_tag,values:[term...]}], extensions:[{pred,arity,rows:[lit...]}], supports:[{fact,clause,subst,body_refs:[{same_stratum:{fact,rank}}|{lower_stratum:{cert,atom}}|{builtin:{atom}}|{neg_lower:{cert,atom}}],rank}], limits_decl:{...}}. CONTEXT BINDING (driven by the CLI): the bound context is DERIVED from the live program (recomputed program_hash) + fixed pins; each cert is auto-bound to it UNLESS the cert sets an explicit program_hash/profile_hash/ctx_hash/theory_config_hash (the mismatch cases). A case with 'plain_check':true calls the plain check() (unbound zero context) for cert_context_unbound. A case may set 'cert_context':{pin overrides}. Top-level 'extensional' lists EDB predicates; 'edb' supplies their EDB-of-record rows (the s3.6 snapshot). The negation_v1 profile: lt theory (lt(a,b) Holds iff a<b bytewise); EDB leaves = the 'extensional' set; Context = unit. Rows that state a `report` pin check()'s work counters tri-core (#4206): counters_version and all 17 counters of the fresh check (never a memo pass), hand-computed from the counting rules in contract/rs/src/check/report.rs, never pasted from an implementation. PINNED vs COUNTED (#4206, the coordinator's rule: never pin by hand a value the checker's own order of work decides). A report value is either an integer, pinned exactly, or the string \"counted\", which asserts the counter is counted (a non-negative integer) without pinning its value. Pinned wherever report.rs's rules fix the value from the row's derivation, program and profile: the walk's counters (nodes_walked and the three kinds, premises_pos/neg, theory_decisions, leaf_verifications, admissibility_checks, max_depth_reached, max_term_depth_reached) and certs_verified; and, on a row whose certificate is verified to completion, the certificate meters (cert_tables_read, cert_rows_read, join_steps_used, groundings_enumerated), which are then totals over the certificate's own tables and closure. A row whose certificate is refused partway (cert_canonical_rows_unsorted) states those four as \"counted\": how much was read before the refusal depends on the order the checker visits tables. check() Outcome equality compares the verdict only (checker SPI v2), so this report pin is the only place the counters are compared. No vector row exercises certs_memo_hits: a memo hit needs a second check of one world, which no row is.",
   "extensional": ["base", "revoked", "src", "e", "gauge", "pair", "stk_item", "stk_flag", "law_pair", "law_bad", "sv_q", "nbase", "nsmall", "e2"],
   "edb": {
     "base": [
@@ -309,7 +309,16 @@
           }
         ]
       },
-      "outcome": { "reject": "neg_atom_present" }
+      "outcome": { "reject": "neg_atom_present" },
+      "report": {
+        "counters_version": 24,
+        "nodes_walked": 1, "rule_nodes": 1, "builtin_nodes": 0, "leaf_nodes": 0,
+        "premises_pos": 0, "premises_neg": 1,
+        "theory_decisions": 0, "leaf_verifications": 0, "admissibility_checks": 0,
+        "certs_verified": 1, "certs_memo_hits": 0, "cert_tables_read": 2, "cert_rows_read": 2,
+        "join_steps_used": 1, "groundings_enumerated": 1,
+        "max_depth_reached": 1, "max_term_depth_reached": 1
+      }
     },
     {
       "name": "accept_negation_of_absent_atom",
@@ -346,7 +355,16 @@
           }
         ]
       },
-      "outcome": "accept"
+      "outcome": "accept",
+      "report": {
+        "counters_version": 24,
+        "nodes_walked": 1, "rule_nodes": 1, "builtin_nodes": 0, "leaf_nodes": 0,
+        "premises_pos": 0, "premises_neg": 1,
+        "theory_decisions": 0, "leaf_verifications": 0, "admissibility_checks": 1,
+        "certs_verified": 1, "certs_memo_hits": 0, "cert_tables_read": 2, "cert_rows_read": 2,
+        "join_steps_used": 1, "groundings_enumerated": 1,
+        "max_depth_reached": 1, "max_term_depth_reached": 1
+      }
     },
     {
       "name": "c3_support_ref_cites_missing_cert",
@@ -598,7 +616,16 @@
           }
         ]
       },
-      "outcome": { "reject": "cert_unsupported" }
+      "outcome": { "reject": "cert_unsupported" },
+      "report": {
+        "counters_version": 24,
+        "nodes_walked": 1, "rule_nodes": 1, "builtin_nodes": 0, "leaf_nodes": 0,
+        "premises_pos": 0, "premises_neg": 1,
+        "theory_decisions": 0, "leaf_verifications": 0, "admissibility_checks": 0,
+        "certs_verified": 1, "certs_memo_hits": 0, "cert_tables_read": "counted", "cert_rows_read": "counted",
+        "join_steps_used": "counted", "groundings_enumerated": "counted",
+        "max_depth_reached": 1, "max_term_depth_reached": 1
+      }
     },
     {
       "name": "cert_canonical_scope_duplicated",
@@ -2513,7 +2540,16 @@
           }
         ]
       },
-      "outcome": "accept"
+      "outcome": "accept",
+      "report": {
+        "counters_version": 24,
+        "nodes_walked": 1, "rule_nodes": 1, "builtin_nodes": 0, "leaf_nodes": 0,
+        "premises_pos": 0, "premises_neg": 1,
+        "theory_decisions": 2, "leaf_verifications": 0, "admissibility_checks": 1,
+        "certs_verified": 1, "certs_memo_hits": 0, "cert_tables_read": 2, "cert_rows_read": 2,
+        "join_steps_used": 2, "groundings_enumerated": 1,
+        "max_depth_reached": 1, "max_term_depth_reached": 1
+      }
     },
     {
       "name": "cert_budget_join_steps_under_declared",

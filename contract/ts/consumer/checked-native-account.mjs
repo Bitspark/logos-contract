@@ -30,11 +30,11 @@ const checks = [
 
 for (const [name, verify] of checks) {
   test(`${name} owns the final comparison with the caller's claim`, () => {
-    assert.equal(verify(attested, proofOf(attested)).kind, "accept");
-    assert.equal(verify(wrong, proofOf(attested)).code, "root_conclusion_mismatch");
+    assert.equal(verify(attested, proofOf(attested)).verdict.kind, "accept");
+    assert.equal(verify(wrong, proofOf(attested)).verdict.code, "root_conclusion_mismatch");
     let calls = 0;
     const proposed = { pred: attested.pred, args: attested.args, equals() { calls++; return true; } };
-    assert.equal(verify(wrong, proofOf(proposed)).kind, "reject");
+    assert.equal(verify(wrong, proofOf(proposed)).verdict.kind, "reject");
     assert.equal(calls, 0);
   });
 
@@ -42,7 +42,7 @@ for (const [name, verify] of checks) {
     const fake = Object.create(Atom.prototype);
     Object.defineProperty(fake, "equals", { value: () => assert.fail("called a producer equality method") });
     const forged = GroundLiteral.of("allowed", [new Tuple([fake])]);
-    assert.equal(verify(attested, proofOf(forged)).code, "unknown_node_kind");
+    assert.equal(verify(attested, proofOf(forged)).verdict.code, "unknown_node_kind");
   });
 
   test(`${name} reads the selected node array once and checks its indexed contents`, () => {
@@ -56,7 +56,7 @@ for (const [name, verify] of checks) {
       root: 0,
       closedWorld: [],
     };
-    assert.equal(verify(attested, proposal).kind, "accept");
+    assert.equal(verify(attested, proposal).verdict.kind, "accept");
     assert.equal(reads, 1);
   });
 }
@@ -71,14 +71,14 @@ test("whole-chain verification interprets the domain's actual values", () => {
     limitsDecl: { certFacts: 0, domainValues: 2, supportEdges: 0, ruleGroundings: 10, joinSteps: 10, certBytes: 4096 },
   })];
   const verify = domain => checkClosedModelChain(program, chain(domain), undefined, profile, bound);
-  assert.equal(verify(FiniteDomain.of(domainTag, [a])).kind, "accept");
+  assert.equal(verify(FiniteDomain.of(domainTag, [a])).verdict.kind, "accept");
   const duplicated = new FiniteDomain(domainTag, [a, a]);
   const expected = verify(duplicated);
-  assert.equal(expected.kind, "reject");
+  assert.equal(expected.verdict.kind, "reject");
   let calls = 0;
   class ClaimedCanonical extends FiniteDomain {
     isCanonical() { calls++; return true; }
   }
-  assert.deepEqual(verify(new ClaimedCanonical(domainTag, [a, a])), expected);
+  assert.deepEqual(verify(new ClaimedCanonical(domainTag, [a, a])).verdict, expected.verdict);
   assert.equal(calls, 0);
 });

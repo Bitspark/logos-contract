@@ -16,6 +16,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Bitspark/logos-contract/contract/go/completion"
 	core "github.com/bitspark/ontos/core/go"
 	data "github.com/bitspark/ontos/data/go"
 )
@@ -45,13 +46,12 @@ func adDeepOne(levels int) core.Value {
 	return e
 }
 
-func adDecide(pred string, lhs, rhs core.Value) TheoryOutcome {
-	return NewArithmeticTheory().Decide(NewGroundLiteral(pred, lhs, rhs))
+func adDecide(pred string, lhs, rhs core.Value) completion.TheoryGround {
+	return DecideGround(NewArithmeticTheory(), NewGroundLiteral(pred, lhs, rhs))
 }
 
-func adHolds(o TheoryOutcome) bool {
-	_, ok := o.(TheoryHolds)
-	return ok
+func adHolds(o completion.TheoryGround) bool {
+	return o == completion.TheoryGroundHolds()
 }
 
 // The theory decides a deep expression by its value, in both polarities.
@@ -60,7 +60,7 @@ func TestTheDeepExpressionIsDecidedByItsValue3123(t *testing.T) {
 	for _, d := range arithDepths {
 		for _, c := range []struct {
 			what string
-			got  TheoryOutcome
+			got  completion.TheoryGround
 			want bool
 		}{
 			{"1 =:= E holds", adDecide("=:=", adInt(1), adDeepOne(d.levels)), true},
@@ -104,14 +104,14 @@ func adVerdict(o Outcome) string {
 	if o.IsAccept() {
 		return "accept"
 	}
-	return o.Code().Code() + " (" + o.Detail() + ")"
+	return o.Verdict.Code().Code() + " (" + o.Verdict.Detail() + ")"
 }
 
 func adCode(o Outcome) string {
 	if o.IsAccept() {
 		return "accept"
 	}
-	return o.Code().Code()
+	return o.Verdict.Code().Code()
 }
 
 // adCheckBuiltin checks one Builtin node concluding pred(lhs, E) under limits.

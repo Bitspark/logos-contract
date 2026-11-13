@@ -13,7 +13,7 @@ use logos_contract::{
     CompleteProgram, Derivation, Evidence, FiniteDomain, Goal, GroundLiteral, Hash, LeafOutcome,
     LeafVerifier, MapProgram, Node, NodeMeta, NonMemberProof, Outcome, PredicateSet, Premise,
     RelationTable, StratumPrefix, Subst, SupportEdge, SupportRef, SupportWitness, Symbol, Term,
-    Theory, TheoryOutcome,
+    Theory, TheoryGround, Verdict,
 };
 use ontos_core::Value;
 use std::collections::BTreeMap;
@@ -32,17 +32,13 @@ impl Theory for LtTheory {
     fn owns(&self, pred: &Symbol) -> bool {
         pred.bytes() == b"lt"
     }
-    fn decide(&self, atom: &GroundLiteral) -> TheoryOutcome {
+    fn decide_ground(&self, atom: &GroundLiteral) -> TheoryGround {
         match atom.args.as_slice() {
             [a, b] => match (a.as_atom(), b.as_atom()) {
-                (Some(a), Some(b)) if a.bytes() < b.bytes() => TheoryOutcome::Holds,
-                _ => TheoryOutcome::Fails {
-                    code: "not_less_than".into(),
-                },
+                (Some(a), Some(b)) if a.bytes() < b.bytes() => TheoryGround::holds(),
+                _ => TheoryGround::fails("not_less_than"),
             },
-            _ => TheoryOutcome::Fails {
-                code: "lt_arity".into(),
-            },
+            _ => TheoryGround::fails("lt_arity"),
         }
     }
 }
@@ -259,14 +255,14 @@ fn run(program: &MapProgram, deriv: &Derivation) -> Outcome {
 }
 
 fn assert_reject(outcome: Outcome, expected: &str) {
-    match outcome {
-        Outcome::Reject { code, detail } => assert_eq!(
+    match outcome.verdict {
+        Verdict::Reject { code, detail } => assert_eq!(
             code.code(),
             expected,
             "expected {expected}, got {} ({detail})",
             code.code()
         ),
-        Outcome::Accept => panic!("expected reject {expected}, got Accept"),
+        Verdict::Accept => panic!("expected reject {expected}, got Accept"),
     }
 }
 
@@ -1920,15 +1916,15 @@ fn reject_non_canonical_domain_struct_literal() {
         values: vec![v("s2"), v("s1")],
     };
     let outcome = run(&base_program(), &permit_derivation(cert));
-    match outcome {
-        Outcome::Reject { code, detail } => {
+    match outcome.verdict {
+        Verdict::Reject { code, detail } => {
             assert_eq!(code.code(), "cert_out_of_domain", "wrong code ({detail})");
             assert!(
                 detail.contains("FiniteDomain::new"),
                 "detail must name the canonicalizing constructor, got: {detail}"
             );
         }
-        Outcome::Accept => panic!("expected reject, got Accept"),
+        Verdict::Accept => panic!("expected reject, got Accept"),
     }
 }
 
@@ -1956,8 +1952,8 @@ fn reject_non_canonical_scope_struct_literal() {
         predicates: vec![sym("revoked"), sym("denied")],
     };
     let outcome = run(&base_program(), &permit_derivation(cert));
-    match outcome {
-        Outcome::Reject { code, detail } => {
+    match outcome.verdict {
+        Verdict::Reject { code, detail } => {
             assert_eq!(
                 code.code(),
                 "cert_scope_incomplete",
@@ -1968,7 +1964,7 @@ fn reject_non_canonical_scope_struct_literal() {
                 "detail must name the canonicalizing constructor, got: {detail}"
             );
         }
-        Outcome::Accept => panic!("expected reject, got Accept"),
+        Verdict::Accept => panic!("expected reject, got Accept"),
     }
 }
 
@@ -1985,15 +1981,15 @@ fn reject_non_canonical_extension_rows_struct_literal() {
     };
     cert.limits_decl.cert_facts = 3;
     let outcome = run(&base_program(), &permit_derivation(cert));
-    match outcome {
-        Outcome::Reject { code, detail } => {
+    match outcome.verdict {
+        Verdict::Reject { code, detail } => {
             assert_eq!(code.code(), "cert_unsupported", "wrong code ({detail})");
             assert!(
                 detail.contains("RelationTable::new"),
                 "detail must name the canonicalizing constructor, got: {detail}"
             );
         }
-        Outcome::Accept => panic!("expected reject, got Accept"),
+        Verdict::Accept => panic!("expected reject, got Accept"),
     }
 }
 
@@ -2008,8 +2004,8 @@ fn reject_duplicated_scope_predicate_struct_literal() {
         predicates: vec![sym("denied"), sym("denied"), sym("revoked")],
     };
     let outcome = run(&base_program(), &permit_derivation(cert));
-    match outcome {
-        Outcome::Reject { code, detail } => {
+    match outcome.verdict {
+        Verdict::Reject { code, detail } => {
             assert_eq!(
                 code.code(),
                 "cert_scope_incomplete",
@@ -2020,7 +2016,7 @@ fn reject_duplicated_scope_predicate_struct_literal() {
                 "detail must name the canonicalizing constructor, got: {detail}"
             );
         }
-        Outcome::Accept => panic!("expected reject, got Accept"),
+        Verdict::Accept => panic!("expected reject, got Accept"),
     }
 }
 
@@ -2037,15 +2033,15 @@ fn reject_duplicated_extension_row_struct_literal() {
     };
     cert.limits_decl.cert_facts = 3;
     let outcome = run(&base_program(), &permit_derivation(cert));
-    match outcome {
-        Outcome::Reject { code, detail } => {
+    match outcome.verdict {
+        Verdict::Reject { code, detail } => {
             assert_eq!(code.code(), "cert_unsupported", "wrong code ({detail})");
             assert!(
                 detail.contains("RelationTable::new"),
                 "detail must name the canonicalizing constructor, got: {detail}"
             );
         }
-        Outcome::Accept => panic!("expected reject, got Accept"),
+        Verdict::Accept => panic!("expected reject, got Accept"),
     }
 }
 
@@ -2555,7 +2551,7 @@ mod world_memo_2565 {
         for _ in 0..5 {
             let outcome =
                 check_with_cert_memo(&program, &permit(), &deriv, &(), &prof, &cx, &mut memo);
-            assert_eq!(outcome, Outcome::Accept);
+            assert_eq!(outcome.verdict, Verdict::Accept);
         }
         assert_eq!(
             memo.certificates_verified(),
@@ -2572,7 +2568,7 @@ mod world_memo_2565 {
         let valid = permit_derivation(valid_cert());
         let mut memo = WorldMemo::new();
         let first = check_with_cert_memo(&program, &permit(), &valid, &(), &prof, &cx, &mut memo);
-        assert_eq!(first, Outcome::Accept);
+        assert_eq!(first.verdict, Verdict::Accept);
         // The control, exact: which single changes a fresh check rejects. The other two (a support
         // rank still above its premises', a size declaration above the real size) are changes the
         // checker ACCEPTS, and they must miss all the same: the memo keys on the certificate, never
@@ -2594,7 +2590,7 @@ mod world_memo_2565 {
                 "{what}: a changed certificate must miss"
             );
             assert_eq!(
-                expected != Outcome::Accept,
+                expected.verdict != Verdict::Accept,
                 rejecting.contains(&what),
                 "{what}: the control's expected verdict, {expected:?}"
             );
@@ -2602,8 +2598,8 @@ mod world_memo_2565 {
             let back =
                 check_with_cert_memo(&program, &permit(), &valid, &(), &prof, &cx, &mut memo);
             assert_eq!(
-                back,
-                Outcome::Accept,
+                back.verdict,
+                Verdict::Accept,
                 "{what}: the valid world after a mutation"
             );
         }
@@ -2641,22 +2637,25 @@ mod world_memo_2565 {
         let cx = bound_context(&program);
         let deriv = permit_derivation(valid_cert());
         // The control: the limits alone change the fresh verdict.
-        assert_eq!(fresh(&program, &prof, &permit(), &deriv), Outcome::Accept);
+        assert_eq!(
+            fresh(&program, &prof, &permit(), &deriv).verdict,
+            Verdict::Accept
+        );
         let tight_fresh = fresh(&program, &tight, &permit(), &deriv);
         assert_ne!(
-            tight_fresh,
-            Outcome::Accept,
+            tight_fresh.verdict,
+            Verdict::Accept,
             "the tighter limit must reject"
         );
 
         let mut memo = WorldMemo::new();
         let loose = check_with_cert_memo(&program, &permit(), &deriv, &(), &prof, &cx, &mut memo);
-        assert_eq!(loose, Outcome::Accept);
+        assert_eq!(loose.verdict, Verdict::Accept);
         let tightened =
             check_with_cert_memo(&program, &permit(), &deriv, &(), &tight, &cx, &mut memo);
         assert_eq!(tightened, tight_fresh);
         let again = check_with_cert_memo(&program, &permit(), &deriv, &(), &prof, &cx, &mut memo);
-        assert_eq!(again, Outcome::Accept);
+        assert_eq!(again.verdict, Verdict::Accept);
         assert_eq!(
             memo.certificates_verified(),
             3,
@@ -2702,8 +2701,8 @@ mod world_memo_2565 {
             assert_eq!(memoized, fresh(&program, &prof, claim, deriv), "step {i}");
         }
         assert_eq!(
-            fresh(&program, &prof, &grant, &positive),
-            Outcome::Accept,
+            fresh(&program, &prof, &grant, &positive).verdict,
+            Verdict::Accept,
             "the positive control accepts"
         );
         assert_eq!(

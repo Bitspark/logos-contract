@@ -32,7 +32,7 @@ import {
   Clause,
   Goal,
   Term,
-  type Subst,
+  Subst,
   GroundLiteral,
   type Symbol,
   Derivation,
@@ -45,8 +45,9 @@ import {
   MapProgram,
   type Theory,
   type LeafVerifier,
-  TheoryOutcome,
+  TheoryGround,
   LeafOutcome,
+  VarId,
 } from "../src/index.js";
 
 // A theory that owns nothing (this suite needs no builtins).
@@ -55,8 +56,8 @@ class NoReachTheory implements Theory {
   owns(_pred: Symbol): boolean {
     return false;
   }
-  decide(_atom: GroundLiteral): TheoryOutcome {
-    return TheoryOutcome.NotMine;
+  decideGround(_atom: GroundLiteral): TheoryGround {
+    return TheoryGround.disowned();
   }
 }
 
@@ -101,7 +102,7 @@ function v(s: string) {
  * appended as node [2]: present in the DAG, **cited by nothing, unreachable from root**.
  */
 function noReachDerivation(extra?: Node): Derivation {
-  const subst: Subst = new Map([["S", Term.atom(new TextEncoder().encode("s1"))]]);
+  const subst: Subst = new Subst([[VarId.of("S"), Term.atom(new TextEncoder().encode("s1"))]]);
   const nodes: Node[] = [
     new LeafNode(GroundLiteral.of("grant", [v("s1")]), Evidence.none()),
     new RuleNode(
@@ -119,8 +120,8 @@ function noReachDerivation(extra?: Node): Derivation {
 }
 
 function reject(out: Outcome): { code: string; detail: string } {
-  assert.equal(out.kind, "reject", `expected Reject, got ${JSON.stringify(out)}`);
-  return out as { kind: "reject"; code: string; detail: string };
+  assert.equal(out.verdict.kind, "reject", `expected Reject, got ${JSON.stringify(out)}`);
+  return out.verdict as { kind: "reject"; code: string; detail: string };
 }
 
 // Baseline: the two-node derivation (no extra node) accepts.
@@ -132,7 +133,7 @@ test("no-reachability: baseline without extra node accepts", () => {
     undefined,
     noReachProfile(),
   );
-  assert.equal(out.kind, "accept", `baseline must accept, got ${JSON.stringify(out)}`);
+  assert.equal(out.verdict.kind, "accept", `baseline must accept, got ${JSON.stringify(out)}`);
 });
 
 // THE FROZEN ABSENCE (obligation 6): a locally-valid extensional leaf the root never
@@ -149,7 +150,7 @@ test("no-reachability: locally-valid root-unreachable node accepts (§4 obligati
     noReachProfile(),
   );
   assert.equal(
-    out.kind,
+    out.verdict.kind,
     "accept",
     `a locally-valid, root-unreachable node must be neither rejected nor required ` +
       `(§4 obligation 6, frozen; thesmos CD-015 rests on this) — got ${JSON.stringify(out)}`,

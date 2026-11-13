@@ -5,6 +5,8 @@ import {
   ClauseId, ClosedModelCert, CountPremise, Derivation, GroundLiteral, PredicateRef,
   ProjectSpec, RuleNode, StratumPrefix, SupportEdge, SupportRef, Symbol, TermAtom,
   cloneDerivation,
+  Subst,
+  VarId,
 } from "@bitspark/logos-contract";
 
 test("a native proof copy retains opaque handles and detaches mutable proof and world data", () => {
@@ -13,7 +15,7 @@ test("a native proof copy retains opaque handles and detaches mutable proof and 
   const pred = new Symbol(bytes);
   const fact = GroundLiteral.of(pred, [new Atom(bytes)]);
   const id = ClauseId.of(String.fromCharCode(0xd800));
-  const answer = new Map([["X", term]]);
+  const answer = new Subst([[VarId.of("X"), term]]);
   const ref = SupportRef.sameStratum(fact, 0);
   const edge = new SupportEdge(fact, id, answer, [ref], 1);
   const hash = Buffer.alloc(32);
@@ -40,7 +42,7 @@ test("a native proof copy retains opaque handles and detaches mutable proof and 
   assert.ok(node?.kind === "rule");
   assert.equal(node.clause.asStr(), id.asStr());
   assert.deepEqual(node.conclusion.pred.bytes(), Uint8Array.of(97));
-  const copiedTerm = node.subst.get("X");
+  const copiedTerm = node.subst.get(VarId.of("X"));
   assert.ok(copiedTerm?.kind === "atom");
   assert.deepEqual(copiedTerm.bytes(), Uint8Array.of(97));
   const counted = node.premises[0];

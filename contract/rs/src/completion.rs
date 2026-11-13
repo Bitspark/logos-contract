@@ -3,19 +3,19 @@
 //!
 //! # Why this exists
 //!
-//! A decider that stops before it establishes a fact must not report that fact as false. Today
-//! [`TheoryOutcome`](crate::spi::TheoryOutcome) has no arm for "not decided", so a stop reads as
+//! A decider that stops before it establishes a fact must not report that fact as false. An answer
+//! with no arm for "not decided" (the checker SPI's v1 theory outcome had none) reads a stop as
 //! `Fails`, and under negation or in the closure check a stop turns into a false positive
 //! (research 0031; #3123 is the measured instance). This module is the vocabulary that keeps the
 //! three answers apart, and the combinators that compose them without losing the difference.
 //!
-//! It is additive. A theory reports "not decided" through
-//! [`Theory::decide_ground`](crate::spi::Theory::decide_ground), an additive method defaulted from
-//! the v1 `decide` (#3126, seat:caa's ruling of 2026-09-27): it returns a [`TheoryDecision`] inside
-//! a [`Completion`], and [`decision_of`] brings it into the algebra. ADR 0036 D8's checker SPI v2
-//! makes `decide_ground` required and deletes `decide` (ratified; #3124's delivery). The search
-//! report (#3162), the closure check and `check`'s builtin verification (#3165) read it. The shapes
-//! are PROPOSED until the ADR for research 0030 and 0031 (#3147) ratifies them.
+//! A theory reports "not decided" through
+//! [`Theory::decide_ground`](crate::spi::Theory::decide_ground) (#3126, seat:caa's ruling of
+//! 2026-09-27; required since checker SPI v2, ADR 0036 D8 change 3): it returns a
+//! [`TheoryGround`](crate::TheoryGround), a [`TheoryDecision`] inside a [`Completion`], and
+//! [`decision_of`] brings it into the algebra. The search report (#3162), the closure check and
+//! `check`'s builtin verification (#3165) read it. The shapes are PROPOSED until the ADR for
+//! research 0030 and 0031 (#3147) ratifies them.
 //!
 //! # The outcome
 //!
@@ -137,7 +137,11 @@ pub enum NonCompletionKind {
     /// routing.
     InconsistentTheory,
     /// A fault: an outcome value no constructor could have built (a Go zero value, a TypeScript
-    /// object of unknown kind). Rust cannot form one; the Go and TypeScript eliminators report it.
+    /// object of unknown kind), or a host's reply to a declared builtin that is not a value of the
+    /// reply type (bytes that are not a value, or a value that is not `Tuple[subst…]`): the host
+    /// broke its channel's contract (#2734 3e-iii, the logos coordinator's ruling on #2734). A reply
+    /// that is well-formed but nested past the reader's depth is NOT this fault: it is the
+    /// `ReplyUnreadable` stop, a capacity of the reader.
     MalformedOutcome,
 }
 
@@ -249,7 +253,8 @@ impl NonCompletion {
         }
     }
 
-    /// The fault that an outcome value is none a constructor could have built.
+    /// The fault that an outcome value is none a constructor could have built, or that a host's
+    /// reply is not a value of the reply type (#2734 3e-iii).
     pub fn malformed_outcome() -> Self {
         NonCompletion {
             kind: NonCompletionKind::MalformedOutcome,

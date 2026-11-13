@@ -5,6 +5,7 @@ import {
   AlwaysAdmit, CertContext, Clause, ClauseId, ClosedModelCert, Derivation, FiniteDomain,
   Goal, LeafOutcome, PredicateSet, RelationTable, RuleNode, StratumPrefix, Symbol, Term,
   asCompleteProgram, check, checkClosedModelChain, defaultLimits, newCompoundTheory, programDigest, programDigestOf,
+  Subst,
 } from "@bitspark/logos-contract";
 
 class Inventory {
@@ -26,8 +27,8 @@ test("a lookup-only program checks a cited positive clause", () => {
   const inventory = new Inventory([[id, Clause.fact(goal)]]);
   const lookup = { clause: key => inventory.clause(key) };
   const claim = goal.asGround();
-  const proof = new Derivation([new RuleNode(claim, id, new Map(), [])], 0);
-  assert.equal(check(lookup, claim, proof, undefined, profile).kind, "accept");
+  const proof = new Derivation([new RuleNode(claim, id, new Subst(), [])], 0);
+  assert.equal(check(lookup, claim, proof, undefined, profile).verdict.kind, "accept");
   assert.equal(asCompleteProgram(lookup), undefined);
   assert.throws(() => programDigestOf(lookup), TypeError);
 });
@@ -71,7 +72,7 @@ test("closure distinguishes unavailable, complete empty and an uncited defining 
     [withFact, programDigestOf(withFact), "cert_not_closed"],
   ]) {
     const { bound, cert } = emptyCertificate(hash);
-    const result = checkClosedModelChain(program, [cert], undefined, profile, bound);
+    const result = checkClosedModelChain(program, [cert], undefined, profile, bound).verdict;
     assert.equal(result.kind === "accept" ? result.kind : result.code, expected, result.detail);
   }
 });
@@ -92,7 +93,7 @@ test("a complete program supplies one inventory to a certificate chain and a fre
   });
   const { cert, bound } = emptyCertificate(programDigest([]));
   for (let call = 1; call <= 2; call++) {
-    const result = checkClosedModelChain(inventory, [cert, cert], undefined, profile, bound);
+    const result = checkClosedModelChain(inventory, [cert, cert], undefined, profile, bound).verdict;
     assert.equal(result.kind, "accept", result.detail);
     assert.equal(selections, call);
     assert.equal(visits, call);

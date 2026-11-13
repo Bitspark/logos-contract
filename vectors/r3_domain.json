@@ -22,6 +22,14 @@
     },
     {
       "cases": [
+        "counting_two_derivations_are_summed",
+        "tropical_over_a_cycle_converges_and_names_its_law",
+        "the_fold_follows_the_canonical_grounding_order"
+      ],
+      "file": "annotated_closed_model.json"
+    },
+    {
+      "cases": [
         "anonymous_positions_are_fresh",
         "control_a_named_repeat_still_shares"
       ],

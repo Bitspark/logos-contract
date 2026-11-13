@@ -63,7 +63,7 @@ func TestTextTheoryVectorDecisions(t *testing.T) {
 			args = append(args, buildArg(t, a))
 		}
 		atom := GroundLiteral{Pred: SymbolFromString(d.Pred), Args: args}
-		expectOutcome(t, d.Name, d.Outcome, DecideGround(theory, atom), theory.Decide(atom))
+		expectOutcome(t, d.Name, d.Outcome, DecideGround(theory, atom))
 	}
 }
 

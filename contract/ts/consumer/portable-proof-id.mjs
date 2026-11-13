@@ -8,6 +8,7 @@ import {
   checkClosedModelChain, checkWithWorldMemo, closedModelCertAsValue, decodeDerivationWireV1,
   defaultLimits, derivationAsValue, derivationWirePayloadV1ToValue, derivationWireV1ToValue,
   encodeDerivationWireV1, newStandardTheory, programDigestOf,
+  Subst,
 } from "@bitspark/logos-contract";
 
 const a = new Atom([97]);
@@ -29,13 +30,13 @@ function evidence(handle) {
     ...context, scope: StratumPrefix.of(0, [claim.pred]),
     domains: [FiniteDomain.of(Symbol.of("domain"), [a])],
     extensions: [RelationTable.of(claim.pred, 1, [claim])],
-    supports: [new SupportEdge(claim, id, new Map(), [], 0)], edbSnapshotHashes: [],
+    supports: [new SupportEdge(claim, id, new Subst(), [], 0)], edbSnapshotHashes: [],
     limitsDecl: { certFacts: 4, domainValues: 4, supportEdges: 4, ruleGroundings: 20, joinSteps: 20, certBytes: 8192 },
   });
   const cert = new ClosedModelCert({
     ...declaration, limitsDecl: { ...declaration.limitsDecl, certBytes: certEncodedBytes(declaration) },
   });
-  const proof = (id, world) => new Derivation([new RuleNode(claim, id, new Map(), [])], 0, world);
+  const proof = (id, world) => new Derivation([new RuleNode(claim, id, new Subst(), [])], 0, world);
   return { program, context, cert, rule: proof(id, []), support: proof(portable, [cert]) };
 }
 
@@ -57,13 +58,13 @@ test("portable rule and support handles round-trip as exact Unicode text", () =>
 test("native rule and support checking retain a nonportable handle", () => {
   for (const handle of ["A\ud800", "A\udc00"]) {
     const { program, context, rule, support, cert } = evidence(handle);
-    assert.equal(check(program, claim, rule, undefined, profile).kind, "accept");
-    assert.equal(checkClosedModelChain(program, [cert], undefined, profile, context).kind, "accept");
+    assert.equal(check(program, claim, rule, undefined, profile).verdict.kind, "accept");
+    assert.equal(checkClosedModelChain(program, [cert], undefined, profile, context).verdict.kind, "accept");
     const under = new ClosedModelCert({ ...cert, limitsDecl: { ...cert.limitsDecl, certBytes: cert.limitsDecl.certBytes - 1 } });
-    assert.equal(checkClosedModelChain(program, [under], undefined, profile, context).code, "cert_decl_mismatch");
+    assert.equal(checkClosedModelChain(program, [under], undefined, profile, context).verdict.code, "cert_decl_mismatch");
     const memo = new WorldMemo(program, profile, undefined, context);
-    assert.equal(checkWithWorldMemo(memo, claim, support).kind, "accept");
-    assert.equal(checkWithWorldMemo(memo, claim, support).kind, "accept");
+    assert.equal(checkWithWorldMemo(memo, claim, support).verdict.kind, "accept");
+    assert.equal(checkWithWorldMemo(memo, claim, support).verdict.kind, "accept");
     assert.equal(memo.certificatesVerified, 1);
     assert.ok(certEncodedBytes(cert) > 0);
 

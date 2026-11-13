@@ -18,7 +18,7 @@
  *   - §2a  reify.ts       — quote, reify
  *   - §3   derivation.ts  — Derivation, Node {Rule, Builtin, Leaf}, NodeMeta, Evidence (opaque)
  *   - §5/§5a/§6 spi.ts    — Theory, RuleAdmissibility, LeafVerifier, PredicateSet
- *   - §4   check.ts       — check(), Outcome, RejectionCode (the 15 stable code strings)
+ *   - §4   check.ts       — check(), Outcome (Verdict + CheckReport), RejectionCode (the 15 stable code strings)
  *
  * The rejection-code STRINGS and every vector outcome are byte-identical to Rust
  * — this is trust-critical parity code (it is what arche's BROWSER checker binds).
@@ -57,9 +57,17 @@ export * from "./text.js";
 export * from "./term_theory.js";
 export * from "./list_theory.js";
 export * from "./compound.js";
+export * from "./semiring.js";
+export * from "./semiring_decimal.js";
+export * from "./semiring_product.js";
+export * from "./semiring_provenance.js";
 export { CertContext, checkClosedModelChain, programDigestOf } from "./cert_check.js";
+// ADR 0031 D5 (#1821 P9 I5a): the annotated closed-model certificate and its check. [PROPOSED]
+export * from "./annotated_cert.js";
+export * from "./annotated_check.js";
 export * from "./fragment.js";
 export * from "./check.js";
+export { CHECK_REPORT_COUNTERS_VERSION, CheckReport, ReportCount } from "./check_report.js";
 export * from "./prelude.js";
 // The completion algebra (research 0031 row 15), PROPOSED: a namespace, since its not/and/or are
 // generic names that would collide at the top level.

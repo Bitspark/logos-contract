@@ -16,7 +16,7 @@ import { fileURLToPath } from "node:url";
 import { atom, tuple, type Value } from "@bitspark/ontos-core";
 import { encodeInt, encodeList } from "@bitspark/ontos-data";
 
-import { GroundLiteral, Symbol, ListTheory, type TheoryOutcome } from "../src/index.js";
+import { GroundLiteral, Symbol, ListTheory, TheoryGround } from "../src/index.js";
 
 // ----- the on-disk vector shape -----
 
@@ -79,11 +79,11 @@ function buildArg(raw: unknown): Value {
 }
 
 // expectOutcome decodes the pinned outcome ("holds" | {"fails": "<code>"}) and asserts the
-// actual TheoryOutcome matches it judgment-for-judgment.
-function expectOutcome(name: string, raw: unknown, got: TheoryOutcome): void {
+// actual TheoryGround matches it judgment-for-judgment.
+function expectOutcome(name: string, raw: unknown, got: TheoryGround): void {
   if (typeof raw === "string") {
     assert.equal(raw, "holds", `${name}: unknown string outcome ${JSON.stringify(raw)}`);
-    assert.equal(got.kind, "holds", `${name}: want Holds, got ${JSON.stringify(got)}`);
+    assert.deepEqual(got, TheoryGround.holds(), `${name}: want Holds, got ${JSON.stringify(got)}`);
     return;
   }
   const fails = (raw as { fails?: unknown })?.fails;
@@ -92,10 +92,11 @@ function expectOutcome(name: string, raw: unknown, got: TheoryOutcome): void {
     true,
     `${name}: outcome is neither "holds" nor {"fails": code}: ${JSON.stringify(raw)}`,
   );
-  assert.equal(got.kind, "fails", `${name}: want Fails{${String(fails)}}, got ${JSON.stringify(got)}`);
-  if (got.kind === "fails") {
-    assert.equal(got.code, fails, `${name}: want fail code ${String(fails)}, got ${got.code}`);
-  }
+  assert.deepEqual(
+    got,
+    TheoryGround.fails(String(fails)),
+    `${name}: want Fails{${String(fails)}}, got ${JSON.stringify(got)}`,
+  );
 }
 
 // ----- the replay -----
@@ -106,7 +107,7 @@ test("ListTheory reproduces every pinned vector decision byte-for-byte", () => {
   assert.equal(vf.decisions.length > 0, true, "no decision vectors loaded");
   for (const d of vf.decisions) {
     const args = d.args.map(buildArg);
-    const got = theory.decide(GroundLiteral.of(d.pred, args));
+    const got = theory.decideGround(GroundLiteral.of(d.pred, args));
     expectOutcome(d.name, d.outcome, got);
   }
 });

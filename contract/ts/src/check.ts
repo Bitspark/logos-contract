@@ -11,27 +11,22 @@ import {
 } from "./derivation.js";
 import { type GroundLiteral, type Goal, type Symbol as PredicateSymbol } from "./literal.js";
 import { type Program } from "./program.js";
-import {
-  ComponentIdentity,
-  decideGround,
-  type LeafVerifier,
-  type RuleAdmissibility,
-  type Theory,
-} from "./spi.js";
+import { ComponentIdentity, type LeafVerifier, type RuleAdmissibility, type Theory } from "./spi.js";
 import { isDisowned, readGround } from "./ground_reading.js";
-import { Term, valueDepthLe, MAX_TERM_DEPTH_DEFAULT } from "./term.js";
+import { Term, MAX_TERM_DEPTH_DEFAULT } from "./term.js";
 import { captureCertContext, captureDerivation } from "./capture.js";
+import { type CheckReport, Tally } from "./check_report.js";
 import { copyArray } from "./native_copy.js";
 import {
   CertContext,
   type CertStatus,
-  checkCertTermDepths,
   equalGroundFilter,
   projectEquals,
   verifyWorld,
   verifyCountPremise,
   verifyNegPremise,
 } from "./cert_check.js";
+import { checkCertTermDepths } from "./cert_depth.js";
 import type { ClosedModelCert } from "./cert.js";
 import { nativeCertificateKey } from "./wire_sink.js";
 
@@ -142,42 +137,55 @@ export function isStructural(code: RejectionCode): boolean {
   );
 }
 
-/** The result of `check`. */
-export type Outcome =
+/** What `check` decided: accept, or reject with a code and its diagnostic detail. rs `Verdict`. */
+export type Verdict =
   | { readonly kind: "accept" }
   | { readonly kind: "reject"; readonly code: RejectionCode; readonly detail: string };
 
-export const Outcome = Object.freeze({
-  Accept: Object.freeze({ kind: "accept" } as const satisfies Outcome),
-  reject(code: RejectionCode, detail: string): Outcome {
+export const Verdict = Object.freeze({
+  Accept: Object.freeze({ kind: "accept" } as const satisfies Verdict),
+  reject(code: RejectionCode, detail: string): Verdict {
     return { kind: "reject", code, detail };
   },
+  isAccept(v: Verdict): boolean {
+    return v.kind === "accept";
+  },
+  /** Two verdicts are equal when their kinds, codes and details are (rs `Verdict`'s equality). */
+  equals(a: Verdict, b: Verdict): boolean {
+    if (a.kind === "accept" || b.kind === "accept") return a.kind === b.kind;
+    return a.code === b.code && a.detail === b.detail;
+  },
+});
+
+/**
+ * The result of `check` (checker SPI v2, ADR 0036 D8 change 5, #3111): its `verdict`, and the
+ * `report` of the work it performed. rs `Outcome`.
+ *
+ * **Equality is the verdict's.** Two outcomes are equal (`Outcome.equals`) when their verdicts are,
+ * whatever their reports say, so a counter can never turn a verdict test red (the coordinator's
+ * ruling of 2026-11-12). Read `report` where the work is asked about.
+ */
+export type Outcome = {
+  readonly verdict: Verdict;
+  readonly report: CheckReport;
+};
+
+export const Outcome = Object.freeze({
   isAccept(o: Outcome): boolean {
-    return o.kind === "accept";
+    return o.verdict.kind === "accept";
+  },
+  /** Verdict-only equality: rs `Outcome`'s `PartialEq`, which compares the verdicts alone. */
+  equals(a: Outcome, b: Outcome): boolean {
+    return Verdict.equals(a.verdict, b.verdict);
   },
 });
 
 
 /**
- * The TERM IDENTITY (#2226, §4.3). **INERT since #3022** (seat:caa's ruling on #3037): `check`
- * ignores it and compares every site structurally, and the check-profile digest does not fold it,
- * so two profiles that differ only here give identical verdicts and share one digest. Pinned inert
- * by `vectors/exact_claims.json`, which the conformance harness drives under each identity, and by
- * the completeness gate's `exact_answer_set` test under each identity.
- *
- * It is slated for DELETION in #3022's step 5: out of `CheckLimits` (ADR 0035 D1) and its pins out
- * of the negotiation wire. It does not move to the representation axis: how a list is spelled on
- * display is the consumer's rendering choice, not a property of what is certified.
- *
- * - `reify_lists`: the default tag (#159). Inert, as is `exact`.
- * - `exact`: the other tag (#2226). Inert: `check` gives the verdict it gives under the default.
- */
-export type TermIdentity = "reify_lists" | "exact";
-
-/**
- * The checker's BEHAVIOUR PARAMETERS (§4.3): budgets on the untrusted supplied derivation, plus
- * the INERT `termIdentity`. The budgets bound proof size on verify, and the node cap is a hard,
- * deterministic rejection checked before any node delegation.
+ * The checker's BEHAVIOUR PARAMETERS (§4.3): budgets on the untrusted supplied derivation.
+ * (Checker SPI v2, ADR 0036 D8 change 1, #3111: the inert term identity is deleted.) The budgets
+ * bound proof size on verify, and the node cap is a hard, deterministic rejection checked before
+ * any node delegation.
  */
 export interface CheckLimits {
   /** Max total node count (`> maxNodes` → `too_many_nodes`). */
@@ -214,11 +222,6 @@ export interface CheckLimits {
    * body literal, #1829); tripped incrementally during the scan.
    */
   readonly maxJoinSteps: number;
-  /**
-   * INERT (#3022): `check` ignores it and the check-profile digest does not fold it. Absent means
-   * `reify_lists`. Slated for deletion in #3022's step 5 (ADR 0035 D1); see `TermIdentity`.
-   */
-  readonly termIdentity?: TermIdentity;
 }
 
 /**
@@ -231,8 +234,8 @@ export interface CheckLimits {
 /**
  * Every budget a caller can raise (#2733, R3), each as the key a vector case's `limits` uses and
  * the field that holds it: the one list of the checker's budgets, which every reader takes rather
- * than keeping its own. `termIdentity` is not a budget. `UnlistedBudget` below fails to compile
- * when a field of `CheckLimits` is neither listed here nor `termIdentity`.
+ * than keeping its own. `UnlistedBudget` below fails to compile when a field of `CheckLimits` is
+ * not listed here.
  */
 export const CHECK_BUDGETS = [
   ["max_nodes", "maxNodes"],
@@ -248,7 +251,7 @@ export const CHECK_BUDGETS = [
 for (const pair of CHECK_BUDGETS) Object.freeze(pair);
 Object.freeze(CHECK_BUDGETS);
 
-type UnlistedBudget = Exclude<keyof CheckLimits, (typeof CHECK_BUDGETS)[number][1] | "termIdentity">;
+type UnlistedBudget = Exclude<keyof CheckLimits, (typeof CHECK_BUDGETS)[number][1]>;
 const everyBudgetIsListed: [UnlistedBudget] extends [never] ? true : never = true;
 void everyBudgetIsListed;
 
@@ -296,10 +299,7 @@ export function captureProofBudgets(limits: ProofBudgets, overrides?: Partial<Pr
 /** Capture the effective native limits. Replacement fields take precedence without
  * consulting the original getters for those fields. Each retained value is read once. */
 export function captureCheckLimits(limits: CheckLimits, overrides?: Partial<CheckLimits>): CheckPolicyResult<CheckLimits> {
-  const counts = captureProofBudgets(limits, overrides);
-  if (!counts.ok) return counts;
-  const termIdentity = overrides !== undefined && "termIdentity" in overrides ? overrides.termIdentity : limits.termIdentity;
-  return termIdentity === undefined ? counts : { ok: true, value: Object.freeze({ ...counts.value, termIdentity }) };
+  return captureProofBudgets(limits, overrides);
 }
 
 export function defaultLimits(): CheckLimits {
@@ -313,7 +313,6 @@ export function defaultLimits(): CheckLimits {
     maxSupportEdges: 1_000_000,
     maxRuleGroundings: 10_000_000,
     maxJoinSteps: 100_000_000,
-    termIdentity: "reify_lists",
   };
 }
 
@@ -446,19 +445,22 @@ export function checkWithCertContext<C>(
   profile: CheckProfile<C>,
   certContext: CertContext,
 ): Outcome {
+  // #3111: one tally per check, threaded through it. A refusal before the walk (the profile and
+  // derivation capture, the limits, an empty derivation, the node cap, the root range) reports zeros.
+  const tally = new Tally();
   const bound = captureCheckProfile(profile);
-  if (!bound.ok) return { kind: "reject", code: "invalid_check_limits", detail: bound.error.message };
+  if (!bound.ok) return tally.outcome(Verdict.reject("invalid_check_limits", bound.error.message));
   profile = bound.value;
   const captured = captureDerivation(proposal, profile.limits);
-  if (captured.kind === "reject") return captured;
+  if (captured.kind === "reject") return tally.outcome(captured);
   const deriv = captured.value;
   if (deriv.closedWorld.length > 0) certContext = captureCertContext(certContext);
-  const early = derivationPrechecks(program, claim, deriv, profile);
+  const early = derivationPrechecks(program, claim, deriv, profile, tally);
   if (early !== undefined) {
-    return early;
+    return tally.outcome(early);
   }
-  const certStatus = verifyWorld(deriv.closedWorld, program, profile, ctx, certContext);
-  return checkNodes(program, claim, deriv, ctx, profile, certStatus);
+  const certStatus = verifyWorld(deriv.closedWorld, program, profile, ctx, certContext, tally);
+  return tally.outcome(checkNodes(program, claim, deriv, ctx, profile, certStatus, tally));
 }
 
 const runBoundCheck = Symbol("check under the bound inputs");
@@ -512,13 +514,19 @@ export class WorldMemo<C> {
   /**
    * The statuses of `world`: from the slot on a hit, verified and stored on a miss. An EMPTY world
    * (a positive derivation) needs no verification and does not touch the slot.
+   *
+   * The calling check's `tally` counts a hit's certificates as `certsMemoHits`, and a miss's
+   * verification as that check's own work (#3111).
    */
-  #statuses(world: readonly ClosedModelCert[], profile: CheckProfile<C>): readonly CertStatus[] {
+  #statuses(world: readonly ClosedModelCert[], profile: CheckProfile<C>, tally: Tally): readonly CertStatus[] {
     if (world.length === 0) {
       return [];
     }
-    if (!this.#hit(world, profile.limits)) {
-      const status = verifyWorld(world, this.program, profile, this.ctx, this.#certContext);
+    if (this.#hit(world, profile.limits)) {
+      // certsMemoHits: every certificate of the world, served instead of verified.
+      tally.certsMemoHits += world.length;
+    } else {
+      const status = verifyWorld(world, this.program, profile, this.ctx, this.#certContext, tally);
       this.#keys = world.map(nativeCertificateKey);
       this.#status = status;
       this.#limits = profile.limits;
@@ -539,23 +547,24 @@ export class WorldMemo<C> {
 
   static [runBoundCheck]<C>(memo: WorldMemo<C>, claim: GroundLiteral, proposal: Derivation): Outcome {
     if (!(#keys in memo)) throw new TypeError("checking requires a bound WorldMemo");
+    const tally = new Tally();
     const bound = captureCheckProfile(memo.profile);
-    if (!bound.ok) return { kind: "reject", code: "invalid_check_limits", detail: bound.error.message };
+    if (!bound.ok) return tally.outcome(Verdict.reject("invalid_check_limits", bound.error.message));
     const profile = bound.value;
     const captured = captureDerivation(proposal, profile.limits);
-    if (captured.kind === "reject") return captured;
+    if (captured.kind === "reject") return tally.outcome(captured);
     const deriv = captured.value;
-    const early = derivationPrechecks(memo.program, claim, deriv, profile);
-    if (early !== undefined) return early;
-    const statuses = memo.#statuses(deriv.closedWorld, profile);
-    return checkNodes(memo.program, claim, deriv, memo.ctx, profile, statuses);
+    const early = derivationPrechecks(memo.program, claim, deriv, profile, tally);
+    if (early !== undefined) return tally.outcome(early);
+    const statuses = memo.#statuses(deriv.closedWorld, profile, tally);
+    return tally.outcome(checkNodes(memo.program, claim, deriv, memo.ctx, profile, statuses, tally));
   }
 }
 const checkBoundWorld = WorldMemo[runBoundCheck];
 
 /** Every field of two `CheckLimits`, compared by value. */
 function sameLimits(a: CheckLimits, b: CheckLimits): boolean {
-  return a.termIdentity === b.termIdentity && CHECK_BUDGETS.every(([, key]) => a[key] === b[key]);
+  return CHECK_BUDGETS.every(([, key]) => a[key] === b[key]);
 }
 
 /**
@@ -573,7 +582,9 @@ function derivationPrechecks<C>(
   claim: GroundLiteral,
   deriv: Derivation,
   profile: CheckProfile<C>,
-): Outcome | undefined {
+  tally: Tally,
+): Verdict | undefined {
+  // Only step 3b counts work (`maxTermDepthReached`): every depth it measures goes into `tally`.
   // 3b. TERM-NESTING DEPTH CAP (issue #253) — BEFORE any recursive term traversal
   //     (cert verification in 3a, the forward pass in 4, the root `equals` in 5). A
   //     single term can nest arbitrarily deep within one node, which neither the node
@@ -583,13 +594,13 @@ function derivationPrechecks<C>(
   //     checking the depth of a deep term does not itself overflow. Over → term_too_deep
   //     (graceful rejection, never a RangeError crash).
   {
-    const result = checkTermDepths(program, claim, deriv, profile.limits);
+    const result = checkTermDepths(program, claim, deriv, profile.limits, tally);
     if (result.kind !== "accept") {
       return result;
     }
     // The cert-deep term-depth check (cert extension rows / domains / support edges /
     // Neg-premise atoms). No-op for an all-positive derivation (closedWorld empty).
-    const certDepth = checkCertTermDepths(deriv, profile.limits.maxTermDepth);
+    const certDepth = checkCertTermDepths(deriv, profile.limits.maxTermDepth, tally);
     if (certDepth.kind !== "accept") {
       return certDepth;
     }
@@ -605,12 +616,13 @@ function checkNodes<C>(
   ctx: C,
   profile: CheckProfile<C>,
   certStatus: readonly CertStatus[],
-): Outcome {
+  tally: Tally,
+): Verdict {
   // 4. one forward pass: validate each node (structural, then delegate).
   const depth = new Array<number>(deriv.nodes.length).fill(0);
   for (let i = 0; i < deriv.nodes.length; i += 1) {
     const node = deriv.nodes[i]!;
-    const result = checkNode(i, node, program, deriv, ctx, profile, depth, certStatus);
+    const result = checkNode(i, node, program, deriv, ctx, profile, depth, certStatus, tally);
     if (result.kind !== "accept") {
       return result;
     }
@@ -619,10 +631,10 @@ function checkNodes<C>(
   // 5. root concludes the claim, structurally (#3022): the certified claim is exactly the fact
   //    the root proves, never another spelling of it.
   if (!deriv.nodes[deriv.root]!.conclusion.equals(claim)) {
-    return Outcome.reject("root_conclusion_mismatch", "root conclusion does not equal claim");
+    return Verdict.reject("root_conclusion_mismatch", "root conclusion does not equal claim");
   }
 
-  return Outcome.Accept;
+  return Verdict.Accept;
 }
 
 /**
@@ -630,62 +642,63 @@ function checkNodes<C>(
  * cutoff, that no term the trusted path will traverse recursively nests deeper than
  * `limits.maxTermDepth`. Covers the claim's args, every node's conclusion args + (for a
  * Rule) its subst image terms, and every cited clause's head + body-literal args.
- * Returns `Outcome.Accept` when every term is within bound, else a `term_too_deep`
- * rejection. Each `*depthLe` call is itself non-recursive and cuts off at the bound,
- * so this gate's own cost is bounded by `maxTermDepth`, not by the (unbounded) depth of
- * a pathological term.
+ * Returns `Verdict.Accept` when every term is within bound, else a `term_too_deep`
+ * rejection. Each measurement (`Term.depthLe`'s walk) is itself non-recursive and cuts off at
+ * the bound, so this gate's own cost is bounded by `maxTermDepth`, not by the (unbounded) depth
+ * of a pathological term. Every depth it measures goes into `tally` (`maxTermDepthReached`).
  */
 function checkTermDepths(
   program: Program,
   claim: GroundLiteral,
   deriv: Derivation,
   limits: CheckLimits,
-): Outcome {
+  tally: Tally,
+): Verdict {
   const max = limits.maxTermDepth;
-  const tooDeep = (what: string): Outcome =>
-    Outcome.reject("term_too_deep", `${what} nests deeper than max_term_depth ${max}`);
+  const tooDeep = (what: string): Verdict =>
+    Verdict.reject("term_too_deep", `${what} nests deeper than max_term_depth ${max}`);
   // (a) the claim.
-  if (!groundWithin(claim, max)) return tooDeep("claim argument");
+  if (!groundWithin(claim, max, tally)) return tooDeep("claim argument");
   // (b) every node conclusion + (for Rule) subst images, and every cited clause.
   for (const node of deriv.nodes) {
-    if (!groundWithin(node.conclusion, max)) return tooDeep("node conclusion argument");
+    if (!groundWithin(node.conclusion, max, tally)) return tooDeep("node conclusion argument");
     if (node.kind === "rule") {
       for (const term of node.subst.values()) {
-        if (!Term.depthLe(term, max)) return tooDeep("subst image term");
+        if (!tally.termWithin(term, max)) return tooDeep("subst image term");
       }
       // A missing clause is the structural unknown_clause error raised later in the
       // forward pass; here we only depth-check a clause that exists.
       const clause = program.clause(node.clause);
       if (clause !== undefined) {
-        if (!goalWithin(clause.head, max)) return tooDeep("cited clause head argument");
+        if (!goalWithin(clause.head, max, tally)) return tooDeep("cited clause head argument");
         for (const bl of clause.body) {
           if (bl.isCount()) {
             // A count body literal has no single Goal: depth-check its filter terms + count slot.
             for (const e of bl.countLit!.filter) {
-              if (!Term.depthLe(e.term, max)) return tooDeep("cited clause count filter term");
+              if (!tally.termWithin(e.term, max)) return tooDeep("cited clause count filter term");
             }
-            if (!Term.depthLe(bl.countLit!.count, max)) return tooDeep("cited clause count slot term");
+            if (!tally.termWithin(bl.countLit!.count, max)) return tooDeep("cited clause count slot term");
             continue;
           }
           // Non-null: the count arm above covers the only inner-less form.
-          if (!goalWithin(bl.asInner()!, max)) {
+          if (!goalWithin(bl.asInner()!, max, tally)) {
             return tooDeep("cited clause body-literal argument");
           }
         }
       }
     }
   }
-  return Outcome.Accept;
+  return Verdict.Accept;
 }
 
-/** Every argument of a GroundLiteral nests within `max` (iterative cutoff). */
-function groundWithin(lit: GroundLiteral, max: number): boolean {
-  return lit.args.every((v) => valueDepthLe(v, max));
+/** Every argument of a GroundLiteral nests within `max` (iterative cutoff), each measured into `tally`. */
+function groundWithin(lit: GroundLiteral, max: number, tally: Tally): boolean {
+  return lit.args.every((v) => tally.valueWithin(v, max));
 }
 
-/** Every argument term of a Goal nests within `max`. */
-function goalWithin(goal: Goal, max: number): boolean {
-  return goal.args.every((t) => Term.depthLe(t, max));
+/** Every argument term of a Goal nests within `max`, each measured into `tally`. */
+function goalWithin(goal: Goal, max: number, tally: Tally): boolean {
+  return goal.args.every((t) => tally.termWithin(t, max));
 }
 
 function checkNode<C>(
@@ -697,20 +710,26 @@ function checkNode<C>(
   profile: CheckProfile<C>,
   depth: number[],
   certStatus: readonly CertStatus[],
-): Outcome {
+  tally: Tally,
+): Verdict {
+  // nodesWalked: the walk begins this node, before any of its checks (a node that then rejects
+  // counts). Its kind is counted first thing in its arm below.
+  tally.nodesWalked += 1;
   switch (node.kind) {
     case "rule": {
+      // ruleNodes
+      tally.ruleNodes += 1;
       // (a) cited clause exists.
       const clause = program.clause(node.clause);
       if (clause === undefined) {
-        return Outcome.reject("unknown_clause", `no clause for id "${node.clause.asStr()}"`);
+        return Verdict.reject("unknown_clause", `no clause for id "${node.clause.asStr()}"`);
       }
       // (b) positive premise indices reference strictly earlier nodes (acyclic DAG). A
       //     Neg / Count premise carries no node index — it is a checked cert side-condition,
       //     validated in (f).
       for (const p of node.premises) {
         if (typeof p === "number" && p >= i) {
-          return Outcome.reject("bad_dependency_order", `premise ${p} not < node ${i}`);
+          return Verdict.reject("bad_dependency_order", `premise ${p} not < node ${i}`);
         }
       }
       // (c) depth (positive premises are < i, so already computed); cap → too_deep. A
@@ -722,8 +741,10 @@ function checkNode<C>(
         if (d > maxPremiseDepth) maxPremiseDepth = d;
       }
       depth[i] = maxPremiseDepth + 1;
+      // maxDepthReached: the depth compared against maxDepth, a tripping one included.
+      tally.reachDepth(depth[i]!);
       if (depth[i]! > profile.limits.maxDepth) {
-        return Outcome.reject(
+        return Verdict.reject(
           "too_deep",
           `depth ${depth[i]} exceeds max_depth ${profile.limits.maxDepth}`,
         );
@@ -731,15 +752,15 @@ function checkNode<C>(
       // (d) subst applied to the head is ground and equals the conclusion.
       const head = clause.head.substitute(node.subst).asGround();
       if (head === undefined) {
-        return Outcome.reject("instantiation_mismatch", "clause head not ground under subst");
+        return Verdict.reject("instantiation_mismatch", "clause head not ground under subst");
       }
       // Structural (#3022): a conclusion is never a relabeling of the instantiated head.
       if (!head.equals(node.conclusion)) {
-        return Outcome.reject("instantiation_mismatch", "instantiated head != conclusion");
+        return Verdict.reject("instantiation_mismatch", "instantiated head != conclusion");
       }
       // (e) one premise per body literal.
       if (node.premises.length !== clause.body.length) {
-        return Outcome.reject(
+        return Verdict.reject(
           "instantiation_mismatch",
           `premise count ${node.premises.length} != body length ${clause.body.length}`,
         );
@@ -756,12 +777,15 @@ function checkNode<C>(
       //     clauses now holds for every clause by construction.
       for (let k = 0; k < clause.body.length; k += 1) {
         const bodyLit = clause.body[k]!;
+        // premisesPos / premisesNeg: (f) begins examining premise k, counted by its own kind (a
+        // count premise is positive) before any of its checks.
+        tally.premise(node.premises[k]!);
         // A Count body literal has no single underlying Goal (asInner() is null), so
         // branch on it BEFORE computing the Pos/Neg `expected` grounding.
         if (bodyLit.isCount()) {
           const premise = node.premises[k]!;
           if (!isCountPremise(premise)) {
-            return Outcome.reject("instantiation_mismatch", `premise ${k} polarity != body literal ${k} polarity`);
+            return Verdict.reject("instantiation_mismatch", `premise ${k} polarity != body literal ${k} polarity`);
           }
           // The grounded count body literal must agree with the premise's
           // pred/filter/project/k (positional + value agreement) before re-deriving the count.
@@ -778,7 +802,7 @@ function checkNode<C>(
           }
           const gCount = Term.eraseGround(gc.count);
           if (!groundOK || gCount === undefined) {
-            return Outcome.reject("instantiation_mismatch", `count body literal ${k} not ground under subst`);
+            return Verdict.reject("instantiation_mismatch", `count body literal ${k} not ground under subst`);
           }
           // Structural, like every site (#3022).
           if (
@@ -787,7 +811,7 @@ function checkNode<C>(
             !projectEquals(gc.project, premise.project) ||
             !valueEquals(gCount, premise.k)
           ) {
-            return Outcome.reject("instantiation_mismatch", `count premise ${k} != body literal ${k} under subst`);
+            return Verdict.reject("instantiation_mismatch", `count premise ${k} != body literal ${k} under subst`);
           }
           const countResult = verifyCountPremise(premise, node.conclusion.pred, deriv, certStatus);
           if (countResult.kind !== "accept") {
@@ -798,7 +822,7 @@ function checkNode<C>(
         // Non-null: the count premise arm above ends in `continue`.
         const expected = bodyLit.asInner()!.substitute(node.subst).asGround();
         if (expected === undefined) {
-          return Outcome.reject(
+          return Verdict.reject(
             "instantiation_mismatch",
             `body literal ${k} not ground under subst`,
           );
@@ -810,7 +834,7 @@ function checkNode<C>(
           // node kind (#3022; #2232 already required it of a Builtin, whose theory decides on its
           // own spelling).
           if (!deriv.nodes[premise]!.conclusion.equals(expected)) {
-            return Outcome.reject(
+            return Verdict.reject(
               "instantiation_mismatch",
               `premise ${k} conclusion != body literal ${k} under subst`,
             );
@@ -821,7 +845,7 @@ function checkNode<C>(
           // match under account equality would transfer an absence judged about one spelling to
           // another. Then discharge it.
           if (!premise.atom.equals(expected)) {
-            return Outcome.reject(
+            return Verdict.reject(
               "instantiation_mismatch",
               `neg premise ${k} atom != body literal ${k} under subst`,
             );
@@ -831,7 +855,7 @@ function checkNode<C>(
             return negResult;
           }
         } else {
-          return Outcome.reject(
+          return Verdict.reject(
             "instantiation_mismatch",
             `premise ${k} polarity != body literal ${k} polarity`,
           );
@@ -840,100 +864,114 @@ function checkNode<C>(
       // (g) sealing / partition on the head predicate (local checks, §4.2/§4.4):
       //     a clause head must be intensional — not extensional, not theory-owned.
       if (profile.leaves.extensional().contains(node.conclusion.pred)) {
-        return Outcome.reject(
+        return Verdict.reject(
           "sealed_violation",
           "rule head collides with an extensional predicate",
         );
       }
       if (profile.theory.owns(node.conclusion.pred)) {
-        return Outcome.reject(
+        return Verdict.reject(
           "predicate_partition_violation",
           "rule head predicate is owned by a theory",
         );
       }
       // (h) THEN delegate metadata admissibility (§4 ob.2: structural-then-delegate).
+      // admissibilityChecks: one `admissible` call.
+      tally.admissibilityChecks += 1;
       const verdict = profile.admit.admissible(clause, node.meta, ctx);
       if (verdict.kind === "admit") {
-        return Outcome.Accept;
+        return Verdict.Accept;
       }
-      return Outcome.reject("rule_inadmissible", verdict.code);
+      return Verdict.reject("rule_inadmissible", verdict.code);
     }
 
     case "builtin": {
+      // builtinNodes
+      tally.builtinNodes += 1;
       depth[i] = 1;
+      // maxDepthReached
+      tally.reachDepth(depth[i]!);
       if (depth[i]! > profile.limits.maxDepth) {
-        return Outcome.reject("too_deep", "depth 1 exceeds max_depth");
+        return Verdict.reject("too_deep", "depth 1 exceeds max_depth");
       }
       const owned = profile.theory.owns(node.conclusion.pred);
       // partition: a builtin predicate must be theory-owned, and not also
       // extensional (overlap is a partition violation, §4.4).
       if (!owned) {
-        return Outcome.reject(
+        return Verdict.reject(
           "predicate_partition_violation",
           "no theory owns the builtin predicate",
         );
       }
       if (profile.leaves.extensional().contains(node.conclusion.pred)) {
-        return Outcome.reject(
+        return Verdict.reject(
           "predicate_partition_violation",
           "builtin predicate is also extensional",
         );
       }
       // #3126: the ground verdict, which can say "not decided". The detail of a false is the
       // theory's own code, read before any conversion into the algebra.
-      const verdict = readGround(decideGround(profile.theory, node.conclusion));
+      // theoryDecisions: one `decideGround` call.
+      tally.theoryDecisions += 1;
+      const verdict = readGround(profile.theory.decideGround(node.conclusion));
       switch (verdict.arm) {
         case "holds":
-          return Outcome.Accept;
+          return Verdict.Accept;
         case "fails":
-          return Outcome.reject("builtin_failed", verdict.code);
+          return Verdict.reject("builtin_failed", verdict.code);
         case "not_decided":
           if (isDisowned(verdict)) {
-            // owns() said yes but decide disowns: an inconsistent theory.
-            return Outcome.reject(
+            // owns() said yes but decideGround disowns: an inconsistent theory.
+            return Verdict.reject(
               "predicate_partition_violation",
               "theory owns predicate but returned NotMine",
             );
           }
           // A stop is refused by name, never read as a decision (#3126).
-          return Outcome.reject("builtin_not_decided", verdict.cause.kind);
+          return Verdict.reject("builtin_not_decided", verdict.cause.kind);
       }
     }
 
     case "leaf": {
+      // leafNodes
+      tally.leafNodes += 1;
       depth[i] = 1;
+      // maxDepthReached
+      tally.reachDepth(depth[i]!);
       if (depth[i]! > profile.limits.maxDepth) {
-        return Outcome.reject("too_deep", "depth 1 exceeds max_depth");
+        return Verdict.reject("too_deep", "depth 1 exceeds max_depth");
       }
       const extensional = profile.leaves.extensional().contains(node.conclusion.pred);
       const owned = profile.theory.owns(node.conclusion.pred);
       // sealing / partition (§4.2/§4.4): a leaf may conclude only an extensional
       // predicate.
       if (extensional && owned) {
-        return Outcome.reject(
+        return Verdict.reject(
           "predicate_partition_violation",
           "leaf predicate is both extensional and theory-owned",
         );
       }
       if (!extensional) {
         if (owned) {
-          return Outcome.reject(
+          return Verdict.reject(
             "predicate_partition_violation",
             "leaf predicate is owned by a theory, not extensional",
           );
         }
         // not extensional and not a builtin ⇒ it is intensional: a leaf concluding
         // an intensional predicate is the sealing error.
-        return Outcome.reject(
+        return Verdict.reject(
           "sealed_violation",
           "leaf concludes a non-extensional (intensional) predicate",
         );
       }
+      // leafVerifications: one `verify` call.
+      tally.leafVerifications += 1;
       const verdict = profile.leaves.verify(node.conclusion, node.evidence, ctx);
       if (verdict.kind === "admit") {
-        return Outcome.Accept;
+        return Verdict.Accept;
       }
-      return Outcome.reject("leaf_rejected", verdict.code);
+      return Verdict.reject("leaf_rejected", verdict.code);
     }
   }
 }
@@ -960,14 +998,14 @@ function checkNode<C>(
  * It does **not** mean `check` will accept. It answers **one** condition - theory ownership.
  * Two other conditions raise the same structural code and are untouched here: a builtin
  * predicate that is **also extensional** (a genuine partition overlap), and a theory whose
- * `owns()` says yes while `decide()` returns `notMine` (an inconsistent theory).
+ * `owns()` says yes while `decideGround()` disowns the atom (an inconsistent theory).
  *
  * So **empty means no capability refusal will occur, never that the account is valid.**
  *
  * ## Scope
  *
  * Additive and non-breaking: a helper over existing contract types, adding no rejection code
- * and moving no vector. It reads builtin conclusions and `theory.owns` only - no `decide()`
+ * and moving no vector. It reads builtin conclusions and `theory.owns` only - no `decideGround()`
  * call, so it is total and side-effect-free. Order is derivation node order, deduplicated on
  * first appearance, so the result is deterministic for a given derivation.
  */
@@ -1003,20 +1041,20 @@ export function profileDecidesAllBuiltins<C>(
 
 /**
  * The `Builtin` conclusions this profile's theory **owns but disowns** - `owns(pred)` is
- * `true` while `decide(conclusion)` returns `not_mine`.
+ * `true` while `decideGround(conclusion)` answers the disowning `inconsistent_theory` fault.
  *
  * A non-empty result is a **verifier-side defect**: the bound `Theory` violates the coherence
- * obligation of §5, which requires `decide` to reach a verdict on every atom whose predicate
+ * obligation of §5, which requires `decideGround` to reach a verdict on every atom whose predicate
  * `owns` claims. `check` rejects this with the structural code `predicate_partition_violation`
  * - correctly, since the account cannot be verified by this profile - but a consumer reading
  * that code alone is pointed at the **producer** for what is a bug in the host's own theory
  * binding. This query is the attribution the code cannot carry (issue #1378): it names the
  * atoms that expose it.
  *
- * ⚠ Unlike {@link unownedBuiltinPredicates}, this one CALLS `decide`. Ownership is a property
+ * ⚠ Unlike {@link unownedBuiltinPredicates}, this one CALLS `decideGround`. Ownership is a property
  * of a *predicate*, but incoherence is only observable per *atom*, so the question cannot be
  * answered without deciding. It therefore costs what the corresponding part of `check` costs
- * and is **not** side-effect-free against a theory whose `decide` is expensive or stateful.
+ * and is **not** side-effect-free against a theory whose `decideGround` is expensive or stateful.
  * Its value is **attribution after a rejection**, not avoidance before one.
  *
  * ⛔ An empty result does **not** certify the theory coherent. It witnesses only that no atom
@@ -1026,7 +1064,7 @@ export function profileDecidesAllBuiltins<C>(
  *
  * Additive and non-breaking: no `RejectionCode` member, no vector moved. Order is derivation
  * node order, deduplicated on first appearance, so the result is deterministic for a given
- * derivation. The dedup test precedes the `decide` call, so a repeated offending atom is
+ * derivation. The dedup test precedes the `decideGround` call, so a repeated offending atom is
  * decided once.
  */
 export function incoherentBuiltinAtoms<C>(
@@ -1039,9 +1077,9 @@ export function incoherentBuiltinAtoms<C>(
     const conc = node.conclusion;
     if (!profile.theory.owns(conc.pred)) continue;
     if (out.some((a) => a.equals(conc))) continue;
-    // The disowning fault, which a `not_mine` from `decide` becomes (#3126). A theory that stopped
-    // (a work cap) is not listed: it did not disown the atom.
-    if (isDisowned(readGround(decideGround(profile.theory, conc)))) out.push(conc);
+    // The disowning `inconsistent_theory` fault (#3126). A theory that stopped (a work cap) is not
+    // listed: it did not disown the atom.
+    if (isDisowned(readGround(profile.theory.decideGround(conc)))) out.push(conc);
   }
   return out;
 }

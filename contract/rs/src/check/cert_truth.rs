@@ -107,7 +107,7 @@ fn eval_body_literal(
     match body_lit {
         BodyLit::Pos(_) => {
             if theory.owns(&grounded.pred) {
-                return theory_truth(theory, grounded);
+                return theory_truth(view, theory, grounded);
             }
             match view.table(&grounded.pred) {
                 Some(t) => Ok(truth(view.contains(t, grounded))),
@@ -122,7 +122,7 @@ fn eval_body_literal(
             // neither sealed nor theory-owned. (Paired with the safety gate, a negated
             // builtin still cannot smuggle an unbounded existential.)
             if theory.owns(&grounded.pred) {
-                return theory_truth(theory, grounded).map(completion::not);
+                return theory_truth(view, theory, grounded).map(completion::not);
             }
             match view.table(&grounded.pred) {
                 Some(t) => Ok(truth(!view.contains(t, grounded))),
@@ -148,9 +148,12 @@ fn eval_body_literal(
 /// as false: a positive filter read false would let the closure under-fire and pass a table that
 /// is not closed.
 fn theory_truth(
+    view: &CertView<'_>,
     theory: &dyn Theory,
     grounded: &GroundLiteral,
 ) -> Result<GroundOutcome<NoCallerLimit>, (RejectionCode, String)> {
+    // theory_decisions: one `decide_ground` call, counted on the view.
+    view.count_decision();
     let ground = theory.decide_ground(grounded);
     if let Completion::NotCompleted(cause) = &ground {
         if is_disowned(cause) {

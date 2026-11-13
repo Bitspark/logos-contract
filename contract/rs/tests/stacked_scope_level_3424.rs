@@ -23,7 +23,7 @@ use logos_contract::{
     Derivation, Evidence, FiniteDomain, Goal, GroundLiteral, Hash, LeafOutcome, LeafVerifier,
     MapProgram, Node, NodeMeta, NonMemberProof, Outcome, PredicateSet, Premise, RelationTable,
     StratumPrefix, Subst, SupportEdge, SupportRef, SupportWitness, Symbol, Term, Theory,
-    TheoryOutcome,
+    TheoryGround, Verdict,
 };
 use ontos_core::Value;
 use std::collections::BTreeMap;
@@ -38,10 +38,8 @@ impl Theory for NoTheory {
     fn owns(&self, _: &Symbol) -> bool {
         false
     }
-    fn decide(&self, _: &GroundLiteral) -> TheoryOutcome {
-        TheoryOutcome::Fails {
-            code: "not_mine".into(),
-        }
+    fn decide_ground(&self, _: &GroundLiteral) -> TheoryGround {
+        TheoryGround::fails("not_mine")
     }
 }
 
@@ -231,9 +229,9 @@ fn run(base_first: bool, base_level: u32, upper_level: u32) -> Outcome {
 }
 
 fn code_of(outcome: Outcome) -> String {
-    match outcome {
-        Outcome::Accept => "accept".to_string(),
-        Outcome::Reject { code, detail } => format!("{} ({detail})", code.code()),
+    match outcome.verdict {
+        Verdict::Accept => "accept".to_string(),
+        Verdict::Reject { code, detail } => format!("{} ({detail})", code.code()),
     }
 }
 

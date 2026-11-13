@@ -14,6 +14,7 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/Bitspark/logos-contract/contract/go/completion"
 	core "github.com/bitspark/ontos/core/go"
 	data "github.com/bitspark/ontos/data/go"
 )
@@ -24,8 +25,8 @@ import (
 type aggNoTheory struct{}
 
 func (aggNoTheory) Owns(Symbol) bool { return false }
-func (aggNoTheory) Decide(GroundLiteral) TheoryOutcome {
-	return TheoryFails{Code: "no_theory"}
+func (aggNoTheory) DecideGround(GroundLiteral) completion.TheoryGround {
+	return completion.TheoryGroundFails("no_theory")
 }
 
 // aggLeaves attests a fixed EDB-of-record snapshot for each extensional predicate (so the
@@ -198,8 +199,8 @@ func assertReject(t *testing.T, outcome Outcome, expected string) {
 	if outcome.IsAccept() {
 		t.Fatalf("expected reject %s, got Accept", expected)
 	}
-	if got := outcome.Code().Code(); got != expected {
-		t.Fatalf("expected %s, got %s (%s)", expected, got, outcome.Detail())
+	if got := outcome.Verdict.Code().Code(); got != expected {
+		t.Fatalf("expected %s, got %s (%s)", expected, got, outcome.Verdict.Detail())
 	}
 }
 
@@ -209,7 +210,7 @@ func TestAggAcceptCountRowsMatchingFilter(t *testing.T) {
 	deriv := aggCountDerivation(cEligibleCount, "eligible_count", Rows(), 4, aggValidCert())
 	out := aggRun(t, aggBaseProgram(), NewGroundLiteral("eligible_count", aggV("o1")), deriv)
 	if !out.IsAccept() {
-		t.Fatalf("expected Accept, got %s (%s)", out.Code().Code(), out.Detail())
+		t.Fatalf("expected Accept, got %s (%s)", out.Verdict.Code().Code(), out.Verdict.Detail())
 	}
 }
 
@@ -217,7 +218,7 @@ func TestAggAcceptCountDistinctExcludesNull(t *testing.T) {
 	deriv := aggCountDerivation(cEligibleDistinct, "eligible_distinct", Distinct(2), 2, aggValidCert())
 	out := aggRun(t, aggBaseProgram(), NewGroundLiteral("eligible_distinct", aggV("o1")), deriv)
 	if !out.IsAccept() {
-		t.Fatalf("expected Accept, got %s (%s)", out.Code().Code(), out.Detail())
+		t.Fatalf("expected Accept, got %s (%s)", out.Verdict.Code().Code(), out.Verdict.Detail())
 	}
 }
 
@@ -455,7 +456,7 @@ func TestAggAcceptCountFilterAppliedO2(t *testing.T) {
 	cx := aggBoundContext(program)
 	out := CheckWithCertContext[struct{}](program, NewGroundLiteral("eligible_count", aggV("o2")), deriv, struct{}{}, aggProfile(), cx)
 	if !out.IsAccept() {
-		t.Fatalf("expected Accept, got %s (%s)", out.Code().Code(), out.Detail())
+		t.Fatalf("expected Accept, got %s (%s)", out.Verdict.Code().Code(), out.Verdict.Detail())
 	}
 }
 
@@ -587,7 +588,7 @@ func TestAggAcceptSumIntColumn(t *testing.T) {
 	edb := scoreEdb()
 	deriv := scoreDeriv(cScoreSum, "score_sum", "g1", Sum(1), 11, scoreCert(prog, edb)) // 3+7+1
 	if out := scoreRun(t, prog, edb, NewGroundLiteral("score_sum", aggV("g1")), deriv); !out.IsAccept() {
-		t.Fatalf("expected Accept (sum=11), got %s (%s)", out.Code().Code(), out.Detail())
+		t.Fatalf("expected Accept (sum=11), got %s (%s)", out.Verdict.Code().Code(), out.Verdict.Detail())
 	}
 }
 
@@ -596,7 +597,7 @@ func TestAggAcceptMinIntColumn(t *testing.T) {
 	edb := scoreEdb()
 	deriv := scoreDeriv(cScoreMin, "score_min", "g1", Min(1), 1, scoreCert(prog, edb))
 	if out := scoreRun(t, prog, edb, NewGroundLiteral("score_min", aggV("g1")), deriv); !out.IsAccept() {
-		t.Fatalf("expected Accept (min=1), got %s (%s)", out.Code().Code(), out.Detail())
+		t.Fatalf("expected Accept (min=1), got %s (%s)", out.Verdict.Code().Code(), out.Verdict.Detail())
 	}
 }
 
@@ -605,7 +606,7 @@ func TestAggAcceptMaxIntColumn(t *testing.T) {
 	edb := scoreEdb()
 	deriv := scoreDeriv(cScoreMax, "score_max", "g1", Max(1), 7, scoreCert(prog, edb))
 	if out := scoreRun(t, prog, edb, NewGroundLiteral("score_max", aggV("g1")), deriv); !out.IsAccept() {
-		t.Fatalf("expected Accept (max=7), got %s (%s)", out.Code().Code(), out.Detail())
+		t.Fatalf("expected Accept (max=7), got %s (%s)", out.Verdict.Code().Code(), out.Verdict.Detail())
 	}
 }
 
@@ -615,7 +616,7 @@ func TestAggAcceptEmptySumIsZero(t *testing.T) {
 	edb := scoreEdb()
 	deriv := scoreDeriv(cScoreSum, "score_sum", "empty_grp", Sum(1), 0, scoreCert(prog, edb))
 	if out := scoreRun(t, prog, edb, NewGroundLiteral("score_sum", aggV("empty_grp")), deriv); !out.IsAccept() {
-		t.Fatalf("expected Accept (empty sum=0), got %s (%s)", out.Code().Code(), out.Detail())
+		t.Fatalf("expected Accept (empty sum=0), got %s (%s)", out.Verdict.Code().Code(), out.Verdict.Detail())
 	}
 }
 

@@ -20,11 +20,9 @@ import { encode } from "@bitspark/ontos-codec";
 import {
   ArithmeticTheory,
   BigDecimal,
-  type completion,
   GroundLiteral,
-  legacyOutcome,
   Symbol,
-  type TheoryOutcome,
+  type TheoryGround,
 } from "../src/index.js";
 
 // ----- the on-disk vector shape -----
@@ -129,10 +127,8 @@ function buildArg(raw: unknown): Value {
 }
 
 // expectOutcome decodes the pinned outcome ("holds" | {"fails": "<code>"} | {"not_completed":
-// "<kind>"}, #3126) and asserts the ground verdict matches it judgment-for-judgment, and that the
-// legacy decide is the one derived from it (a not-completed verdict is not_mine there, never fails).
-function expectOutcome(name: string, raw: unknown, got: completion.TheoryGround, legacy: TheoryOutcome): void {
-  assert.deepEqual(legacy, legacyOutcome(got), `${name}: the legacy decide is not the one derived from decideGround`);
+// "<kind>"}, #3126) and asserts the ground verdict matches it judgment-for-judgment.
+function expectOutcome(name: string, raw: unknown, got: TheoryGround): void {
   if (typeof raw === "string") {
     assert.equal(raw, "holds", `${name}: unknown string outcome ${JSON.stringify(raw)}`);
     assert.equal(got.kind === "completed" && got.value.kind === "holds", true, `${name}: want Holds, got ${JSON.stringify(got)}`);
@@ -172,7 +168,7 @@ test("ArithmeticTheory reproduces every pinned vector decision byte-for-byte", (
   for (const d of vf.decisions) {
     const args = d.args.map(buildArg);
     const atom = GroundLiteral.of(d.pred, args);
-    expectOutcome(d.name, d.outcome, theory.decideGround(atom), theory.decide(atom));
+    expectOutcome(d.name, d.outcome, theory.decideGround(atom));
   }
 });
 

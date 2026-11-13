@@ -10,14 +10,11 @@ import { hashFromBytes, sortDedupByGroundKey, type Hash } from "./cert.js";
 import { Symbol, type GroundLiteral } from "./literal.js";
 import { type Evidence, type NodeMeta } from "./derivation.js";
 import { type Clause } from "./program.js";
-import {
-  completed,
-  fault,
-  notCompleted,
-  theoryFails,
-  theoryHolds,
-  type TheoryGround,
-} from "./completion.js";
+import { TheoryGround } from "./completion.js";
+
+// The answer every `Theory.decideGround` returns, with its constructors (Rust's crate-root
+// `logos_contract::TheoryGround`).
+export { TheoryGround };
 
 /**
  * Domain separator for the canonical EDB-table snapshot hash (ADR 0007 §3.6), so an
@@ -55,26 +52,12 @@ export function edbTableHash(pred: Symbol, rows: readonly GroundLiteral[]): Hash
   return sha256(input);
 }
 
-/** The verdict of a `Theory` on a ground atom (§5). Discriminated by `kind`. */
-export type TheoryOutcome =
-  | { readonly kind: "holds" }
-  | { readonly kind: "fails"; readonly code: string }
-  | { readonly kind: "not_mine" };
-
-export const TheoryOutcome = Object.freeze({
-  Holds: Object.freeze({ kind: "holds" } as const satisfies TheoryOutcome),
-  Fails(code: string): TheoryOutcome {
-    return { kind: "fails", code };
-  },
-  NotMine: Object.freeze({ kind: "not_mine" } as const satisfies TheoryOutcome),
-});
-
 /**
  * §5 Theory SPI — builtins / decidable atoms.
  *
- * STABLE-v1 realization (erratum, §5): the seam is object-safe — `decide(atom)`
- * only, with config closed over at construction (NO live ctx). A verdict MUST be a
- * pure, total, deterministic function of the ground arguments alone.
+ * The seam is object-safe — `decideGround(atom)` only, with config closed over at construction
+ * (NO live ctx). A verdict MUST be a pure, total, deterministic function of the ground arguments
+ * alone.
  *
  * spi-role: consumer. A consumer implements this extension point in its own domain; a test
  * double of it may declare consumer(<what it models>) (#2720, scripts/test_doubles_inventory.py).
@@ -83,22 +66,19 @@ export interface Theory {
   /** Does this theory own (decide) the given predicate? */
   owns(pred: Symbol): boolean;
   /**
-   * Decide an owned ground atom. Pure / total / deterministic / config-pinned. The v1 form, kept
-   * for external readers: logos's own readers call {@link decideGround}, which can also say "not
-   * decided".
+   * **REQUIRED: decide an owned ground atom, or say it was NOT DECIDED** (#3126; seat:caa's rulings
+   * of 2026-09-27; required since checker SPI v2, ADR 0036 D8 change 3). Pure / total /
+   * deterministic / config-pinned. A decider that stops before it establishes a fact (a work cap, a
+   * capacity) returns `not_completed(cause)`, never a false: under negation or in the closure check a
+   * stop read as `fails` becomes a false positive (research 0031). An atom this theory does not own
+   * answers {@link TheoryGround.disowned}. A composite theory FORWARDS to the member that owns the
+   * predicate.
+   *
+   * Every reader calls this: `check`'s builtin verification, the closure's literal truth, and the
+   * search registry's ground decision. `check` refuses a certificate whose builtin was not decided,
+   * in every position.
    */
-  decide(atom: GroundLiteral): TheoryOutcome;
-  /**
-   * **Decide an owned ground atom, or say it was NOT DECIDED (#3126; seat:caa's rulings of
-   * 2026-09-27).** A decider that stops before it establishes a fact (a work cap, a capacity)
-   * returns `not_completed(cause)`, never a false: under negation or in the closure check a stop
-   * read as `fails` becomes a false positive (research 0031). OPTIONAL (ADR 0003): absent, the
-   * default is derived from `decide` ({@link groundFromLegacy}), so a theory that never stops needs
-   * no change. A theory that can stop implements it, and its `decide` then answers the stopped case
-   * with `not_mine`, never `fails`, so a legacy reader fails CLOSED. A composite theory implements
-   * it by FORWARDING to its members. ADR 0036 D8's checker SPI v2 makes it required.
-   */
-  decideGround?(atom: GroundLiteral): TheoryGround;
+  decideGround(atom: GroundLiteral): TheoryGround;
   /**
    * The component's inherent identity (ADR 0004 D4 · parity with the Rust binding's
    * defaulted `identity()`). OPTIONAL: TS optional members are non-breaking, so
@@ -113,7 +93,9 @@ export interface Theory {
    * naming it ({@link completionOf}), which admission treats as may-not-complete (fail closed,
    * seat:caa on #3142). A decision that stops early can surface as `Fails`, and a sealed closure
    * reads that false as knowledge, so the certifying kernel refuses a seal whose clauses reach a
-   * decider that does not declare `stops_are_typed` (#3313 typed the stop; retires at v2, ADR 0036 D8).
+   * decider that does not declare `stops_are_typed` (#3313 typed the stop). It stays in v2 (decided
+   * on #3111): a required `decideGround` gives every theory the typed channel, not proof that it
+   * uses it for every stop.
    */
   completion?(pred: Symbol): DecisionCompletion;
 }
@@ -165,50 +147,6 @@ export const DecisionCompletion = Object.freeze({
  */
 export function completionOf(t: Theory, pred: Symbol): DecisionCompletion {
   return t.completion?.(pred) ?? DecisionCompletion.undeclared(t.identity?.() ?? ComponentIdentity.unidentified());
-}
-
-/**
- * The ONE reader of a theory's ground verdict (#3126): the theory's own `decideGround` when it has
- * one, else the default derived from `decide`. Every logos reader calls it, never `decide`.
- */
-export function decideGround(theory: Theory, atom: GroundLiteral): TheoryGround {
-  const decide = theory.decideGround;
-  return decide === undefined ? groundFromLegacy(theory.decide(atom)) : Reflect.apply(decide, theory, [atom]);
-}
-
-/**
- * The mapping `decideGround`'s default applies to a v1 answer (#3126): `holds` and `fails` are the
- * decision, and `not_mine` is the named `inconsistent_theory` fault. A wrapper whose own answers
- * come from `decide` (a host builtin) uses it for them, and forwards the rest. An outcome outside
- * the type is the fault `malformed_outcome`. Rust's `ground_from_legacy`.
- */
-export function groundFromLegacy(o: TheoryOutcome): TheoryGround {
-  if (o === null || o === undefined) return notCompleted(fault("malformed_outcome"));
-  switch (o.kind) {
-    case "holds":
-      return completed(theoryHolds);
-    case "fails":
-      return completed(theoryFails(o.code));
-    case "not_mine":
-      return notCompleted(fault("inconsistent_theory"));
-    default:
-      return notCompleted(fault("malformed_outcome"));
-  }
-}
-
-/**
- * The one legacy adapter (#3126): the v1 `TheoryOutcome` of a `decideGround` answer, for a theory
- * that implements `decideGround` and derives its `decide` from it. A not-completed answer becomes
- * `not_mine`, never `fails`: v1 has no "not decided" arm, and every reader refuses an owned atom's
- * `not_mine` by name, so a legacy reader fails CLOSED. The wrong category (a stop reported as a
- * routing fault), never a wrong answer; ADR 0036 D8's v2 deletes it with `decide`. Rust's
- * `legacy_outcome`.
- */
-export function legacyOutcome(g: TheoryGround): TheoryOutcome {
-  if (g.kind === "completed") {
-    return g.value.kind === "holds" ? TheoryOutcome.Holds : TheoryOutcome.Fails(g.value.code);
-  }
-  return TheoryOutcome.NotMine;
 }
 
 /** The verdict of a `LeafVerifier` (§6). */

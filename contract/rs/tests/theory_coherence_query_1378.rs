@@ -1,7 +1,7 @@
 //! PROBE (#1378) — `incoherent_builtin_atoms` gives arm 3 the attribution its rejection
 //! code cannot carry.
 //!
-//! `check` rejects an `owns()`-yes / `decide()`-NotMine theory with the structural code
+//! `check` rejects an `owns()`-yes / `decide_ground()`-disowns theory with the structural code
 //! `PredicatePartitionViolation` (pinned as `arm3` in `partition_code_conflation_1371.rs`,
 //! which this does **not** change). That code is correct — the account genuinely cannot be
 //! verified by this profile — but it points a consumer at the **producer** for what is a
@@ -26,13 +26,13 @@
 
 use logos_contract::{
     incoherent_builtin_atoms, CheckLimits, CheckProfile, Derivation, Evidence, GroundLiteral,
-    LeafOutcome, LeafVerifier, Node, PredicateSet, Symbol, Theory, TheoryOutcome,
+    LeafOutcome, LeafVerifier, Node, PredicateSet, Symbol, Theory, TheoryGround,
 };
 use ontos_core::Value;
 
 // ------------------------------------- theories -------------------------------------
 
-/// Arm 3: `owns()` says yes, `decide()` disowns. The defect under test.
+/// Arm 3: `owns()` says yes, `decide_ground()` disowns. The defect under test.
 struct DisowningTheory;
 // test-double: adversarial(owns a predicate yet decides NotMine: the defect under test)
 impl Theory for DisowningTheory {
@@ -43,8 +43,8 @@ impl Theory for DisowningTheory {
     fn owns(&self, _pred: &Symbol) -> bool {
         true
     }
-    fn decide(&self, _atom: &GroundLiteral) -> TheoryOutcome {
-        TheoryOutcome::NotMine
+    fn decide_ground(&self, _atom: &GroundLiteral) -> TheoryGround {
+        TheoryGround::disowned()
     }
 }
 
@@ -59,13 +59,13 @@ impl Theory for OwningTheory {
     fn owns(&self, _pred: &Symbol) -> bool {
         true
     }
-    fn decide(&self, _atom: &GroundLiteral) -> TheoryOutcome {
-        TheoryOutcome::Holds
+    fn decide_ground(&self, _atom: &GroundLiteral) -> TheoryGround {
+        TheoryGround::holds()
     }
 }
 
-/// Arm 1: a host binding no theory. `decide` also answers `NotMine` — which is exactly why
-/// a query keyed on `NotMine` alone would conflate the two arms.
+/// Arm 1: a host binding no theory. `decide_ground` also disowns — which is exactly why a query
+/// keyed on the disowning answer alone would conflate the two arms.
 struct UnboundTheory;
 // test-double: consumer(owns no predicate: the theory-less host)
 impl Theory for UnboundTheory {
@@ -76,8 +76,8 @@ impl Theory for UnboundTheory {
     fn owns(&self, _pred: &Symbol) -> bool {
         false
     }
-    fn decide(&self, _atom: &GroundLiteral) -> TheoryOutcome {
-        TheoryOutcome::NotMine
+    fn decide_ground(&self, _atom: &GroundLiteral) -> TheoryGround {
+        TheoryGround::disowned()
     }
 }
 
@@ -154,7 +154,7 @@ fn a_coherent_theory_yields_nothing() {
     );
 }
 
-/// ⭐ **THE DISCRIMINATING CONTROL.** Arm 1 also answers `NotMine`, and `check` gives it the
+/// ⭐ **THE DISCRIMINATING CONTROL.** Arm 1 also disowns, and `check` gives it the
 /// **same** rejection code. If this query keyed on the outcome alone it would report arm 1
 /// too — and then it would name a defect in a theory the host never bound, which is the
 /// misattribution inverted rather than fixed.

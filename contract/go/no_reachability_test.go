@@ -20,6 +20,7 @@ package contract
 import (
 	"testing"
 
+	"github.com/Bitspark/logos-contract/contract/go/completion"
 	core "github.com/bitspark/ontos/core/go"
 )
 
@@ -27,8 +28,10 @@ import (
 // test-double: consumer(owns no predicate)
 type noReachTheory struct{}
 
-func (noReachTheory) Owns(_ Symbol) bool                   { return false }
-func (noReachTheory) Decide(_ GroundLiteral) TheoryOutcome { return TheoryNotMine{} }
+func (noReachTheory) Owns(_ Symbol) bool { return false }
+func (noReachTheory) DecideGround(_ GroundLiteral) completion.TheoryGround {
+	return completion.TheoryGroundDisowned()
+}
 
 // noReachLeaves declares `grant`/`audit` extensional and admits any leaf.
 // test-double: consumer(admits grant and audit leaves)
@@ -142,7 +145,7 @@ func TestNoReachability_RejectLocallyInvalidRootUnreachableNode(t *testing.T) {
 	if out.IsAccept() {
 		t.Fatal("an invalid (sealing-violating) uncited node must still reject")
 	}
-	if out.Code() != SealedViolation {
-		t.Fatalf("an invalid uncited node must reject with its own local error (sealed_violation), got %s", out.Code().Code())
+	if out.Verdict.Code() != SealedViolation {
+		t.Fatalf("an invalid uncited node must reject with its own local error (sealed_violation), got %s", out.Verdict.Code().Code())
 	}
 }

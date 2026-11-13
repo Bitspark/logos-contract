@@ -29,7 +29,7 @@
 // # Judgments (mirroring Rust exactly)
 //
 // Owns(pred): by NAME only (any arity) — length, nth0, last.
-// Decide(atom) on a ground atom:
+// DecideGround(atom) on a ground atom:
 //   - non-UTF-8 predicate            -> Fails{list_unknown_predicate}   (defensive)
 //   - wrong arity (length/2, nth0/3, last/2)
 //     -> Fails{list_bad_arity}
@@ -42,6 +42,7 @@ import (
 	"math/big"
 	"unicode/utf8"
 
+	"github.com/Bitspark/logos-contract/contract/go/completion"
 	core "github.com/bitspark/ontos/core/go"
 	data "github.com/bitspark/ontos/data/go"
 )
@@ -92,18 +93,18 @@ func (ListTheory) Identity() ComponentIdentity {
 	)
 }
 
-// Decide decides an owned GROUND atom, byte-identically to the Rust ListTheory::decide. A
-// ground list relation binds nothing, so it either Holds (the relation is true) or Fails
-// with a pinned host-band sub-code.
-func (t ListTheory) Decide(atom GroundLiteral) TheoryOutcome {
+// DecideGround decides an owned GROUND atom, byte-identically to the Rust
+// ListTheory::decide_ground. A ground list relation binds nothing, so it either Holds (the
+// relation is true) or Fails with a pinned host-band sub-code.
+func (t ListTheory) DecideGround(atom GroundLiteral) completion.TheoryGround {
 	// Not one of ours: a routing safety net (check routes by Owns, so this is
 	// unreachable on a correctly-routed call — but stay total). Mirrors Rust.
 	if !t.Owns(atom.Pred) {
-		return TheoryNotMine{}
+		return completion.TheoryGroundDisowned()
 	}
 	predBytes := atom.Pred.Bytes()
 	if !utf8.Valid(predBytes) {
-		return TheoryFails{Code: "list_unknown_predicate"}
+		return completion.TheoryGroundFails("list_unknown_predicate")
 	}
 
 	switch string(predBytes) {
@@ -116,7 +117,7 @@ func (t ListTheory) Decide(atom GroundLiteral) TheoryOutcome {
 	default:
 		// Owned name routed here but not handled above — unreachable (the name set is
 		// exactly the switch arms), but stay total.
-		return TheoryFails{Code: "list_does_not_hold"}
+		return completion.TheoryGroundFails("list_does_not_hold")
 	}
 }
 
@@ -134,14 +135,16 @@ func listElements(v core.Value) ([]core.Value, bool) {
 
 // listDoesNotHold / listBadArity are the pinned host-band sub-codes, mirroring Rust's
 // does_not_hold() / bad_arity().
-func listDoesNotHold() TheoryOutcome { return TheoryFails{Code: "list_does_not_hold"} }
-func listBadArity() TheoryOutcome    { return TheoryFails{Code: "list_bad_arity"} }
+func listDoesNotHold() completion.TheoryGround {
+	return completion.TheoryGroundFails("list_does_not_hold")
+}
+func listBadArity() completion.TheoryGround { return completion.TheoryGroundFails("list_bad_arity") }
 
 // decideLength decides length(list(e0..e_{n-1}), int(n)): arity must be 2; then arg0 must
 // be a list embedding of n elements AND arg1 must be the canonical int embedding of that
 // same n. A non-list arg0, a non-int arg1, or a count mismatch is list_does_not_hold.
 // Mirrors Rust's decide_length.
-func decideLength(args []core.Value) TheoryOutcome {
+func decideLength(args []core.Value) completion.TheoryGround {
 	if len(args) != 2 {
 		return listBadArity()
 	}
@@ -154,7 +157,7 @@ func decideLength(args []core.Value) TheoryOutcome {
 	// embedding) accumulate. A non-int or a wrong-int arg1 simply fails to equal it.
 	want := data.EncodeInt(big.NewInt(int64(len(elems))))
 	if core.Equal(args[1], want) {
-		return TheoryHolds{}
+		return completion.TheoryGroundHolds()
 	}
 	return listDoesNotHold()
 }
@@ -164,7 +167,7 @@ func decideLength(args []core.Value) TheoryOutcome {
 // structurally equal to the i-th element. A non-int index, a non-list, an out-of-range
 // index, or an element mismatch is list_does_not_hold. (Prolog/SWI argument order: index,
 // list, element.) Mirrors Rust's decide_nth0.
-func decideNth0(args []core.Value) TheoryOutcome {
+func decideNth0(args []core.Value) completion.TheoryGround {
 	if len(args) != 3 {
 		return listBadArity()
 	}
@@ -190,7 +193,7 @@ func decideNth0(args []core.Value) TheoryOutcome {
 		return listDoesNotHold()
 	}
 	if core.Equal(elems[idx], args[2]) {
-		return TheoryHolds{}
+		return completion.TheoryGroundHolds()
 	}
 	return listDoesNotHold()
 }
@@ -198,7 +201,7 @@ func decideNth0(args []core.Value) TheoryOutcome {
 // decideLast decides last(list(e0..e_{n-1}), e_{n-1}): arity must be 2; then arg0 must be a
 // NON-EMPTY list embedding and arg1 structurally equal to its last element. A non-list, an
 // empty list, or a mismatch is list_does_not_hold. Mirrors Rust's decide_last.
-func decideLast(args []core.Value) TheoryOutcome {
+func decideLast(args []core.Value) completion.TheoryGround {
 	if len(args) != 2 {
 		return listBadArity()
 	}
@@ -210,7 +213,7 @@ func decideLast(args []core.Value) TheoryOutcome {
 		return listDoesNotHold()
 	}
 	if core.Equal(elems[len(elems)-1], args[1]) {
-		return TheoryHolds{}
+		return completion.TheoryGroundHolds()
 	}
 	return listDoesNotHold()
 }

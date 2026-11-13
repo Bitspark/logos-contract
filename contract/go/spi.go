@@ -47,29 +47,6 @@ func EdbTableHash(pred Symbol, rows []GroundLiteral) Hash {
 	return out
 }
 
-// TheoryOutcome is the verdict of a Theory on a ground atom (§5). It is a closed
-// sum type via an unexported marker method (mirroring Rust's enum).
-type TheoryOutcome interface {
-	isTheoryOutcome()
-}
-
-// TheoryHolds is the verdict that the atom holds.
-type TheoryHolds struct{}
-
-// TheoryFails is the verdict that the atom is owned by this theory but does not
-// hold; Code is a host-band sub-code surfaced under builtin_failed.
-type TheoryFails struct {
-	Code string
-}
-
-// TheoryNotMine is the verdict "not this theory's predicate" (a routing safety
-// net; check routes by Theory.Owns, so a correctly-routed call never returns this).
-type TheoryNotMine struct{}
-
-func (TheoryHolds) isTheoryOutcome()   {}
-func (TheoryFails) isTheoryOutcome()   {}
-func (TheoryNotMine) isTheoryOutcome() {}
-
 // Theory is the §5 Theory SPI — builtins / decidable atoms.
 //
 // Purity is load-bearing (§5). A verdict MUST be a pure, total, deterministic
@@ -80,8 +57,13 @@ func (TheoryNotMine) isTheoryOutcome() {}
 // type Config + decide(atom, cfg). To keep check's signature stable via an
 // interface (object-safe — no live ctx), the config is held *inside* the
 // implementing value (closed over at construction) rather than threaded as a type
-// parameter. Decide therefore takes only the atom; the theory is still config-
+// parameter. DecideGround therefore takes only the atom; the theory is still config-
 // pinned and pure by construction.
+//
+// Until checker SPI v2 a theory answered a v1 Decide with a three-arm outcome (holds, fails, not
+// mine) beside an optional DecideGround, through a pair of legacy adapters. v2 (ADR 0036 D8 change
+// 3) deleted all three: the v1 outcome had no "not decided" arm, so a stop could only be reported
+// as a routing fault, and every reader had to remember to call the right one.
 //
 // spi-role: consumer. A consumer implements this extension point in its own domain; a test
 // double of it may declare consumer(<what it models>) (#2720, scripts/test_doubles_inventory.py).
@@ -91,70 +73,24 @@ type Theory interface {
 	// builtin predicate.)
 	Owns(pred Symbol) bool
 
-	// Decide decides an owned ground atom. Pure / total / deterministic /
-	// config-pinned.
-	//
-	// The v1 form, kept for external readers: logos's own readers call DecideGround, which can
-	// also say "not decided".
-	Decide(atom GroundLiteral) TheoryOutcome
-}
-
-// GroundDecider is the optional #3126 method of a Theory (seat:caa's rulings of 2026-09-27): decide
-// an owned ground atom, or say it was NOT DECIDED. A decider that stops before it establishes a fact
-// (a work cap, a capacity) returns NotCompleted(cause), never a false: under negation or in the
-// closure check a stop read as Fails becomes a false positive (research 0031). A theory that can
-// stop implements it, and its Decide then answers the stopped case with TheoryNotMine, never
-// TheoryFails, so a legacy reader fails CLOSED. A composite theory implements it by FORWARDING to
-// its members. Additive (ADR 0003): a theory that never stops needs no change. Rust's
-// Theory::decide_ground; ADR 0036 D8's checker SPI v2 makes it required.
-type GroundDecider interface {
+	// DecideGround decides an owned ground atom, or says it was NOT DECIDED (#3126; seat:caa's
+	// rulings of 2026-09-27; required since checker SPI v2, ADR 0036 D8 change 3). Pure / total /
+	// deterministic / config-pinned. A decider that stops before it establishes a fact (a work cap,
+	// a capacity) returns NotCompleted(cause), never a false: under negation or in the closure
+	// check a stop read as Fails becomes a false positive (research 0031). An atom this theory does
+	// not own answers completion.TheoryGroundDisowned. A composite theory FORWARDS to the member
+	// that owns the predicate. Readers call the package-level DecideGround, never this method
+	// directly. Rust's Theory::decide_ground.
 	DecideGround(atom GroundLiteral) completion.TheoryGround
 }
 
-// DecideGround is the ONE reader of a theory's ground verdict (#3126): the theory's own
-// DecideGround when it implements GroundDecider, else the default derived from Decide
-// (GroundFromLegacy). Every logos reader calls it, never Decide.
+// DecideGround is the ONE reader of a theory's ground verdict (#3126): it detaches the atom, so the
+// theory cannot alias or mutate the caller's argument slice, and asks the theory. Every reader
+// calls it: check's builtin verification, the closure's literal truth, and the search registry's
+// ground decision. Check refuses a certificate whose builtin was not decided, in every position.
 func DecideGround(t Theory, atom GroundLiteral) completion.TheoryGround {
-	atom = atom.detached()
-	if g, ok := t.(GroundDecider); ok {
-		return g.DecideGround(atom)
-	}
-	return GroundFromLegacy(t.Decide(atom))
+	return t.DecideGround(atom.detached())
 }
-
-// GroundFromLegacy is the mapping DecideGround's default applies to a v1 answer (#3126): Holds and
-// Fails are the decision, and TheoryNotMine is the named inconsistent_theory fault. A wrapper whose
-// own answers come from Decide uses it for them, and forwards the rest. An outcome no TheoryOutcome
-// type names (nil, an unknown type) is the fault malformed_outcome. Rust's ground_from_legacy.
-func GroundFromLegacy(o TheoryOutcome) completion.TheoryGround {
-	switch out := o.(type) {
-	case TheoryHolds:
-		return completion.Completed[completion.TheoryDecision, completion.NoCallerLimit](completion.TheoryHolds())
-	case TheoryFails:
-		return completion.Completed[completion.TheoryDecision, completion.NoCallerLimit](completion.TheoryFails(out.Code))
-	case TheoryNotMine:
-		return completion.NotCompleted[completion.TheoryDecision, completion.NoCallerLimit](completion.InconsistentTheory())
-	default:
-		return completion.NotCompleted[completion.TheoryDecision, completion.NoCallerLimit](completion.MalformedOutcome())
-	}
-}
-
-// LegacyOutcome is the one legacy adapter (#3126): the v1 TheoryOutcome of a DecideGround answer,
-// for a theory that implements GroundDecider and derives its Decide from it. A not-completed answer
-// becomes TheoryNotMine, never TheoryFails: v1 has no "not decided" arm, and every reader refuses an
-// owned atom's NotMine by name, so a legacy reader fails CLOSED. The wrong category (a stop reported
-// as a routing fault), never a wrong answer; ADR 0036 D8's v2 deletes it with Decide. Rust's
-// legacy_outcome.
-func LegacyOutcome(g completion.TheoryGround) TheoryOutcome {
-	return completion.MatchTheory[completion.NoCallerLimit, TheoryOutcome](g, legacyCases{})
-}
-
-type legacyCases struct{}
-
-func (legacyCases) Holds() TheoryOutcome                                 { return TheoryHolds{} }
-func (legacyCases) Fails(code string) TheoryOutcome                      { return TheoryFails{Code: code} }
-func (legacyCases) LimitExceeded(completion.NoCallerLimit) TheoryOutcome { return TheoryNotMine{} }
-func (legacyCases) NotCompleted(completion.NonCompletion) TheoryOutcome  { return TheoryNotMine{} }
 
 // groundArm is which of a ground verdict's three answers a reader holds.
 type groundArm uint8
@@ -193,8 +129,8 @@ func (readCases) NotCompleted(cause completion.NonCompletion) groundReading {
 	return groundReading{arm: groundNotDecided, cause: cause}
 }
 
-// disowned reports whether a not-decided reading is the fault the default reports for a
-// TheoryNotMine (#3126): each reader keeps the refusal it gave NotMine for it.
+// disowned reports whether a not-decided reading is the named inconsistent_theory fault a theory
+// answers for an atom it does not own (completion.TheoryGroundDisowned, #3126).
 func (r groundReading) disowned() bool {
 	return r.arm == groundNotDecided && r.cause.Kind() == completion.KindInconsistentTheory
 }

@@ -14,7 +14,7 @@ import {
   GroundLiteral,
   Symbol,
   type Theory,
-  TheoryOutcome,
+  TheoryGround,
 } from "../src/index.js";
 
 function utf8(s: string): Uint8Array {
@@ -67,8 +67,8 @@ test("a component without identity() resolves to unidentified", () => {
     owns(_pred: Symbol): boolean {
       return false;
     }
-    decide(_atom: GroundLiteral): TheoryOutcome {
-      return TheoryOutcome.NotMine;
+    decideGround(_atom: GroundLiteral): TheoryGround {
+      return TheoryGround.disowned();
     }
   }
   const theory: Theory = new UnidentifiedTheory();

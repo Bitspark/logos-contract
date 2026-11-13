@@ -3,12 +3,13 @@ package contract
 import (
 	"testing"
 
+	"github.com/Bitspark/logos-contract/contract/go/completion"
 	core "github.com/bitspark/ontos/core/go"
 )
 
 // The arm-3 attribution query (issue #1378), Go half of the tri-core surface.
 //
-// Check rejects an Owns()-yes / Decide()-NotMine theory with the structural code
+// Check rejects an Owns()-yes / DecideGround()-disowned theory with the structural code
 // PredicatePartitionViolation. That code is correct - the account cannot be verified by this
 // profile - but it points a consumer at the PRODUCER for a defect in the verifier's own theory
 // binding. Per the #1382 ruling on the sibling arm a new RejectionCode is v1-breaking in all
@@ -21,13 +22,13 @@ import (
 
 // --------------------------------- theories ---------------------------------
 
-// Arm 3: Owns says yes, Decide disowns. The defect under test.
+// Arm 3: Owns says yes, DecideGround disowns. The defect under test.
 // test-double: adversarial(owns a predicate yet decides NotMine: the defect under test)
 type tcDisowningTheory struct{}
 
 func (tcDisowningTheory) Owns(pred Symbol) bool { return true }
-func (tcDisowningTheory) Decide(atom GroundLiteral) TheoryOutcome {
-	return TheoryNotMine{}
+func (tcDisowningTheory) DecideGround(atom GroundLiteral) completion.TheoryGround {
+	return completion.TheoryGroundDisowned()
 }
 
 // A coherent theory: owns it and decides it.
@@ -35,17 +36,17 @@ func (tcDisowningTheory) Decide(atom GroundLiteral) TheoryOutcome {
 type tcOwningTheory struct{}
 
 func (tcOwningTheory) Owns(pred Symbol) bool { return true }
-func (tcOwningTheory) Decide(atom GroundLiteral) TheoryOutcome {
-	return TheoryHolds{}
+func (tcOwningTheory) DecideGround(atom GroundLiteral) completion.TheoryGround {
+	return completion.TheoryGroundHolds()
 }
 
-// Arm 1: a host binding no theory. Decide also answers NotMine.
+// Arm 1: a host binding no theory. DecideGround also disowns.
 // test-double: consumer(owns no predicate: the theory-less host)
 type tcUnboundTheory struct{}
 
 func (tcUnboundTheory) Owns(pred Symbol) bool { return false }
-func (tcUnboundTheory) Decide(atom GroundLiteral) TheoryOutcome {
-	return TheoryNotMine{}
+func (tcUnboundTheory) DecideGround(atom GroundLiteral) completion.TheoryGround {
+	return completion.TheoryGroundDisowned()
 }
 
 // ---------------------------------- harness ----------------------------------

@@ -10,8 +10,8 @@
 
 use logos_contract::{
     check, CheckLimits, CheckProfile, Clause, ClauseId, Derivation, Evidence, Goal, GroundLiteral,
-    LeafOutcome, LeafVerifier, MapProgram, Node, NodeMeta, Outcome, PredicateSet, Premise,
-    RuleAdmissibility, RuleOutcome, Subst, Symbol, Term, Theory, TheoryOutcome,
+    LeafOutcome, LeafVerifier, MapProgram, Node, NodeMeta, PredicateSet, Premise,
+    RuleAdmissibility, RuleOutcome, Subst, Symbol, Term, Theory, TheoryGround, Verdict,
     MAX_TERM_DEPTH_DEFAULT,
 };
 use std::collections::BTreeMap;
@@ -32,17 +32,13 @@ impl Theory for LtTheory {
     fn owns(&self, pred: &Symbol) -> bool {
         pred.bytes() == b"lt"
     }
-    fn decide(&self, atom: &GroundLiteral) -> TheoryOutcome {
+    fn decide_ground(&self, atom: &GroundLiteral) -> TheoryGround {
         match atom.args.as_slice() {
             [a, b] => match (a.as_atom(), b.as_atom()) {
-                (Some(a), Some(b)) if a.bytes() < b.bytes() => TheoryOutcome::Holds,
-                _ => TheoryOutcome::Fails {
-                    code: "not_less_than".into(),
-                },
+                (Some(a), Some(b)) if a.bytes() < b.bytes() => TheoryGround::holds(),
+                _ => TheoryGround::fails("not_less_than"),
             },
-            _ => TheoryOutcome::Fails {
-                code: "lt_arity".into(),
-            },
+            _ => TheoryGround::fails("lt_arity"),
         }
     }
 }
@@ -98,8 +94,9 @@ fn host_band_builtin_failed() {
         0,
     );
     let profile = demo_profile(CheckLimits::default());
-    match check(&MapProgram::new(), &lt("b", "a"), &deriv, &(), &profile) {
-        Outcome::Reject { code, detail } => {
+    let outcome = check(&MapProgram::new(), &lt("b", "a"), &deriv, &(), &profile);
+    match outcome.verdict {
+        Verdict::Reject { code, detail } => {
             assert_eq!(code.code(), "builtin_failed");
             assert_eq!(detail, "not_less_than");
             assert!(!code.is_structural());
@@ -137,8 +134,9 @@ fn host_band_leaf_rejected() {
         admit: Box::new(logos_contract::AlwaysAdmit),
         limits: CheckLimits::default(),
     };
-    match check(&MapProgram::new(), &edge, &deriv, &(), &profile) {
-        Outcome::Reject { code, detail } => {
+    let outcome = check(&MapProgram::new(), &edge, &deriv, &(), &profile);
+    match outcome.verdict {
+        Verdict::Reject { code, detail } => {
             assert_eq!(code.code(), "leaf_rejected");
             assert_eq!(detail, "no_attestation");
         }
@@ -192,8 +190,9 @@ fn host_band_rule_inadmissible() {
         admit: Box::new(DenyAdmit),
         limits: CheckLimits::default(),
     };
-    match check(&program, &greet_a, &deriv, &(), &profile) {
-        Outcome::Reject { code, detail } => {
+    let outcome = check(&program, &greet_a, &deriv, &(), &profile);
+    match outcome.verdict {
+        Verdict::Reject { code, detail } => {
             assert_eq!(code.code(), "rule_inadmissible");
             assert_eq!(detail, "placement_mismatch");
         }
@@ -236,8 +235,9 @@ fn rule_head_collides_with_extensional_is_sealed() {
         1,
     );
     let profile = demo_profile(CheckLimits::default());
-    match check(&program, &edge_ab, &deriv, &(), &profile) {
-        Outcome::Reject { code, .. } => assert_eq!(code.code(), "sealed_violation"),
+    let outcome = check(&program, &edge_ab, &deriv, &(), &profile);
+    match outcome.verdict {
+        Verdict::Reject { code, .. } => assert_eq!(code.code(), "sealed_violation"),
         other => panic!("expected sealed_violation, got {other:?}"),
     }
 }
@@ -275,8 +275,9 @@ fn rule_head_owned_by_theory_is_partition_violation() {
         1,
     );
     let profile = demo_profile(CheckLimits::default());
-    match check(&program, &lt_ab, &deriv, &(), &profile) {
-        Outcome::Reject { code, .. } => assert_eq!(code.code(), "predicate_partition_violation"),
+    let outcome = check(&program, &lt_ab, &deriv, &(), &profile);
+    match outcome.verdict {
+        Verdict::Reject { code, .. } => assert_eq!(code.code(), "predicate_partition_violation"),
         other => panic!("expected predicate_partition_violation, got {other:?}"),
     }
 }
@@ -335,8 +336,8 @@ fn over_deep_term_is_rejected_term_too_deep_not_a_crash() {
     let outcome = check(&MapProgram::new(), &claim, &deriv, &(), &profile);
     // Leak BEFORE matching is unnecessary (check only borrows); leak after so the
     // recursive Drop of the depth-50_000 fixture never runs.
-    match &outcome {
-        Outcome::Reject { code, .. } => {
+    match &outcome.verdict {
+        Verdict::Reject { code, .. } => {
             assert_eq!(code.code(), "term_too_deep");
             assert!(
                 code.is_structural(),
@@ -378,8 +379,9 @@ fn term_depth_bound_is_exact_at_the_boundary() {
 
     // value depth = MAX + 1 → rejected.
     let (claim, deriv) = edge_leaf_deriv(|| deep_value(MAX_TERM_DEPTH_DEFAULT));
-    match check(&MapProgram::new(), &claim, &deriv, &(), &profile) {
-        Outcome::Reject { code, .. } => assert_eq!(code.code(), "term_too_deep"),
+    let outcome = check(&MapProgram::new(), &claim, &deriv, &(), &profile);
+    match outcome.verdict {
+        Verdict::Reject { code, .. } => assert_eq!(code.code(), "term_too_deep"),
         other => panic!("expected term_too_deep at boundary+1, got {other:?}"),
     }
 }
@@ -429,8 +431,8 @@ fn over_deep_subst_image_in_a_rule_is_rejected() {
     );
     let profile = demo_profile(CheckLimits::default());
     let outcome = check(&program, &greet, &deriv, &(), &profile);
-    match &outcome {
-        Outcome::Reject { code, .. } => assert_eq!(code.code(), "term_too_deep"),
+    match &outcome.verdict {
+        Verdict::Reject { code, .. } => assert_eq!(code.code(), "term_too_deep"),
         other => panic!("expected term_too_deep for a deep subst image, got {other:?}"),
     }
     leak(deriv); // the deep subst image term is inside; leak to avoid recursive Drop.

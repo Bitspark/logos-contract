@@ -11,6 +11,7 @@ package contract
 import (
 	"testing"
 
+	"github.com/Bitspark/logos-contract/contract/go/completion"
 	core "github.com/bitspark/ontos/core/go"
 )
 
@@ -28,16 +29,16 @@ type ltTheory struct{}
 
 func (ltTheory) Owns(pred Symbol) bool { return pred.Equal(SymbolFromString("lt")) }
 
-func (ltTheory) Decide(atom GroundLiteral) TheoryOutcome {
+func (ltTheory) DecideGround(atom GroundLiteral) completion.TheoryGround {
 	if len(atom.Args) != 2 {
-		return TheoryFails{Code: "lt_arity"}
+		return completion.TheoryGroundFails("lt_arity")
 	}
 	a, aok := atom.Args[0].(core.Atom)
 	b, bok := atom.Args[1].(core.Atom)
 	if aok && bok && bytesLess(a.Bytes(), b.Bytes()) {
-		return TheoryHolds{}
+		return completion.TheoryGroundHolds()
 	}
-	return TheoryFails{Code: "not_less_than"}
+	return completion.TheoryGroundFails("not_less_than")
 }
 
 // bytesLess reports lexicographic byte ordering (a < b), matching Rust's slice
@@ -98,13 +99,13 @@ func TestHostBandBuiltinFailed(t *testing.T) {
 	if got.IsAccept() {
 		t.Fatalf("expected builtin_failed, got accept")
 	}
-	if got.Code().Code() != "builtin_failed" {
-		t.Errorf("got code %q want builtin_failed", got.Code().Code())
+	if got.Verdict.Code().Code() != "builtin_failed" {
+		t.Errorf("got code %q want builtin_failed", got.Verdict.Code().Code())
 	}
-	if got.Detail() != "not_less_than" {
-		t.Errorf("got detail %q want not_less_than", got.Detail())
+	if got.Verdict.Detail() != "not_less_than" {
+		t.Errorf("got detail %q want not_less_than", got.Verdict.Detail())
 	}
-	if got.Code().IsStructural() {
+	if got.Verdict.Code().IsStructural() {
 		t.Errorf("builtin_failed must not be structural")
 	}
 }
@@ -134,11 +135,11 @@ func TestHostBandLeafRejected(t *testing.T) {
 	if got.IsAccept() {
 		t.Fatalf("expected leaf_rejected, got accept")
 	}
-	if got.Code().Code() != "leaf_rejected" {
-		t.Errorf("got code %q want leaf_rejected", got.Code().Code())
+	if got.Verdict.Code().Code() != "leaf_rejected" {
+		t.Errorf("got code %q want leaf_rejected", got.Verdict.Code().Code())
 	}
-	if got.Detail() != "no_attestation" {
-		t.Errorf("got detail %q want no_attestation", got.Detail())
+	if got.Verdict.Detail() != "no_attestation" {
+		t.Errorf("got detail %q want no_attestation", got.Verdict.Detail())
 	}
 }
 
@@ -182,11 +183,11 @@ func TestHostBandRuleInadmissible(t *testing.T) {
 	if got.IsAccept() {
 		t.Fatalf("expected rule_inadmissible, got accept")
 	}
-	if got.Code().Code() != "rule_inadmissible" {
-		t.Errorf("got code %q want rule_inadmissible", got.Code().Code())
+	if got.Verdict.Code().Code() != "rule_inadmissible" {
+		t.Errorf("got code %q want rule_inadmissible", got.Verdict.Code().Code())
 	}
-	if got.Detail() != "placement_mismatch" {
-		t.Errorf("got detail %q want placement_mismatch", got.Detail())
+	if got.Verdict.Detail() != "placement_mismatch" {
+		t.Errorf("got detail %q want placement_mismatch", got.Verdict.Detail())
 	}
 }
 
@@ -217,7 +218,7 @@ func TestRuleHeadCollidesWithExtensionalIsSealed(t *testing.T) {
 	}, 1)
 	profile := demoProfile(DefaultLimits())
 	got := Check[unitCtx](program, edgeAB, deriv, unitCtx{}, profile)
-	if got.IsAccept() || got.Code().Code() != "sealed_violation" {
+	if got.IsAccept() || got.Verdict.Code().Code() != "sealed_violation" {
 		t.Fatalf("expected sealed_violation, got %s", got)
 	}
 }
@@ -247,7 +248,7 @@ func TestRuleHeadOwnedByTheoryIsPartitionViolation(t *testing.T) {
 	}, 1)
 	profile := demoProfile(DefaultLimits())
 	got := Check[unitCtx](program, ltAB, deriv, unitCtx{}, profile)
-	if got.IsAccept() || got.Code().Code() != "predicate_partition_violation" {
+	if got.IsAccept() || got.Verdict.Code().Code() != "predicate_partition_violation" {
 		t.Fatalf("expected predicate_partition_violation, got %s", got)
 	}
 }

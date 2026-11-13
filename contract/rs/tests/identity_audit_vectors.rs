@@ -19,7 +19,7 @@
 
 use logos_contract::{
     compound_identity_of, ComponentIdentity, CompoundTheory, GroundLiteral, Symbol, Theory,
-    TheoryOutcome,
+    TheoryGround,
 };
 use serde_json::Value as Json;
 
@@ -37,8 +37,8 @@ impl Theory for PinnedTheory {
     fn owns(&self, _pred: &Symbol) -> bool {
         false
     }
-    fn decide(&self, _atom: &GroundLiteral) -> TheoryOutcome {
-        TheoryOutcome::NotMine
+    fn decide_ground(&self, _atom: &GroundLiteral) -> TheoryGround {
+        TheoryGround::disowned()
     }
     fn identity(&self) -> ComponentIdentity {
         self.identity.clone()
@@ -57,8 +57,8 @@ impl Theory for DefaultedTheory {
     fn owns(&self, _pred: &Symbol) -> bool {
         false
     }
-    fn decide(&self, _atom: &GroundLiteral) -> TheoryOutcome {
-        TheoryOutcome::NotMine
+    fn decide_ground(&self, _atom: &GroundLiteral) -> TheoryGround {
+        TheoryGround::disowned()
     }
 }
 

@@ -104,13 +104,6 @@ test("one budget controls both certificates and the reported refusal", () => {
   }
 });
 
-test("the wire budget is numeric and does not read native term-display policy", () => {
-  const policy = Object.create(defaultLimits(), {
-    termIdentity: { get() { throw Error("term display was inspected"); } },
-  });
-  assert.equal(decodeDerivationWireV1Bounded(frame(1), policy).closedWorld.length, 1);
-});
-
 test("portable certificate byte caps retain the exact span boundary", () => {
   for (const cap of [2 ** 32 - 1, 2 ** 32, Number.MAX_SAFE_INTEGER]) {
     assert.equal(decodeDerivationWireV1Bounded(frame(1), limits(cap)).closedWorld.length, 1);

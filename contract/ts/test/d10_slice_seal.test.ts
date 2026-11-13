@@ -124,7 +124,7 @@ function d10Profile(): CheckProfile<void> {
 
 /** The verdict of gate 2 only: `undefined` when the context gate passed, else its code. */
 function contextVerdict(cert: ClosedModelCert, program: CompleteProgram, cx: CertContextT): string | undefined {
-  const result = checkClosedModelChain(program, [cert], undefined, d10Profile(), cx);
+  const result = checkClosedModelChain(program, [cert], undefined, d10Profile(), cx).verdict;
   return result.kind === "reject" && result.code === "cert_context_mismatch" ? result.code : undefined;
 }
 

@@ -12,7 +12,7 @@
 //! ```text
 //! !owned              "no theory owns the builtin predicate"        HOST CAPABILITY
 //! also extensional    "builtin predicate is also extensional"       genuine §4.4 overlap
-//! decide -> NotMine   "theory owns predicate but returned NotMine"  INCONSISTENT THEORY
+//! disowned            "theory owns predicate but returned NotMine"  INCONSISTENT THEORY
 //! ```
 //!
 //! Only the first is a statement about the **verifier's binding set** rather than about
@@ -26,7 +26,7 @@
 use logos_contract::{
     check, CheckLimits, CheckProfile, Derivation, Evidence, GroundLiteral, LeafOutcome,
     LeafVerifier, MapProgram, Node, Outcome, PredicateSet, RejectionCode, Symbol, Theory,
-    TheoryOutcome,
+    TheoryGround, Verdict,
 };
 use ontos_core::Value;
 
@@ -43,8 +43,8 @@ impl Theory for UnboundTheory {
     fn owns(&self, _pred: &Symbol) -> bool {
         false
     }
-    fn decide(&self, _atom: &GroundLiteral) -> TheoryOutcome {
-        TheoryOutcome::NotMine
+    fn decide_ground(&self, _atom: &GroundLiteral) -> TheoryGround {
+        TheoryGround::disowned()
     }
 }
 
@@ -59,12 +59,12 @@ impl Theory for OwningTheory {
     fn owns(&self, _pred: &Symbol) -> bool {
         true
     }
-    fn decide(&self, _atom: &GroundLiteral) -> TheoryOutcome {
-        TheoryOutcome::Holds
+    fn decide_ground(&self, _atom: &GroundLiteral) -> TheoryGround {
+        TheoryGround::holds()
     }
 }
 
-/// Arm 3: an **inconsistent** theory — `owns()` says yes, `decide()` disowns.
+/// Arm 3: an **inconsistent** theory — `owns()` says yes, `decide_ground()` disowns.
 struct DisowningTheory;
 // test-double: adversarial(owns a predicate yet decides NotMine: the inconsistent arm)
 impl Theory for DisowningTheory {
@@ -75,8 +75,8 @@ impl Theory for DisowningTheory {
     fn owns(&self, _pred: &Symbol) -> bool {
         true
     }
-    fn decide(&self, _atom: &GroundLiteral) -> TheoryOutcome {
-        TheoryOutcome::NotMine
+    fn decide_ground(&self, _atom: &GroundLiteral) -> TheoryGround {
+        TheoryGround::disowned()
     }
 }
 
@@ -144,9 +144,9 @@ fn run(theory: Box<dyn Theory>, leaves: Leaves, pred: &str) -> Outcome {
 }
 
 fn reject_parts(outcome: &Outcome) -> (RejectionCode, String) {
-    match outcome {
-        Outcome::Reject { code, detail } => (*code, detail.clone()),
-        Outcome::Accept => panic!("expected a rejection, got Accept"),
+    match &outcome.verdict {
+        Verdict::Reject { code, detail } => (*code, detail.clone()),
+        Verdict::Accept => panic!("expected a rejection, got Accept"),
     }
 }
 
@@ -178,7 +178,7 @@ fn arm2_extensional_overlap_keeps_the_structural_code() {
     assert_eq!(detail, "builtin predicate is also extensional");
 }
 
-/// **Arm 3 — inconsistent theory.** `owns()` said yes and `decide()` disowned. A
+/// **Arm 3 — inconsistent theory.** `owns()` said yes and `decide_ground()` disowned. A
 /// verifier-side defect, correctly structural. #1371 must NOT change this either.
 #[test]
 fn arm3_inconsistent_theory_keeps_the_structural_code() {

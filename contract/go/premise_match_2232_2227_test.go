@@ -59,7 +59,7 @@ func pmVerdict(o Outcome) string {
 	if o.IsAccept() {
 		return "ACCEPT"
 	}
-	return o.Code().Code()
+	return o.Verdict.Code().Code()
 }
 
 // selfNeq checks self_neq(.(a,[])) from `self_neq(X) :- cand(X), X \== X.`, citing the builtin

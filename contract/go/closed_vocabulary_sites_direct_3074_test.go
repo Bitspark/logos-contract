@@ -54,41 +54,44 @@ var unknownPremises3074 = []struct {
 
 func TestCheckTermDepthsRefusesAnUnknownPremiseKindByName3074(t *testing.T) {
 	program, claim, deriv, _ := direct3074(PosNode(0))
-	if got := directOutcome3074(t, "control", func() Outcome {
-		return checkTermDepths(program, claim, deriv, DefaultLimits())
+	if got := directOutcome3074(t, "control", func() Verdict {
+		var tally checkTally
+		return checkTermDepths(program, claim, deriv, DefaultLimits(), &tally)
 	}); !got.IsAccept() {
-		t.Fatalf("control: a positive premise within the limits is accepted, got %s: %s", negOutcomeString(got), got.Detail())
+		t.Fatalf("control: a positive premise within the limits is accepted, got %s", got)
 	}
 	for _, c := range unknownPremises3074 {
 		program, claim, deriv, _ := direct3074(c.premise)
-		got := directOutcome3074(t, c.name, func() Outcome {
-			return checkTermDepths(program, claim, deriv, DefaultLimits())
+		got := directOutcome3074(t, c.name, func() Verdict {
+			var tally checkTally
+			return checkTermDepths(program, claim, deriv, DefaultLimits(), &tally)
 		})
 		if got.IsAccept() || got.Code() != UnknownNodeKind {
-			t.Errorf("%s: want unknown_node_kind, got %s: %s", c.name, negOutcomeString(got), got.Detail())
+			t.Errorf("%s: want unknown_node_kind, got %s", c.name, got)
 		}
 	}
 }
 
 func TestCheckNodeRefusesAnUnknownPremiseKindByName3074(t *testing.T) {
-	run := func(premise Premise) Outcome {
+	run := func(premise Premise) Verdict {
 		program, _, deriv, profile := direct3074(premise)
 		node := deriv.Nodes[1]
-		return checkNode[unitCtx](1, node, program, deriv, unitCtx{}, profile, nil, make([]int, len(deriv.Nodes)))
+		var tally checkTally
+		return checkNode[unitCtx](1, node, program, deriv, unitCtx{}, profile, nil, make([]int, len(deriv.Nodes)), &tally)
 	}
-	if got := directOutcome3074(t, "control", func() Outcome { return run(PosNode(0)) }); !got.IsAccept() {
-		t.Fatalf("control: the positive premise is accepted, got %s: %s", negOutcomeString(got), got.Detail())
+	if got := directOutcome3074(t, "control", func() Verdict { return run(PosNode(0)) }); !got.IsAccept() {
+		t.Fatalf("control: the positive premise is accepted, got %s", got)
 	}
 	// A KNOWN kind in the wrong place keeps its own code: the default arm is not a catch-all refusal.
 	// Its arm reads no field, so the zero value is enough.
 	count := CountPremise{}
-	if got := directOutcome3074(t, "count premise", func() Outcome { return run(count) }); got.Code() != InstantiationMismatch {
-		t.Fatalf("control: a count premise at a positive literal is instantiation_mismatch, got %s: %s", negOutcomeString(got), got.Detail())
+	if got := directOutcome3074(t, "count premise", func() Verdict { return run(count) }); got.Code() != InstantiationMismatch {
+		t.Fatalf("control: a count premise at a positive literal is instantiation_mismatch, got %s", got)
 	}
 	for _, c := range unknownPremises3074 {
-		got := directOutcome3074(t, c.name, func() Outcome { return run(c.premise) })
+		got := directOutcome3074(t, c.name, func() Verdict { return run(c.premise) })
 		if got.IsAccept() || got.Code() != UnknownNodeKind {
-			t.Errorf("%s: want unknown_node_kind, got %s: %s", c.name, negOutcomeString(got), got.Detail())
+			t.Errorf("%s: want unknown_node_kind, got %s", c.name, got)
 		}
 	}
 }

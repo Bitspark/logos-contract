@@ -76,21 +76,21 @@ func TestNativeProofHandlesRefusePortableWriting(t *testing.T) {
 	for _, handle := range []string{"A\xff", "A\xed\xa0\x80"} {
 		f := evidenceForHandle(handle)
 		if out := contract.Check(f.program, f.claim, f.rule, struct{}{}, profile); !out.IsAccept() {
-			t.Fatalf("native rule check: %v", out.Detail())
+			t.Fatalf("native rule check: %v", out.Verdict.Detail())
 		}
 		if out := contract.CheckClosedModelChain(f.program, f.support.ClosedWorld, struct{}{}, profile, f.context); !out.IsAccept() {
-			t.Fatalf("native support check: %v", out.Detail())
+			t.Fatalf("native support check: %v", out.Verdict.Detail())
 		}
 		under := f.support.ClosedWorld[0]
 		under.LimitsDecl.CertBytes--
 		short := contract.CheckClosedModelChain(f.program, []contract.ClosedModelCert{under}, struct{}{}, profile, f.context)
-		if short.IsAccept() || short.Code().Code() != "cert_decl_mismatch" {
-			t.Fatalf("a native certificate declared one byte short: %v", short.Detail())
+		if short.IsAccept() || short.Verdict.Code().Code() != "cert_decl_mismatch" {
+			t.Fatalf("a native certificate declared one byte short: %v", short.Verdict.Detail())
 		}
 		memo := contract.NewWorldMemo(f.program, profile, struct{}{}, f.context)
 		for range 2 {
 			if out := contract.CheckWithWorldMemo(memo, f.claim, f.support); !out.IsAccept() {
-				t.Fatalf("native memo check: %v", out.Detail())
+				t.Fatalf("native memo check: %v", out.Verdict.Detail())
 			}
 		}
 		cert := f.support.ClosedWorld[0]

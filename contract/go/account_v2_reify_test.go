@@ -10,6 +10,7 @@ package contract
 import (
 	"testing"
 
+	"github.com/Bitspark/logos-contract/contract/go/completion"
 	core "github.com/bitspark/ontos/core/go"
 )
 
@@ -19,8 +20,10 @@ import (
 // test-double: consumer(owns no predicate)
 type noTheory struct{}
 
-func (noTheory) Owns(Symbol) bool                   { return false }
-func (noTheory) Decide(GroundLiteral) TheoryOutcome { return TheoryNotMine{} }
+func (noTheory) Owns(Symbol) bool { return false }
+func (noTheory) DecideGround(GroundLiteral) completion.TheoryGround {
+	return completion.TheoryGroundDisowned()
+}
 
 // srcLeaves declares src extensional and admits any src leaf whose argument, AFTER
 // cons↔`list` canonicalization, is in its cons-form EDB-of-record — exercising the
@@ -124,7 +127,7 @@ func TestReifiedListDerivationIsRefused3022(t *testing.T) {
 		},
 	}, 1)
 	got := Check[unitCtx](program, wrapList, deriv, unitCtx{}, srcProfile(leaves))
-	if got.IsAccept() || got.Code().Code() != "instantiation_mismatch" {
+	if got.IsAccept() || got.Verdict.Code().Code() != "instantiation_mismatch" {
 		t.Fatalf("a reified conclusion is not the instantiated head (#3022); got %s", got.String())
 	}
 }
@@ -145,7 +148,7 @@ func TestReifiedRootIsRefusedAgainstConsClaim3022(t *testing.T) {
 	}, 1)
 	consClaim := gl("wrap", consList(elems...))
 	got := Check[unitCtx](program, consClaim, deriv, unitCtx{}, srcProfile(leaves))
-	if got.IsAccept() || got.Code().Code() != "instantiation_mismatch" {
+	if got.IsAccept() || got.Verdict.Code().Code() != "instantiation_mismatch" {
 		t.Fatalf("a reified node is refused at its own head before the root is read (#3022); got %s", got.String())
 	}
 }
@@ -192,8 +195,8 @@ func TestReifiedWrongOrderListIsRejected(t *testing.T) {
 	if got.IsAccept() {
 		t.Fatal("a wrong-order reified list was wrongly ACCEPTED (unsound)")
 	}
-	if got.Code().Code() != "instantiation_mismatch" {
-		t.Errorf("got code %q want instantiation_mismatch", got.Code().Code())
+	if got.Verdict.Code().Code() != "instantiation_mismatch" {
+		t.Errorf("got code %q want instantiation_mismatch", got.Verdict.Code().Code())
 	}
 }
 
@@ -219,8 +222,8 @@ func TestImproperTailNotConflatedWithProperList(t *testing.T) {
 	if got.IsAccept() {
 		t.Fatal("an improper cons claimed as a proper list was wrongly ACCEPTED (unsound)")
 	}
-	if got.Code().Code() != "instantiation_mismatch" {
-		t.Errorf("got code %q want instantiation_mismatch", got.Code().Code())
+	if got.Verdict.Code().Code() != "instantiation_mismatch" {
+		t.Errorf("got code %q want instantiation_mismatch", got.Verdict.Code().Code())
 	}
 }
 
@@ -242,8 +245,8 @@ func TestDefaultDistinctConsStillRejects(t *testing.T) {
 	if got.IsAccept() {
 		t.Fatal("a distinct cons root matched the claim (unsound)")
 	}
-	if got.Code().Code() != "root_conclusion_mismatch" {
-		t.Errorf("got code %q want root_conclusion_mismatch", got.Code().Code())
+	if got.Verdict.Code().Code() != "root_conclusion_mismatch" {
+		t.Errorf("got code %q want root_conclusion_mismatch", got.Verdict.Code().Code())
 	}
 }
 
@@ -344,7 +347,7 @@ func TestReifiedLeafMatchesConsEdb(t *testing.T) {
 	if got2.IsAccept() {
 		t.Fatal("a leaf absent from the EDB was wrongly admitted")
 	}
-	if got2.Code().Code() != "leaf_rejected" {
-		t.Errorf("got code %q want leaf_rejected", got2.Code().Code())
+	if got2.Verdict.Code().Code() != "leaf_rejected" {
+		t.Errorf("got code %q want leaf_rejected", got2.Verdict.Code().Code())
 	}
 }

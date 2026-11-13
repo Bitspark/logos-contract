@@ -19,7 +19,7 @@ use logos_contract::{
     CheckLimits, CheckProfile, Clause, ClauseId, ClosedModelCert, ClosureWitness, Derivation,
     Evidence, FiniteDomain, Goal, GroundLiteral, Hash, LeafOutcome, LeafVerifier, MapProgram, Node,
     NodeMeta, NonMemberProof, Outcome, PredicateSet, Premise, RelationTable, StratumPrefix, Subst,
-    SupportEdge, SupportRef, SupportWitness, Symbol, Term,
+    SupportEdge, SupportRef, SupportWitness, Symbol, Term, Verdict,
 };
 use ontos_core::Value;
 use std::collections::BTreeMap;
@@ -80,9 +80,9 @@ impl LeafVerifier<()> for Leaves {
 }
 
 fn verdict(outcome: &Outcome) -> &'static str {
-    match outcome {
-        Outcome::Accept => "ACCEPT",
-        Outcome::Reject { code, .. } => code.code(),
+    match &outcome.verdict {
+        Verdict::Accept => "ACCEPT",
+        Verdict::Reject { code, .. } => code.code(),
     }
 }
 

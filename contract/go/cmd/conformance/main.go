@@ -7,7 +7,9 @@
 // asserts each line against the hand-authored oracle.
 //
 //	check   : in  {program, cases:[{name, claim, derivation, limits?}]}
-//	          out {"name":…,"outcome":"accept"|{"reject":"<code>"}}
+//	          out {"name":…,"outcome":"accept"|{"reject":"<code>"},"report":{…}}, the report
+//	              being check()'s work counters by their snake_case names (#4206; the negation
+//	              family emits the same shape)
 //	account : in  {clauses:[{name, head, body}]}
 //	          out {"name":…,"id":"<hex>"}
 //
@@ -49,16 +51,16 @@ func (ltTheory) Completion(contract.Symbol) contract.DecisionCompletion {
 	return contract.DecisionStopsAreTyped{}
 }
 
-func (ltTheory) Decide(atom contract.GroundLiteral) contract.TheoryOutcome {
+func (ltTheory) DecideGround(atom contract.GroundLiteral) completion.TheoryGround {
 	if len(atom.Args) != 2 {
-		return contract.TheoryFails{Code: "lt_arity"}
+		return completion.TheoryGroundFails("lt_arity")
 	}
 	a, aok := atom.Args[0].(core.Atom)
 	b, bok := atom.Args[1].(core.Atom)
 	if aok && bok && bytesLess(a.Bytes(), b.Bytes()) {
-		return contract.TheoryHolds{}
+		return completion.TheoryGroundHolds()
 	}
-	return contract.TheoryFails{Code: "not_less_than"}
+	return completion.TheoryGroundFails("not_less_than")
 }
 
 func bytesLess(a, b []byte) bool {
@@ -389,6 +391,44 @@ func (j jsonBodyLit) build() contract.BodyLit {
 type checkResult struct {
 	Name    string `json:"name"`
 	Outcome any    `json:"outcome"`
+	// Report is check()'s report on the check and negation families (#4206), and absent on the
+	// theory families: the harness asserts it against every row that states a report.
+	Report map[string]any `json:"report,omitempty"`
+}
+
+// reportJSON renders check()'s report as the harness reads it (#4206): counters_version and the
+// 17 counters by their snake_case names, each a count, or null where this core does not count it.
+func reportJSON(r contract.CheckReport) map[string]any {
+	out := map[string]any{"counters_version": r.CountersVersion}
+	for _, c := range []struct {
+		name  string
+		count contract.ReportCount
+	}{
+		{"nodes_walked", r.NodesWalked},
+		{"rule_nodes", r.RuleNodes},
+		{"builtin_nodes", r.BuiltinNodes},
+		{"leaf_nodes", r.LeafNodes},
+		{"premises_pos", r.PremisesPos},
+		{"premises_neg", r.PremisesNeg},
+		{"theory_decisions", r.TheoryDecisions},
+		{"leaf_verifications", r.LeafVerifications},
+		{"admissibility_checks", r.AdmissibilityChecks},
+		{"certs_verified", r.CertsVerified},
+		{"certs_memo_hits", r.CertsMemoHits},
+		{"cert_tables_read", r.CertTablesRead},
+		{"cert_rows_read", r.CertRowsRead},
+		{"join_steps_used", r.JoinStepsUsed},
+		{"groundings_enumerated", r.GroundingsEnumerated},
+		{"max_depth_reached", r.MaxDepthReached},
+		{"max_term_depth_reached", r.MaxTermDepthReached},
+	} {
+		if n, ok := c.count.Get(); ok {
+			out[c.name] = n
+		} else {
+			out[c.name] = nil
+		}
+	}
+	return out
 }
 
 type accountResult struct {
@@ -444,9 +484,9 @@ func runCheck(data []byte) {
 		if got.IsAccept() {
 			outcome = "accept"
 		} else {
-			outcome = map[string]string{"reject": got.Code().Code()}
+			outcome = map[string]string{"reject": got.Verdict.Code().Code()}
 		}
-		emit(checkResult{Name: c.Name, Outcome: outcome})
+		emit(checkResult{Name: c.Name, Outcome: outcome, Report: reportJSON(got.Report)})
 	}
 }
 
@@ -828,9 +868,9 @@ func runNegation(data []byte) {
 		if got.IsAccept() {
 			outcome = "accept"
 		} else {
-			outcome = map[string]string{"reject": got.Code().Code()}
+			outcome = map[string]string{"reject": got.Verdict.Code().Code()}
 		}
-		emit(checkResult{Name: c.Name, Outcome: outcome})
+		emit(checkResult{Name: c.Name, Outcome: outcome, Report: reportJSON(got.Report)})
 	}
 }
 
@@ -875,7 +915,7 @@ func setIf(dst *int, src *int) {
 }
 
 // ===================== theory-decision families (ADR 0006 / #95, #154) ==============
-// arithmetic / list / term / text / compound — each drives a contract Theory's Decide
+// arithmetic / list / term / text / compound — each drives a contract Theory's DecideGround
 // over the shared vectors/<family>.json `decisions` array, emitting one {name,outcome}
 // line per ground decision plus a trailing __identity__ line pinning the theory's config
 // digest. The arg builder mirrors the unit replays' buildArg (arithmetic_vectors_test.go)

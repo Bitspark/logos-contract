@@ -11,6 +11,7 @@ package contract
 // `refusal` rows pin it in all three cores.
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"strings"
@@ -41,6 +42,14 @@ const (
 	// DecodeNotCanonical: a collection arrived out of canonical sorted+deduped order (#839,
 	// #2630's subst entries).
 	DecodeNotCanonical
+	// DecodeCodecFault: DecodeDerivationWireV1's codec stopped on the caller's own bytes. Err is the
+	// codec's own *codec.DecodeError, unfolded (checker SPI v2, ADR 0036 D8 change 4; #2734 3c,
+	// seat:caa's ruling C). It is a FAULT, never a shape refusal: that decoder reads bytes its
+	// caller produced and trusts, so a codec that cannot read them is the caller's defect. Bytes
+	// from anyone else go through DecodeDerivationWireV1Bounded, whose BoundedWireStopped carries
+	// the same error as an ordinary refusal. The rendering names the codec's portable Code; its
+	// message stays in Err, because the cores' codecs word it differently.
+	DecodeCodecFault
 )
 
 // There is no depth class here, in any core (#2731, `seat:caa`'s ruling). The decoder imposes no
@@ -63,7 +72,12 @@ type DecodeError struct {
 	// Tag is the tag's exact bytes (DecodeUnknownTag); a Go string holds any bytes. Rendered by
 	// RenderTag.
 	Tag string
+	// Err is the codec's error (DecodeCodecFault).
+	Err error
 }
+
+// Unwrap returns the codec's error of a DecodeCodecFault, and nil for every refusal.
+func (e *DecodeError) Unwrap() error { return e.Err }
 
 // Error renders the one tri-core text, byte-identical to rs's DecodeError Display.
 func (e *DecodeError) Error() string {
@@ -82,6 +96,13 @@ func (e *DecodeError) Error() string {
 		return "decode " + e.Ctx + ": not valid UTF-8"
 	case DecodeNotCanonical:
 		return "decode " + e.Ctx + ": not in canonical sorted+deduped order"
+	case DecodeCodecFault:
+		code := "not_a_codec_error"
+		var ce *codec.DecodeError
+		if errors.As(e.Err, &ce) {
+			code = ce.Code
+		}
+		return "decode " + e.Ctx + ": codec fault: " + code
 	default:
 		return "decode " + e.Ctx + ": unknown refusal"
 	}
@@ -1013,10 +1034,12 @@ func DerivationWireV1FromValue(v core.Value) (Derivation, error) {
 
 // DecodeDerivationWireV1 decodes ontos-codec bytes as a public proof-interchange v1 derivation.
 // For bytes the caller trusts; bytes it did not produce go through DecodeDerivationWireV1Bounded.
+// A codec stop on the caller's bytes is a DecodeCodecFault, a fault, never a shape refusal
+// (checker SPI v2).
 func DecodeDerivationWireV1(bytes []byte) (Derivation, error) {
 	v, err := codec.Decode(bytes)
 	if err != nil {
-		return Derivation{}, &DecodeError{Kind: DecodeShape, Ctx: "derivation wire v1 bytes"}
+		return Derivation{}, &DecodeError{Kind: DecodeCodecFault, Ctx: "derivation wire v1 bytes", Err: err}
 	}
 	return DerivationWireV1FromValue(v)
 }

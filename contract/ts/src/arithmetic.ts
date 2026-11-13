@@ -5,7 +5,7 @@
 //
 // This lifts the positive-Datalog-only scope of host-side certification: a program
 // that uses the arithmetic relations (is / =:= / =\= / < / > / >= / =<) can now be
-// CHECKED in TS, because the same decide() that the Rust core uses is reproduced
+// CHECKED in TS, because the same decision the Rust core makes is reproduced
 // here byte-for-byte. All three cores agree on EVERY ground arithmetic atom — the §7
 // dual-conformance law and the issue-#95 byte-parity requirement (TS sibling, #154).
 //
@@ -32,8 +32,8 @@
 //
 // owns(pred): by NAME only (any arity, byte-exact) for the seven arithmetic
 // relations. The expression operators (+ - * / // mod abs min max) are never goals,
-// so they are NOT owned. decide(atom) on a ground atom:
-//   - not owned                      -> NotMine                     (routed away by check)
+// so they are NOT owned. decideGround(atom) on a ground atom:
+//   - not owned                      -> disowned                    (routed away by check)
 //   - owned name, unregistered arity -> Fails{arith_bad_arity}      (e.g. is/3, </1)
 //   - registered, evaluates to true  -> Holds
 //   - registered, evaluates to false
@@ -53,17 +53,16 @@ import { encodeInt, readInt } from "@bitspark/ontos-data";
 
 import {
   completed,
-  fault,
   notCompleted,
   stop,
   theoryFails,
   theoryHolds,
   type NonCompletion,
-  type TheoryGround,
+  TheoryGround,
 } from "./completion.js";
 import { BigDecimal, type DecimalResult } from "./decval.js";
 import { Symbol, type GroundLiteral } from "./literal.js";
-import { ComponentIdentity, DecisionCompletion, legacyOutcome, type Theory, TheoryOutcome } from "./spi.js";
+import { ComponentIdentity, DecisionCompletion, type Theory } from "./spi.js";
 
 // A numeric value the arithmetic evaluator produces and applyOperator combines: an exact
 // integer OR an exact decimal (#331), mirroring Rust's arithmetic::Num and Go's num. The
@@ -135,14 +134,6 @@ export class ArithmeticTheory implements Theory {
     return ARITHMETIC_PREDICATE_KEYS.has(hexKey(pred.bytes()));
   }
 
-  /**
-   * The v1 answer, DERIVED from {@link decideGround} by the one legacy adapter (#3126). An
-   * evaluation past a work cap is `not_mine` there, never `fails`: every legacy reader refuses an
-   * owned atom's `not_mine` by name, so it fails closed (seat:caa on #3126).
-   */
-  decide(atom: GroundLiteral): TheoryOutcome {
-    return legacyOutcome(this.decideGround(atom));
-  }
 
   /**
    * Decides an owned GROUND arithmetic atom, byte-identically to the Rust/Go
@@ -152,9 +143,9 @@ export class ArithmeticTheory implements Theory {
    */
   decideGround(atom: GroundLiteral): TheoryGround {
     // Not one of ours: check routes by owns, so this is the theory contradicting its own routing,
-    // the fault the default reports for not_mine. Stay total. Mirrors Rust/Go.
+    // the inconsistent_theory fault. Stay total. Mirrors Rust/Go.
     if (!this.owns(atom.pred)) {
-      return notCompleted(fault("inconsistent_theory"));
+      return TheoryGround.disowned();
     }
     // An owned name is always valid UTF-8 (the names are ASCII), but mirror Rust's
     // from_utf8 / Go's utf8.Valid guard so the non-UTF-8 defensive arm carries the

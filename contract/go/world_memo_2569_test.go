@@ -98,7 +98,7 @@ func TestWorldMemoBindsTheWorldBeforeCallingTheVerifier(t *testing.T) {
 		t.Fatalf("the original verified table should discharge the original count: %s", first)
 	}
 	fresh := memoFresh(program, aggProfile(), memoClaim(), deriv)
-	if fresh.IsAccept() || fresh.Code() != CertContextMismatch {
+	if fresh.IsAccept() || fresh.Verdict.Code() != CertContextMismatch {
 		t.Fatalf("control: the changed input should fail the context check: %s", fresh)
 	}
 	if got := CheckWithWorldMemo(memo, memoClaim(), deriv); got.String() != fresh.String() || memo.CertificatesVerified() != 2 {

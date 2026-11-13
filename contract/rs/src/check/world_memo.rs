@@ -14,6 +14,7 @@
 //! the checker fills them: a caller can present a memo, never a verdict.
 
 use super::cert::CertStatus;
+use super::report::Tally;
 use super::{verify_world, CertContext, CheckLimits, CheckProfile};
 use crate::program::Program;
 use crate::ClosedModelCert;
@@ -36,8 +37,8 @@ use crate::ClosedModelCert;
 ///   `CHECKER_VERSION` is a constant of the one binary that fills and reads it.
 ///
 /// ⚠ It rests on `verify_cert` being a pure function of those inputs, and so on every theory's
-/// `decide` and the caller's leaf verifier being deterministic within a run. The contract states
-/// that obligation (`docs/spec/logos-contract.md`, the leaf verifier and theory sections); a
+/// `decide_ground` and the caller's leaf verifier being deterministic within a run. The contract
+/// states that obligation (`docs/spec/logos-contract.md`, the leaf verifier and theory sections); a
 /// non-deterministic decider would already break dual conformance, and this memo makes the
 /// obligation load-bearing.
 pub struct WorldMemo<'a, C> {
@@ -81,6 +82,9 @@ impl<'a, C> WorldMemo<'a, C> {
     /// The statuses of `world` under these inputs: served from the slot on a hit, verified and
     /// stored on a miss. An EMPTY world (a positive derivation) needs no verification and does not
     /// touch the slot, so positive answers between two that cite a world do not evict it.
+    ///
+    /// The calling check's `tally` counts a hit's certificates as `certs_memo_hits`, and a miss's
+    /// verification as that check's own work.
     #[allow(ambiguous_wide_pointer_comparisons)] // the vtable is part of the identity on purpose
     pub(super) fn statuses(
         &mut self,
@@ -89,6 +93,7 @@ impl<'a, C> WorldMemo<'a, C> {
         ctx: &'a C,
         cert_context: &CertContext,
         world: &[ClosedModelCert],
+        tally: &mut Tally,
     ) -> &[CertStatus] {
         if world.is_empty() {
             return &[];
@@ -101,8 +106,11 @@ impl<'a, C> WorldMemo<'a, C> {
                 && entry.limits == profile.limits
                 && entry.world.as_slice() == world
         });
-        if !hit {
-            let status = verify_world(world, program, profile, ctx, cert_context);
+        if hit {
+            // certs_memo_hits: every certificate of the world, served instead of verified.
+            tally.certs_memo_hits += world.len() as u64;
+        } else {
+            let status = verify_world(world, program, profile, ctx, cert_context, tally);
             self.verified += world.len();
             self.last = Some(Entry {
                 program,

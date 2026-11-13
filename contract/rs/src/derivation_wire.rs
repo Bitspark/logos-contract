@@ -402,10 +402,12 @@ pub fn clause_as_value(clause: &Clause) -> Value {
     clause_value(clause)
 }
 
-/// Why a [`Value`] is not in the image of the corresponding `*_as_value` reading.
+/// Why a [`Value`] is not in the image of the corresponding `*_as_value` reading, or why the trusted
+/// bytes decoder could not read its caller's bytes at all.
 ///
-/// Every variant is a malformed-wire fault — the bytes do not decode to a
-/// well-formed candidate/derivation/subst. The decoders return this instead of
+/// Every variant but [`DecodeError::CodecFault`] is a malformed-wire refusal: the value does not
+/// decode to a well-formed candidate/derivation/subst. `CodecFault` is the trusted decoder's own
+/// arm (checker SPI v2, ADR 0036 D8 change 4, #2734 ruling C). The decoders return this instead of
 /// panicking, so a byzantine or cross-language producer cannot crash the kernel.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum DecodeError {
@@ -440,6 +442,18 @@ pub enum DecodeError {
     /// downstream — and silently *repairing* them would mask the producer bug.
     /// Proof-carrying data is rejected, never fixed up. `ctx` names the collection.
     NotCanonical { ctx: &'static str },
+    /// [`decode_derivation_wire_v1`]'s codec stopped on the caller's own bytes: the codec's error,
+    /// unfolded (checker SPI v2, ADR 0036 D8 change 4; #2734 increment 3c, `seat:caa`'s ruling C).
+    /// It is a FAULT, never a shape refusal: that decoder reads bytes its caller produced and
+    /// trusts, so a codec that cannot read them (a capacity such as the decode depth, an atom
+    /// length or an arity, or bytes that are not a value) is the caller's defect. Bytes from
+    /// anyone else go through `decode_derivation_wire_v1_bounded`, whose `Stopped` arm carries the
+    /// same error as an ordinary refusal. The rendering names the codec's portable `code`; its
+    /// message stays in `error`, because the cores' codecs word it differently.
+    CodecFault {
+        ctx: &'static str,
+        error: ontos_codec::DecodeError,
+    },
 }
 
 impl std::fmt::Display for DecodeError {
@@ -464,11 +478,22 @@ impl std::fmt::Display for DecodeError {
             DecodeError::NotCanonical { ctx } => {
                 write!(f, "decode {ctx}: not in canonical sorted+deduped order")
             }
+            DecodeError::CodecFault { ctx, error } => {
+                write!(f, "decode {ctx}: codec fault: {}", error.code())
+            }
         }
     }
 }
 
-impl std::error::Error for DecodeError {}
+impl std::error::Error for DecodeError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        if let DecodeError::CodecFault { error, .. } = self {
+            Some(error)
+        } else {
+            None
+        }
+    }
+}
 
 /// The ONE rendering of an arity refusal (#2630, `seat:caa`'s ruling): a reading that takes a
 /// single arity keeps the text it always had (`decode {ctx}: expected arity 3, got 2`); a reading
@@ -523,14 +548,18 @@ type Result<T> = std::result::Result<T, DecodeError>;
 // ------------------------------- small helpers ------------------------------
 
 /// Borrow `v`'s tuple items, or `Shape`.
-fn items<'a>(v: &'a Value, ctx: &'static str) -> Result<&'a [Value]> {
+pub(crate) fn items<'a>(v: &'a Value, ctx: &'static str) -> Result<&'a [Value]> {
     v.as_tuple()
         .map(|t| t.items())
         .ok_or(DecodeError::Shape { ctx })
 }
 
 /// Borrow `v`'s tuple items at one of the `accepted` arities.
-fn items_n<'a>(v: &'a Value, ctx: &'static str, accepted: &'static [usize]) -> Result<&'a [Value]> {
+pub(crate) fn items_n<'a>(
+    v: &'a Value,
+    ctx: &'static str,
+    accepted: &'static [usize],
+) -> Result<&'a [Value]> {
     let its = items(v, ctx)?;
     if !accepted.contains(&its.len()) {
         return Err(DecodeError::Arity {
@@ -543,7 +572,7 @@ fn items_n<'a>(v: &'a Value, ctx: &'static str, accepted: &'static [usize]) -> R
 }
 
 /// Borrow `v`'s atom bytes, or `Shape`.
-fn atom_bytes<'a>(v: &'a Value, ctx: &'static str) -> Result<&'a [u8]> {
+pub(crate) fn atom_bytes<'a>(v: &'a Value, ctx: &'static str) -> Result<&'a [u8]> {
     v.as_atom()
         .map(|a| a.bytes())
         .ok_or(DecodeError::Shape { ctx })
@@ -551,7 +580,7 @@ fn atom_bytes<'a>(v: &'a Value, ctx: &'static str) -> Result<&'a [u8]> {
 
 /// Split a tagged value `Tuple[Atom(tag), payload…]` into its tag and payload — the
 /// inverse of [`tagged`](super::wire::tagged). Requires at least the tag slot.
-fn split_tag<'a>(v: &'a Value, ctx: &'static str) -> Result<(&'a [u8], &'a [Value])> {
+pub(crate) fn split_tag<'a>(v: &'a Value, ctx: &'static str) -> Result<(&'a [u8], &'a [Value])> {
     let its = items(v, ctx)?;
     let (head, rest) = its.split_first().ok_or(DecodeError::Arity {
         ctx,
@@ -946,7 +975,7 @@ pub fn derivation_from_value(v: &Value) -> Result<Derivation> {
 /// Read a digest atom into a [`Hash`](crate::Hash) — the inverse of
 /// [`digest_atom`](super::wire::digest_atom), which writes the 32 bytes as a 64-char
 /// lowercase-hex `Atom`.
-fn read_hash(v: &Value, ctx: &'static str) -> Result<[u8; 32]> {
+pub(crate) fn read_hash(v: &Value, ctx: &'static str) -> Result<[u8; 32]> {
     crate::parse_hash_hex(atom_bytes(v, ctx)?).ok_or(DecodeError::Shape { ctx })
 }
 
@@ -1235,10 +1264,12 @@ pub fn encode_derivation_wire_v1(deriv: &Derivation) -> Vec<u8> {
 /// Decodes ontos-codec bytes as a public proof-interchange v1 derivation.
 /// For bytes the caller trusts. Bytes it did not produce go through
 /// [`decode_derivation_wire_v1_bounded`](crate::decode_derivation_wire_v1_bounded), which holds
-/// every certificate to the caller's `CheckLimits` before decoding (#2561).
+/// every certificate to the caller's `CheckLimits` before decoding (#2561). A codec stop on the
+/// caller's bytes is [`DecodeError::CodecFault`], a fault, never a shape refusal (checker SPI v2).
 pub fn decode_derivation_wire_v1(bytes: &[u8]) -> Result<Derivation> {
-    let value = ontos_codec::decode(bytes).map_err(|_| DecodeError::Shape {
+    let value = ontos_codec::decode(bytes).map_err(|error| DecodeError::CodecFault {
         ctx: "derivation wire v1 bytes",
+        error,
     })?;
     derivation_wire_v1_from_value(&value)
 }
@@ -1269,5 +1300,43 @@ mod platform_domain_2682 {
         for b in 0x80u8..=0xff {
             assert_eq!(render_tag(&[b]), format!("\"\\x{{{b:02x}}}\""));
         }
+    }
+}
+
+/// Checker SPI v2, ADR 0036 D8 change 4 (#3111; #2734 ruling C): the trusted decoder's codec stop is
+/// its own FAULT arm, carrying the codec's error, and a decoded value of the wrong shape is still the
+/// shape refusal. The go and ts twins pin the same text.
+#[cfg(test)]
+mod trusted_codec_fault_3111 {
+    use super::*;
+
+    #[test]
+    fn a_codec_stop_on_trusted_bytes_is_a_codec_fault_not_a_shape_3111() {
+        let err = decode_derivation_wire_v1(&[]).expect_err("empty bytes are not a value");
+        let DecodeError::CodecFault { ctx, error } = &err else {
+            panic!("expected the codec fault arm, got {err:?}");
+        };
+        assert_eq!(*ctx, "derivation wire v1 bytes");
+        assert_eq!(error.code(), "unexpected_eof");
+        assert_eq!(
+            err.to_string(),
+            "decode derivation wire v1 bytes: codec fault: unexpected_eof"
+        );
+        assert!(
+            std::error::Error::source(&err).is_some(),
+            "the codec error is the source"
+        );
+    }
+
+    #[test]
+    fn a_value_of_the_wrong_shape_is_still_a_shape_refusal_3111() {
+        // CONTROL: the bytes ARE a value (an atom), so the codec did not stop; the wire reading
+        // refuses it, and that is not the fault arm.
+        let bytes = ontos_codec::encode(&Value::atom(*b"not-a-wire"));
+        let err = decode_derivation_wire_v1(&bytes).expect_err("an atom is not a wire");
+        assert!(
+            !matches!(err, DecodeError::CodecFault { .. }),
+            "a decoded value is never a codec fault: {err:?}"
+        );
     }
 }

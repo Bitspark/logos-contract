@@ -7,7 +7,7 @@
 //! which already place it here. The search-side builtin SOLVER stays in
 //! `logos_core::builtins` (it needs core's unify/`Subst` machinery); it shares THIS
 //! module's walk ([`eval_resolving`]), operator semantics ([`apply_operator`]) and the
-//! [`BigInt`] int embedding, so `decide` (check) and `solve` (search) agree on every
+//! [`BigInt`] int embedding, so `decide_ground` (check) and `solve` (search) agree on every
 //! ground atom — the §7 dual-conformance law, byte-frozen in `vectors/arithmetic.json`.
 //!
 //! # No depth capacity (#3123)
@@ -62,9 +62,6 @@
 //!   - registered, evaluates to false,
 //!     or a [`DomainError`]              → `Completed(Fails{arith_does_not_hold})`
 //!   - an evaluation past a work cap    → `NotCompleted(work_cap)` (#3126)
-//!
-//! The v1 `decide` is derived from it by [`legacy_outcome`](crate::spi::legacy_outcome): the
-//! not-completed case is `NotMine`, which every reader refuses by name, never `Fails`.
 
 use std::cmp::Ordering;
 
@@ -72,8 +69,7 @@ use crate::completion::{CauseScope, Completion, NonCompletion, TheoryDecision};
 use crate::decval::{BigDecimal, DecimalError};
 use crate::engine::NoCallerLimit;
 use crate::intval::BigInt;
-use crate::spi::legacy_outcome;
-use crate::{ComponentIdentity, GroundLiteral, Symbol, Term, Theory, TheoryOutcome};
+use crate::{ComponentIdentity, GroundLiteral, Symbol, Term, Theory, TheoryGround};
 
 /// The arithmetic-relation predicate names this theory owns: `is/2` and the six
 /// arithmetic comparisons. Owned by NAME only — the expression operators
@@ -309,9 +305,9 @@ impl Theory for ArithmeticTheory {
     /// evaluation past a work cap is `NotCompleted(work_cap)`, never a false (research 0031).
     fn decide_ground(&self, atom: &GroundLiteral) -> Completion<TheoryDecision, NoCallerLimit> {
         // Not one of ours: `check` routes by `owns`, so this is the theory contradicting its own
-        // routing, the fault the default reports for `NotMine`. Stay total.
+        // routing, the named `inconsistent_theory` fault. Stay total.
         if !owns_name(&atom.pred) {
-            return Completion::NotCompleted(NonCompletion::inconsistent_theory());
+            return TheoryGround::disowned();
         }
         let name = match std::str::from_utf8(atom.pred.bytes()) {
             Ok(name) => name,
@@ -332,13 +328,6 @@ impl Theory for ArithmeticTheory {
             // is exactly the match arms above), but stay total.
             _ => fails(ARITH_DOES_NOT_HOLD),
         }
-    }
-
-    /// The v1 answer, DERIVED from [`decide_ground`](Theory::decide_ground) by the one legacy
-    /// adapter. An evaluation past a work cap is `NotMine` there, never `Fails`: every legacy
-    /// reader refuses an owned atom's `NotMine` by name, so it fails closed (seat:caa on #3126).
-    fn decide(&self, atom: &GroundLiteral) -> TheoryOutcome {
-        legacy_outcome(self.decide_ground(atom))
     }
 }
 
@@ -532,7 +521,7 @@ pub fn eval_resolving<'t>(
 }
 
 /// Apply an arithmetic operator named `op` to its already-evaluated operands. The
-/// single source of operator semantics, shared by `decide` (check) and
+/// single source of operator semantics, shared by `decide_ground` (check) and
 /// `logos_core::builtins` (search), so the two cannot drift. An unknown `op/arity` is
 /// [`DomainError::UnknownOperator`]; an operator's own failures are its [`DomainError`]s, and
 /// a decimal alignment past the cap is not completed (#3126).

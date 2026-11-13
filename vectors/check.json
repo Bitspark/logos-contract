@@ -1,7 +1,7 @@
 {
   "spi": "logos-checker-spi v1",
   "profile": "demo_v1",
-  "note": "Language-agnostic conformance vectors for check() over a NON-ARCHE program (graph reachability + byte-ordering), so genericity is demonstrated, not asserted. Every {rs,go} binding replays this file and must agree on every outcome. Pins ONLY the FIRM structural rejection band (branch on the code string, never on detail). The host-extension band (builtin_failed/leaf_rejected/rule_inadmissible + consumer sub-codes) is deliberately NOT here: it is pinned in each consumer's own suite (see the rs runner's host_band unit tests). Two structural codes are decoder-only and unreachable from well-typed input, so they have no case here: non_ground_conclusion (a GroundLiteral's args are ontos Values, always ground) and unknown_node_kind (Node is a closed 3-variant enum). This is grammar/shape conformance; account-codec BYTE vectors are deferred until quote/reify byte form + VarId alpha-normalization settle (contract §9). Authoring notation: term = {atom:<hex>} | {atom_str:<utf8 sugar>} | {tuple:[...]} | {var:<id>} | {nest:{functor:<utf8>, times:N, leaf:<term>}} (#2731: functor(functor(...leaf...)), `times` Tuple[Atom(functor), ·] levels around `leaf`, expanded by a loop, so a term past any JSON parser's nesting limit is authored flat); pred = a utf8 string; ground_literal = {pred, args:[ground term...]}; node = {kind:rule|builtin|leaf, conclusion, ...}. The demo_v1 profile (implemented identically per language): Theory owns 'lt' and Holds iff lt(a,b) with a<b bytewise; LeafVerifier extensional={edge}, admits any edge leaf; RuleAdmissibility = always-admit; Context = unit.",
+  "note": "Language-agnostic conformance vectors for check() over a NON-ARCHE program (graph reachability + byte-ordering), so genericity is demonstrated, not asserted. Every {rs,go} binding replays this file and must agree on every outcome. Pins ONLY the FIRM structural rejection band (branch on the code string, never on detail). The host-extension band (builtin_failed/leaf_rejected/rule_inadmissible + consumer sub-codes) is deliberately NOT here: it is pinned in each consumer's own suite (see the rs runner's host_band unit tests). Two structural codes are decoder-only and unreachable from well-typed input, so they have no case here: non_ground_conclusion (a GroundLiteral's args are ontos Values, always ground) and unknown_node_kind (Node is a closed 3-variant enum). This is grammar/shape conformance; account-codec BYTE vectors are deferred until quote/reify byte form + VarId alpha-normalization settle (contract §9). Authoring notation: term = {atom:<hex>} | {atom_str:<utf8 sugar>} | {tuple:[...]} | {var:<id>} | {nest:{functor:<utf8>, times:N, leaf:<term>}} (#2731: functor(functor(...leaf...)), `times` Tuple[Atom(functor), ·] levels around `leaf`, expanded by a loop, so a term past any JSON parser's nesting limit is authored flat); pred = a utf8 string; ground_literal = {pred, args:[ground term...]}; node = {kind:rule|builtin|leaf, conclusion, ...}. The demo_v1 profile (implemented identically per language): Theory owns 'lt' and Holds iff lt(a,b) with a<b bytewise; LeafVerifier extensional={edge}, admits any edge leaf; RuleAdmissibility = always-admit; Context = unit. Rows that state a `report` pin check()'s work counters tri-core (#4206): counters_version and all 17 counters, hand-computed from the counting rules in contract/rs/src/check/report.rs, never pasted from an implementation. PINNED vs COUNTED (#4206, the coordinator's rule: never pin by hand a value the checker's own order of work decides). A report value is either an integer, pinned exactly, or the string \"counted\", which asserts the counter is counted (a non-negative integer) without pinning its value. Pinned wherever report.rs's rules fix the value from the row's derivation, program and profile: the walk's counters (nodes_walked and the three kinds, premises_pos/neg, theory_decisions, leaf_verifications, admissibility_checks, max_depth_reached, max_term_depth_reached) and certs_verified; and, on a row whose certificate is verified to completion, the certificate meters (cert_tables_read, cert_rows_read, join_steps_used, groundings_enumerated), which are then totals over the certificate's own tables and closure. A row whose certificate is refused partway (cert_canonical_rows_unsorted) states those four as \"counted\": how much was read before the refusal depends on the order the checker visits tables. check() Outcome equality compares the verdict only (checker SPI v2), so this report pin is the only place the counters are compared. No vector row exercises certs_memo_hits (a memo hit needs a second check of one world), and no check.json row cites a certificate, so negation.json's report rows carry the certificate counters.",
   "program": {
     "reach_base": {
       "head": { "pred": "reach", "args": [{ "var": "X" }, { "var": "Y" }] },
@@ -47,7 +47,16 @@
         ],
         "root": 3
       },
-      "outcome": "accept"
+      "outcome": "accept",
+      "report": {
+        "counters_version": 24,
+        "nodes_walked": 4, "rule_nodes": 2, "builtin_nodes": 0, "leaf_nodes": 2,
+        "premises_pos": 3, "premises_neg": 0,
+        "theory_decisions": 0, "leaf_verifications": 2, "admissibility_checks": 2,
+        "certs_verified": 0, "certs_memo_hits": 0, "cert_tables_read": 0, "cert_rows_read": 0,
+        "join_steps_used": 0, "groundings_enumerated": 0,
+        "max_depth_reached": 3, "max_term_depth_reached": 1
+      }
     },
     {
       "name": "ordered_edge_builtin_accept",
@@ -133,7 +142,16 @@
         ],
         "root": 0
       },
-      "outcome": { "reject": "too_many_nodes" }
+      "outcome": { "reject": "too_many_nodes" },
+      "report": {
+        "counters_version": 24,
+        "nodes_walked": 0, "rule_nodes": 0, "builtin_nodes": 0, "leaf_nodes": 0,
+        "premises_pos": 0, "premises_neg": 0,
+        "theory_decisions": 0, "leaf_verifications": 0, "admissibility_checks": 0,
+        "certs_verified": 0, "certs_memo_hits": 0, "cert_tables_read": 0, "cert_rows_read": 0,
+        "join_steps_used": 0, "groundings_enumerated": 0,
+        "max_depth_reached": 0, "max_term_depth_reached": 0
+      }
     },
     {
       "name": "too_deep",
@@ -150,7 +168,16 @@
         ],
         "root": 3
       },
-      "outcome": { "reject": "too_deep" }
+      "outcome": { "reject": "too_deep" },
+      "report": {
+        "counters_version": 24,
+        "nodes_walked": 3, "rule_nodes": 1, "builtin_nodes": 0, "leaf_nodes": 2,
+        "premises_pos": 0, "premises_neg": 0,
+        "theory_decisions": 0, "leaf_verifications": 2, "admissibility_checks": 0,
+        "certs_verified": 0, "certs_memo_hits": 0, "cert_tables_read": 0, "cert_rows_read": 0,
+        "join_steps_used": 0, "groundings_enumerated": 0,
+        "max_depth_reached": 2, "max_term_depth_reached": 1
+      }
     },
     {
       "name": "unknown_clause",
@@ -238,7 +265,16 @@
         ],
         "root": 0
       },
-      "outcome": { "reject": "term_too_deep" }
+      "outcome": { "reject": "term_too_deep" },
+      "report": {
+        "counters_version": 24,
+        "nodes_walked": 0, "rule_nodes": 0, "builtin_nodes": 0, "leaf_nodes": 0,
+        "premises_pos": 0, "premises_neg": 0,
+        "theory_decisions": 0, "leaf_verifications": 0, "admissibility_checks": 0,
+        "certs_verified": 0, "certs_memo_hits": 0, "cert_tables_read": 0, "cert_rows_read": 0,
+        "join_steps_used": 0, "groundings_enumerated": 0,
+        "max_depth_reached": 0, "max_term_depth_reached": 2
+      }
     },
     {
       "name": "term_within_depth_bound_accept",
@@ -299,7 +335,16 @@
         ],
         "root": 5
       },
-      "outcome": "accept"
+      "outcome": "accept",
+      "report": {
+        "counters_version": 24,
+        "nodes_walked": 6, "rule_nodes": 1, "builtin_nodes": 3, "leaf_nodes": 2,
+        "premises_pos": 5, "premises_neg": 0,
+        "theory_decisions": 3, "leaf_verifications": 2, "admissibility_checks": 1,
+        "certs_verified": 0, "certs_memo_hits": 0, "cert_tables_read": 0, "cert_rows_read": 0,
+        "join_steps_used": 0, "groundings_enumerated": 0,
+        "max_depth_reached": 2, "max_term_depth_reached": 1
+      }
     },
     {
       "name": "term_depth_256_at_the_default_accept",

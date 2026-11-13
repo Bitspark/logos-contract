@@ -33,7 +33,7 @@
 import { decodeUtf8Lossy, decodeUtf8 } from "./utf8.js";
 import { portableClauseIdBytes } from "./clause_id_encoding.js";
 import { Atom, Tuple, atom as valueAtom, tuple as valueTuple, type Value } from "@bitspark/ontos-core";
-import { encode, decode } from "@bitspark/ontos-codec";
+import { encode, decode, DecodeError as CodecDecodeError } from "@bitspark/ontos-codec";
 import { encodeBool, readInt } from "@bitspark/ontos-data";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { ClauseId, PredicateRef, ProjectSpec, type Clause } from "./program.js";
@@ -65,7 +65,8 @@ import {
 } from "./derivation.js";
 import {
   Term,
-  type Subst,
+  Subst,
+  VarId,
 } from "./term.js";
 import { quote, reify } from "./reify.js";
 import { buildValue, measureLen, writeClosedModelCert, writeGroundLiteral, writeSubst } from "./wire_sink.js";
@@ -205,7 +206,7 @@ export function symbolAsValue(sym: Symbol): Value {
 }
 
 /**
- * A `Subst` (`Map<VarId, Term>`) as `Tuple` of `Tuple[Atom(var_id), quote(term)]`
+ * A `Subst` (keyed by `VarId`) as `Tuple` of `Tuple[Atom(var_id), quote(term)]`
  * sorted by var-id bytes — matching the rs `BTreeMap` order (§5.2). Terms reuse the
  * FROZEN quote reading; no second encoding.
  */
@@ -337,6 +338,29 @@ export class DecodeError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "DecodeError";
+  }
+}
+
+/**
+ * `decodeDerivationWireV1`'s codec stopped on the caller's own bytes: the codec's error, unfolded in
+ * `codecError` (checker SPI v2, ADR 0036 D8 change 4; #2734 3c, seat:caa's ruling C), rs's
+ * `DecodeError::CodecFault` and go's `DecodeCodecFault`. It is a FAULT, never a shape refusal: that
+ * decoder reads bytes its caller produced and trusts, so a codec that cannot read them is the
+ * caller's defect. Bytes from anyone else go through `decodeDerivationWireV1Bounded`, whose
+ * `decode_stopped` kind carries the same error as an ordinary refusal. The message names the
+ * codec's portable `code`; its own message stays in `codecError`, because the cores' codecs word it
+ * differently. Test for it with `instanceof DecodeCodecFault` before reading a `DecodeError` as a
+ * refusal.
+ */
+export class DecodeCodecFault extends DecodeError {
+  readonly ctx: string;
+  readonly codecError: unknown;
+  constructor(ctx: string, codecError: unknown) {
+    const code = codecError instanceof CodecDecodeError ? String(codecError.code) : "not_a_codec_error";
+    super(`decode ${ctx}: codec fault: ${code}`);
+    this.name = "DecodeCodecFault";
+    this.ctx = ctx;
+    this.codecError = codecError;
   }
 }
 
@@ -534,11 +558,12 @@ function groundLiteralFromValue(v: Value, ctx: string): GroundLiteral {
  * The inverse of substAsValue: Tuple[ Tuple[Atom(var_id), quote(term)], … ] back to a Subst. The
  * entries must arrive strictly increasing in the codec bytes of their key, as the encoder writes
  * them (#2630): a repeated or misordered var-id is refused by name. Terms go through reify, the
- * frozen inverse of quote, and may contain holes.
+ * frozen inverse of quote, and may contain holes. Each key is built by the `VarId` constructor
+ * (#3288), from text `strictText` has already decoded as UTF-8, so the constructor's test cannot fail.
  */
 export function substFromValue(v: Value): Subst {
   const entries = items(v, "subst");
-  const out: Subst = new Map<string, Term>();
+  const out = new Subst();
   let previousKey: Uint8Array | undefined;
   for (const entry of entries) {
     const pair = itemsN(entry, "subst.entry", [2]);
@@ -548,7 +573,7 @@ export function substFromValue(v: Value): Subst {
     previousKey = key;
     const term = reify(pair[1]!);
     if (term === undefined) throw refuse.notQuoted("subst.term");
-    out.set(name, term);
+    out.set(new VarId(name), term);
   }
   return out;
 }
@@ -870,8 +895,8 @@ export function decodeDerivationWireV1(bytes: Uint8Array): Derivation {
   let value: Value;
   try {
     value = decode(bytes);
-  } catch {
-    throw refuse.shape("derivation wire v1 bytes");
+  } catch (e) {
+    throw new DecodeCodecFault("derivation wire v1 bytes", e);
   }
   return derivationWireV1FromValue(value);
 }

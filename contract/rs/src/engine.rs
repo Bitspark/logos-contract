@@ -182,12 +182,12 @@ impl LeafSource for Vec<GroundLiteral> {
 ///
 /// **The dual-conformance contract (§7) of an implementor.** Each returned `Subst`,
 /// deep-applied to the goal, MUST yield a **ground** atom that the paired
-/// [`Theory::decide`](crate::spi::Theory::decide) also accepts (`Holds`). The engine
-/// relies on this: after binding via the solver it forms the now-ground conclusion
-/// and re-checks it with `Theory::decide` before emitting the `Builtin` node, so a
+/// [`Theory::decide_ground`](crate::spi::Theory::decide_ground) also accepts (`Holds`). The
+/// engine relies on this: after binding via the solver it forms the now-ground conclusion
+/// and re-checks it with `Theory::decide_ground` before emitting the `Builtin` node, so a
 /// `Builtin` the engine produces is exactly one [`check`](crate::check::check)
 /// re-accepts. A solver whose bindings disagree with the theory would simply have its
-/// proposed solution dropped (the engine's `decide` gate fails it), never emit an
+/// proposed solution dropped (the engine's `decide_ground` gate fails it), never emit an
 /// unsound node.
 ///
 /// `logos-core` provides the standard implementation over its arithmetic registry
@@ -200,18 +200,19 @@ impl LeafSource for Vec<GroundLiteral> {
 /// it cannot bind) says so with `NotCompleted(cause)`, and a caller reads that as a refusal,
 /// never as "no".
 pub trait BuiltinSolver {
-    /// Whether this solver answers `goal`'s predicate at its arity. A search routes a
-    /// theory-owned goal the solver owns through [`solve`](Self::solve), ground or not, and a
-    /// goal it does not own to the theory alone (seat:caa's D2 ruling on #3162, the v1 interim
-    /// until the checker's theory reports three values, #3165). It is derived from the same
-    /// declaration that routes `solve`, never from a second list, and it claims only what the
-    /// paired theory owns (solver-owned within theory-owned), so every answer has a gate.
-    fn owns(&self, goal: &Goal) -> bool;
-
     /// The extension substitutions under which the (theory-owned) `goal` holds, given the
     /// current `subst`, and whether they are all of them. Each answer, deep-applied, must
-    /// ground the goal to a `Theory::decide`-accepted atom. A stop names the decider that stopped
-    /// ([`SolverReport::stopped`]).
+    /// ground the goal to a `Theory::decide_ground`-accepted atom. A stop names the decider that
+    /// stopped ([`SolverReport::stopped`]).
+    ///
+    /// **Whether the goal is this solver's is part of the same answer** (#3162 Stage B, the
+    /// logos coordinator's ruling on #3162): a goal the solver does not answer at its predicate
+    /// and arity is [`SolverReport::declined`], never a stop and never "no". There is no separate
+    /// ownership query, so ownership and the answer cannot disagree; the retired `owns` was a
+    /// second computation of the same decision. A solver declines whatever its paired theory does
+    /// not own (solver-owned within theory-owned), so every answer has a gate. A search reads a
+    /// decline as "no solver binds this goal": the engine's own non-ground prune, never a
+    /// decider's stop.
     fn solve(&self, goal: &Goal, subst: &Subst) -> SolverReport;
 }
 
@@ -231,6 +232,7 @@ pub trait BuiltinSolver {
 pub struct SolverReport {
     answers: Vec<Subst>,
     stop: Option<(crate::spi::ComponentIdentity, NonCompletion)>,
+    declined: bool,
 }
 
 impl SolverReport {
@@ -239,7 +241,24 @@ impl SolverReport {
         SolverReport {
             answers,
             stop: None,
+            declined: false,
         }
+    }
+
+    /// The goal is not this solver's (#3162 Stage B): it answers nothing about it, neither a
+    /// binding, nor "no", nor a stop. The caller decides what an unbound goal no solver answers
+    /// means (a search: its own non-ground prune).
+    pub fn declined() -> Self {
+        SolverReport {
+            answers: Vec::new(),
+            stop: None,
+            declined: true,
+        }
+    }
+
+    /// Whether the solver declined the goal ([`SolverReport::declined`]).
+    pub fn is_declined(&self) -> bool {
+        self.declined
     }
 
     /// `answers` hold, and `decider` stopped (`stop`) before the solver established there are no
@@ -252,6 +271,7 @@ impl SolverReport {
         SolverReport {
             answers,
             stop: Some((decider, stop)),
+            declined: false,
         }
     }
 
@@ -531,8 +551,9 @@ impl DerivationBuilder {
 pub enum TruncationReason {
     /// The caller's guest live-allocation budget, distinct from a deployment capacity.
     MemoryBytes,
-    /// The RUN-WIDE fixpoint round budget ([`ResourceLimits::max_rounds`], #1605) tripped:
-    /// the scheduler had executed that many rounds across strata in stratification order
+    /// The per-fixpoint round budget ([`ResourceLimits::max_rounds`], #1605; research 0051 row 7)
+    /// tripped: this fixpoint computation had executed that many rounds across its strata in
+    /// stratification order
     /// and refused the next one — sealing the current stratum and evaluating NO higher
     /// stratum (the soundness rule under negation: a higher stratum must never negate over a
     /// partial relation). The partial is the k-th iterate of the immediate-consequence
@@ -607,7 +628,8 @@ pub struct ResourceLimits {
     /// scheduler stops with [`TruncationReason::Cancelled`].
     pub cancelled: Option<Arc<AtomicBool>>,
     /// The bottom-up WORK budget (#1605): the maximum number of fixpoint rounds the
-    /// scheduler may execute in this run, counted across strata in stratification order.
+    /// scheduler may execute in ONE fixpoint computation, counted across its strata in
+    /// stratification order: per fixpoint, never a run-wide account (research 0051 row 7).
     /// `None` means unbounded. Rounds rather than firings because a round is the unit the
     /// seam already names ([`RoundOutcome`]) and the partial after `k` rounds is the `k`-th
     /// iterate of the immediate-consequence operator — canonical, order-independent, and
@@ -648,6 +670,7 @@ impl ResourceLimits {
     /// [`TruncationReason::MaxWallMs`] immediately (fail-loud over silently
     /// admitting an unbounded run from a malformed budget).
     pub fn reason(&self, started: MonoClock) -> Option<TruncationReason> {
+        execution_checkpoint();
         if self
             .cancelled
             .as_ref()
@@ -665,6 +688,27 @@ impl ResourceLimits {
             None
         }
     }
+}
+
+/// Yield control to the embedding at an execution checkpoint. Returning continues the same
+/// evaluation. The hook supplies no data or logical judgment. A host that interrupts the
+/// Wasm stack must discard that guest instance. Native evaluators keep their own controls.
+#[inline]
+pub fn execution_checkpoint() {
+    #[cfg(target_arch = "wasm32")]
+    if let Some(checkpoint) = HOST_CHECKPOINT.get() {
+        checkpoint();
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+static HOST_CHECKPOINT: std::sync::OnceLock<fn()> = std::sync::OnceLock::new();
+
+/// Bind the single host of this Wasm instance. The host owns the active call and its
+/// cancellation source. No request identity or cancellation state is retained by the guest.
+#[cfg(target_arch = "wasm32")]
+pub fn install_execution_checkpoint(checkpoint: fn()) {
+    let _ = HOST_CHECKPOINT.set(checkpoint);
 }
 
 /// A monotonic run clock for the engines' wall-clock budget. On native targets it wraps

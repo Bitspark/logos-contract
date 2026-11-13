@@ -11,7 +11,11 @@
 //! the private [`cert`] submodule (a pure file split — `verify_cert`,
 //! `verify_neg_premise`, and the public [`program_digest`] are re-bound here, so the
 //! crate-root re-exports and the public `check` signature are byte-identical).
+//!
+//! The ANNOTATED closed-model check (ADR 0031 D5) lives in the private `annotated` submodule: a
+//! new entry point beside the boolean one, which runs the boolean check first, unchanged.
 
+mod annotated;
 mod cert;
 mod cert_count;
 mod cert_stack;
@@ -20,9 +24,15 @@ mod cert_truth;
 #[cfg(test)]
 mod fragment_replay;
 mod join_index;
+mod report;
 #[cfg(test)]
 mod tests;
 mod world_memo;
+
+// ADR 0031 D5 (P9 I5a): the annotated closed-model check, re-exported at the crate root.
+pub use annotated::{
+    check_annotated_closed_model, AnnotatedOutcome, AnnotatedRow, AnnotationCode, AnnotationLaw,
+};
 
 // The cert machinery the rule-check pass delegates to, re-bound into this module so
 // the file split is internal: `check_with_cert_context` verifies each cited cert via
@@ -36,6 +46,7 @@ use cert::{
     verify_cert, verify_count_premise, verify_neg_premise, CertPlace, CertStatus, WorldProgram,
 };
 pub use cert_stack::seal_contexts;
+pub use report::{CheckReport, ReportCount, CHECK_REPORT_COUNTERS_VERSION};
 pub use world_memo::WorldMemo;
 
 use crate::cert::{Hash, SupportRef};
@@ -51,7 +62,7 @@ use std::collections::BTreeSet;
 // **Every certified literal claim is EXACT** (#3022, research 0028; `seat:caa`'s ruling). `check`
 // compares ground terms STRUCTURALLY at every site: the root against the claim, a Rule's
 // instantiated head against its conclusion, a positive premise against the grounded body literal,
-// a negated atom, and a count's `k`. The profile's `TermIdentity` is not read here.
+// a negated atom, and a count's `k`. (The inert term identity was deleted in checker SPI v2, #3111.)
 //
 // Before #3022 the default identity compared four of those sites under #277's ACCOUNT EQUALITY
 // (the cons and `list(…)` spellings of a proper list as one term). That relation is not a
@@ -134,23 +145,50 @@ fn proved_equal_fast(goal: &Goal, subst: &Subst, lit: &GroundLiteral) -> bool {
     fast
 }
 
-/// The result of [`check`].
+/// What [`check`] decided: accept, or reject with a code and its diagnostic detail.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Outcome {
+pub enum Verdict {
     Accept,
     Reject { code: RejectionCode, detail: String },
 }
 
-impl Outcome {
-    fn reject(code: RejectionCode, detail: impl Into<String>) -> Outcome {
-        Outcome::Reject {
+impl Verdict {
+    fn reject(code: RejectionCode, detail: impl Into<String>) -> Verdict {
+        Verdict::Reject {
             code,
             detail: detail.into(),
         }
     }
 
     pub fn is_accept(&self) -> bool {
-        matches!(self, Outcome::Accept)
+        matches!(self, Verdict::Accept)
+    }
+}
+
+/// The result of [`check`] (checker SPI v2, ADR 0036 D8 change 5): its [`Verdict`], and the
+/// [`CheckReport`] of the work it performed.
+///
+/// **Equality is the verdict's.** Two outcomes are equal when their verdicts are, whatever their
+/// reports say, so a counter can never turn a verdict test red (the coordinator's ruling of
+/// 2026-11-12; pinned by `outcome_equality_is_the_verdicts`). Read `report` where the work is
+/// asked about.
+#[derive(Clone, Debug)]
+pub struct Outcome {
+    pub verdict: Verdict,
+    pub report: CheckReport,
+}
+
+impl PartialEq for Outcome {
+    fn eq(&self, other: &Self) -> bool {
+        self.verdict == other.verdict
+    }
+}
+
+impl Eq for Outcome {}
+
+impl Outcome {
+    pub fn is_accept(&self) -> bool {
+        self.verdict.is_accept()
     }
 }
 
@@ -160,7 +198,7 @@ impl Outcome {
 ///   itself emits. Branch on these, not on `detail`.
 /// - **host-extension band** (STABLE v1 *mechanism*; sub-code set open) — the three
 ///   wrappers a delegated extension point raises; the seam's own sub-code is
-///   carried in `Outcome::Reject.detail`.
+///   carried in `Verdict::Reject.detail`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum RejectionCode {
     // ---- structural band (FIRM) ----
@@ -348,44 +386,16 @@ pub(super) fn builtin_not_decided(cause: NonCompletion) -> (RejectionCode, Strin
     )
 }
 
-/// Whether a non-completion is the fault the default `decide_ground` reports for a `NotMine`
+/// Whether a non-completion is the disowning fault, [`TheoryGround::disowned`](crate::TheoryGround)
 /// (#3126): the theory disowned an atom its `owns` claimed. Each reader keeps the refusal it gave
-/// `NotMine` for it, so an inconsistent theory reads as before.
+/// v1's `NotMine` for it, so an inconsistent theory reads as before.
 pub(super) fn is_disowned(cause: &NonCompletion) -> bool {
     cause.kind() == NonCompletionKind::InconsistentTheory
 }
 
-/// The TERM IDENTITY (#2226, §4.3). **INERT since #3022** (`seat:caa`'s ruling on #3037): `check`
-/// ignores it and compares every site structurally, and the check-profile digest does not fold it,
-/// so two profiles that differ only here give identical verdicts and share one digest. Pinned
-/// inert by `vectors/exact_claims.json`, which the conformance harness drives under each identity,
-/// and by the completeness gate's `exact_answer_set` test under each identity.
-///
-/// It is slated for DELETION in #3022's step 5: out of [`CheckLimits`] (ADR 0035 D1, since removing
-/// a field is a v1 signature change) and its pins out of the negotiation wire. It does not move to
-/// the representation axis: how a list is spelled on display is the consumer's rendering choice
-/// ([`crate::engine::PresentedFact`]), not a property of what is certified.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
-pub enum TermIdentity {
-    /// The default tag (#159). Inert, as is [`Exact`](Self::Exact).
-    #[default]
-    ReifyLists,
-    /// The other tag (#2226). Inert: `check` gives the verdict it gives under the default.
-    Exact,
-}
-
-impl TermIdentity {
-    /// The stable tag: `reify_lists` or `exact`.
-    pub fn tag(self) -> &'static str {
-        match self {
-            TermIdentity::ReifyLists => "reify_lists",
-            TermIdentity::Exact => "exact",
-        }
-    }
-}
-
 /// The checker's **behaviour parameters** (§4.3): budgets on the **untrusted** supplied
-/// derivation, plus the INERT [`term_identity`](Self::term_identity). The budgets are distinct
+/// derivation. (Checker SPI v2, ADR 0036 D8 change 1, #3111: the inert term identity is deleted.)
+/// The budgets are distinct
 /// from search-effort limits: they bound *proof size on verify*, and the node cap is a hard,
 /// deterministic rejection checked **before any node delegation**.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -419,10 +429,6 @@ pub struct CheckLimits {
     /// Max number of join steps the closure join may perform (one per candidate examined
     /// at one body literal, #1829); tripped incrementally during the scan.
     pub max_join_steps: usize,
-    // ---- the term identity (#2226), INERT since #3022 ----
-    /// INERT (#3022): `check` ignores it and the check-profile digest does not fold it. Slated for
-    /// deletion in #3022's step 5 (ADR 0035 D1); see [`TermIdentity`].
-    pub term_identity: TermIdentity,
 }
 
 impl Default for CheckLimits {
@@ -440,7 +446,6 @@ impl Default for CheckLimits {
             max_support_edges: 1_000_000,
             max_rule_groundings: 10_000_000,
             max_join_steps: 100_000_000,
-            term_identity: TermIdentity::ReifyLists,
         }
     }
 }
@@ -504,8 +509,7 @@ impl CheckLimits {
     }
 
     /// Every budget a caller can raise, by its field name, in declaration order (#2733, R3). The
-    /// names are the keys a vector case's `limits` object uses. `term_identity` is not a budget and
-    /// is not listed. Read from [`budgets_mut`](Self::budgets_mut), the one place the struct is
+    /// names are the keys a vector case's `limits` object uses. Read from [`budgets_mut`](Self::budgets_mut), the one place the struct is
     /// destructured, so every reader of the checker's budgets takes the list from one site.
     pub fn budgets(&self) -> [(&'static str, usize); 9] {
         let mut copy = *self;
@@ -525,7 +529,6 @@ impl CheckLimits {
             max_support_edges,
             max_rule_groundings,
             max_join_steps,
-            term_identity: _,
         } = self;
         [
             ("max_nodes", max_nodes),
@@ -759,8 +762,8 @@ impl CertContext {
 /// ```
 /// use logos_contract::{
 ///     check, AlwaysAdmit, CheckLimits, CheckProfile, Clause, ClauseId, Derivation, Evidence,
-///     Goal, GroundLiteral, LeafOutcome, LeafVerifier, MapProgram, Node, NodeMeta, Outcome,
-///     PredicateSet, Premise, Subst, Symbol, Term, Theory, TheoryOutcome,
+///     Goal, GroundLiteral, LeafOutcome, LeafVerifier, MapProgram, Node, NodeMeta, PredicateSet,
+///     Premise, ReportCount, Subst, Symbol, Term, Theory, TheoryGround, Verdict,
 /// };
 /// use ontos_core::Value;
 /// use std::collections::BTreeMap;
@@ -770,7 +773,9 @@ impl CertContext {
 /// struct NoTheory;
 /// impl Theory for NoTheory {
 ///     fn owns(&self, _pred: &Symbol) -> bool { false }
-///     fn decide(&self, _atom: &GroundLiteral) -> TheoryOutcome { TheoryOutcome::NotMine }
+///     fn decide_ground(&self, _atom: &GroundLiteral) -> TheoryGround {
+///         TheoryGround::disowned()
+///     }
 ///     // Copying is a declared capability (#2722): `check` never copies, so this one declines.
 ///     logos_contract::cannot_copy!(Theory, "an example theory; check never copies it");
 /// }
@@ -821,8 +826,11 @@ impl CertContext {
 ///     limits: CheckLimits::default(),
 /// };
 ///
-/// // 4. Check it. `()` is the verification context this profile is generic over.
-/// assert!(check(&program, &permit, &deriv, &(), &profile).is_accept());
+/// // 4. Check it. `()` is the verification context this profile is generic over. The outcome
+/// //    carries the verdict and the report of the work the check did: two nodes walked.
+/// let outcome = check(&program, &permit, &deriv, &(), &profile);
+/// assert_eq!(outcome.verdict, Verdict::Accept);
+/// assert_eq!(outcome.report.nodes_walked, ReportCount::Counted(2));
 ///
 /// // And the other direction: the root must conclude the CLAIM. Ask the same
 /// // derivation to justify a different literal and it is rejected, not accepted.
@@ -856,18 +864,35 @@ pub fn check_closed_model_chain<C>(
     profile: &CheckProfile<C>,
     cert_context: &CertContext,
 ) -> Outcome {
+    let source = WorldProgram::new(program);
+    let mut tally = report::Tally::default();
+    let verdict = chain_over(&source, certs, ctx, profile, cert_context, &mut tally);
+    tally.outcome(verdict)
+}
+
+/// [`check_closed_model_chain`] over a world inventory the caller holds, its work counted into
+/// `tally`. The inventory captures the clauses on first use, so the annotated check (ADR 0031 D5)
+/// reads its groundings from the clauses this verdict was reached on.
+fn chain_over<C>(
+    source: &WorldProgram<'_>,
+    certs: &[crate::ClosedModelCert],
+    ctx: &C,
+    profile: &CheckProfile<C>,
+    cert_context: &CertContext,
+    tally: &mut report::Tally,
+) -> Verdict {
     if let Err(error) = profile.limits.validate() {
-        return Outcome::reject(RejectionCode::InvalidCheckLimits, error.to_string());
+        return Verdict::reject(RejectionCode::InvalidCheckLimits, error.to_string());
     }
     if certs.is_empty() {
-        return Outcome::reject(
+        return Verdict::reject(
             RejectionCode::CertOutOfRange,
             "empty certificate chain: no closed-model certificate to verify",
         );
     }
     for (own, cert) in certs.iter().enumerate() {
-        if let Err(what) = cert_depths_within(cert, profile.limits.max_term_depth) {
-            return Outcome::reject(
+        if let Err(what) = cert_depths_within(cert, profile.limits.max_term_depth, tally) {
+            return Verdict::reject(
                 RejectionCode::TermTooDeep,
                 format!(
                     "chain cert {own}: {what} nests deeper than max_term_depth {}",
@@ -877,7 +902,7 @@ pub fn check_closed_model_chain<C>(
         }
     }
     if cert_context.is_unbound() {
-        return Outcome::reject(
+        return Verdict::reject(
             RejectionCode::CertContextUnbound,
             "certifying check supplied an all-zero (unbound) cert context",
         );
@@ -886,7 +911,6 @@ pub fn check_closed_model_chain<C>(
     // exactly as a derivation's closed world is, so a cert that reads a lower cert's seal does so
     // only once that cert's status is final. The first invalid cert in that order rejects.
     let mut status: Vec<Option<CertStatus>> = vec![None; certs.len()];
-    let source = WorldProgram::new(program);
     for own in cert_stack::verification_order(certs) {
         let place = CertPlace {
             own,
@@ -897,18 +921,19 @@ pub fn check_closed_model_chain<C>(
             place,
             certs,
             &status,
-            &source,
+            source,
             profile,
             ctx,
             cert_context,
             &profile.limits,
+            tally,
         );
         if let CertStatus::Invalid(code, detail) = &verdict {
-            return Outcome::reject(*code, format!("chain cert {own}: {detail}"));
+            return Verdict::reject(*code, format!("chain cert {own}: {detail}"));
         }
         status[own] = Some(verdict);
     }
-    Outcome::Accept
+    Verdict::Accept
 }
 
 /// Verify a derivation that may carry closed-model certificates (ADR 0007). Total,
@@ -927,11 +952,14 @@ pub fn check_with_cert_context<C>(
     profile: &CheckProfile<C>,
     cert_context: &CertContext,
 ) -> Outcome {
-    if let Some(reject) = derivation_prechecks(program, claim, deriv, profile) {
-        return reject;
+    let mut tally = report::Tally::default();
+    if let Some(reject) = derivation_prechecks(program, claim, deriv, profile, &mut tally) {
+        return tally.outcome(reject);
     }
-    let cert_status = verify_world(&deriv.closed_world, program, profile, ctx, cert_context);
-    check_nodes(program, claim, deriv, ctx, profile, &cert_status)
+    let world = &deriv.closed_world;
+    let statuses = verify_world(world, program, profile, ctx, cert_context, &mut tally);
+    let verdict = check_nodes(program, claim, deriv, ctx, profile, &statuses, &mut tally);
+    tally.outcome(verdict)
 }
 
 /// [`check_with_cert_context`], with the derivation's closed world verified through `memo` (#2565
@@ -953,30 +981,34 @@ pub fn check_with_cert_memo<'a, C>(
     cert_context: &CertContext,
     memo: &mut WorldMemo<'a, C>,
 ) -> Outcome {
-    if let Some(reject) = derivation_prechecks(program, claim, deriv, profile) {
-        return reject;
+    let mut tally = report::Tally::default();
+    if let Some(reject) = derivation_prechecks(program, claim, deriv, profile, &mut tally) {
+        return tally.outcome(reject);
     }
-    let cert_status = memo.statuses(program, profile, ctx, cert_context, &deriv.closed_world);
-    check_nodes(program, claim, deriv, ctx, profile, cert_status)
+    let world = &deriv.closed_world;
+    let statuses = memo.statuses(program, profile, ctx, cert_context, world, &mut tally);
+    let verdict = check_nodes(program, claim, deriv, ctx, profile, statuses, &mut tally);
+    tally.outcome(verdict)
 }
 
 /// Steps 1 to 3b of [`check_with_cert_context`]: the checks that run before any certificate or
-/// node is inspected. `Some` is the rejection.
+/// node is inspected. `Some` is the rejection. Only step 3b counts work (`max_term_depth_reached`).
 fn derivation_prechecks<C>(
     program: &dyn Program,
     claim: &GroundLiteral,
     deriv: &Derivation,
     profile: &CheckProfile<C>,
-) -> Option<Outcome> {
+    tally: &mut report::Tally,
+) -> Option<Verdict> {
     if let Err(error) = profile.limits.validate() {
-        return Some(Outcome::reject(
+        return Some(Verdict::reject(
             RejectionCode::InvalidCheckLimits,
             error.to_string(),
         ));
     }
     // 1. non-empty.
     if deriv.nodes.is_empty() {
-        return Some(Outcome::reject(
+        return Some(Verdict::reject(
             RejectionCode::EmptyDerivation,
             "derivation has no nodes",
         ));
@@ -984,7 +1016,7 @@ fn derivation_prechecks<C>(
     // 2. node cap — BEFORE any delegation, strict `>` (§4.3). An oversized untrusted
     //    proof is refused without inspecting (delegating) a single node.
     if deriv.nodes.len() > profile.limits.max_nodes {
-        return Some(Outcome::reject(
+        return Some(Verdict::reject(
             RejectionCode::TooManyNodes,
             format!(
                 "{} nodes exceeds max_nodes {}",
@@ -995,7 +1027,7 @@ fn derivation_prechecks<C>(
     }
     // 3. root in range: the root is a protocol index, an offset only if it names a node (#2735).
     if deriv.root_offset().is_none() {
-        return Some(Outcome::reject(
+        return Some(Verdict::reject(
             RejectionCode::RootOutOfRange,
             format!(
                 "root {} out of range (len {})",
@@ -1013,8 +1045,8 @@ fn derivation_prechecks<C>(
     //     cutoff (`Term::depth_le` / `value_depth_le`), so checking the depth of a
     //     deep term does not itself overflow. Over → `term_too_deep` (graceful
     //     rejection, never a crash).
-    if let reject @ Outcome::Reject { .. } =
-        check_term_depths(program, claim, deriv, &profile.limits)
+    if let reject @ Verdict::Reject { .. } =
+        check_term_depths(program, claim, deriv, &profile.limits, tally)
     {
         return Some(reject);
     }
@@ -1030,6 +1062,7 @@ fn verify_world<C>(
     profile: &CheckProfile<C>,
     ctx: &C,
     cert_context: &CertContext,
+    tally: &mut report::Tally,
 ) -> Vec<CertStatus> {
     // 3a. verify every cited certificate ONCE, up front, memoized into a parallel
     //     `Vec<CertStatus>`. A `Neg` premise reuses the cached result. For an
@@ -1068,6 +1101,7 @@ fn verify_world<C>(
                 ctx,
                 cert_context,
                 &profile.limits,
+                tally,
             )
         };
         status[own] = Some(verdict);
@@ -1096,7 +1130,8 @@ fn check_nodes<C>(
     ctx: &C,
     profile: &CheckProfile<C>,
     cert_status: &[CertStatus],
-) -> Outcome {
+    tally: &mut report::Tally,
+) -> Verdict {
     // 4. one forward pass: validate each node (structural, then delegate).
     let mut depth = vec![0usize; deriv.nodes.len()];
     for (i, node) in deriv.nodes.iter().enumerate() {
@@ -1109,9 +1144,10 @@ fn check_nodes<C>(
             profile,
             cert_status,
             &mut depth,
+            tally,
         ) {
-            Outcome::Accept => {}
-            reject => return reject,
+            Verdict::Accept => {}
+            reject @ Verdict::Reject { .. } => return reject,
         }
     }
 
@@ -1123,13 +1159,13 @@ fn check_nodes<C>(
     .conclusion()
         != claim
     {
-        return Outcome::reject(
+        return Verdict::reject(
             RejectionCode::RootConclusionMismatch,
             "root conclusion does not equal claim",
         );
     }
 
-    Outcome::Accept
+    Verdict::Accept
 }
 
 /// A positive premise's node offset, once step (b) has checked it names a node below the citing
@@ -1148,7 +1184,11 @@ fn check_node<C>(
     profile: &CheckProfile<C>,
     cert_status: &[CertStatus],
     depth: &mut [usize],
-) -> Outcome {
+    tally: &mut report::Tally,
+) -> Verdict {
+    // nodes_walked: the walk begins this node, before any of its checks (a node that then rejects
+    // counts). Its kind is counted first thing in its arm below.
+    tally.nodes_walked += 1;
     match node {
         Node::Rule {
             conclusion,
@@ -1157,9 +1197,11 @@ fn check_node<C>(
             premises,
             meta,
         } => {
+            // rule_nodes
+            tally.rule_nodes += 1;
             // (a) cited clause exists.
             let Some(clause) = program.clause(clause_id) else {
-                return Outcome::reject(
+                return Verdict::reject(
                     RejectionCode::UnknownClause,
                     format!("no clause for id {:?}", clause_id.as_str()),
                 );
@@ -1170,7 +1212,7 @@ fn check_node<C>(
             for premise in premises {
                 if let Premise::Pos { node: p } = premise {
                     if index_offset(*p, i).is_none() {
-                        return Outcome::reject(
+                        return Verdict::reject(
                             RejectionCode::BadDependencyOrder,
                             format!("premise {p} not < node {i}"),
                         );
@@ -1192,8 +1234,10 @@ fn check_node<C>(
                 .max()
                 .unwrap_or(0)
                 .saturating_add(1);
+            // max_depth_reached: the depth compared against max_depth, a tripping one included.
+            tally.reach_depth(depth[i]);
             if depth[i] > profile.limits.max_depth {
-                return Outcome::reject(
+                return Verdict::reject(
                     RejectionCode::TooDeep,
                     format!(
                         "depth {} exceeds max_depth {}",
@@ -1206,13 +1250,13 @@ fn check_node<C>(
             //     path (#2177 A) can only prove equality; otherwise the allocating path decides.
             if !proved_equal_fast(&clause.head, subst, conclusion) {
                 let Some(head) = clause.head.substitute(subst).as_ground() else {
-                    return Outcome::reject(
+                    return Verdict::reject(
                         RejectionCode::InstantiationMismatch,
                         "clause head not ground under subst",
                     );
                 };
                 if head != *conclusion {
-                    return Outcome::reject(
+                    return Verdict::reject(
                         RejectionCode::InstantiationMismatch,
                         "instantiated head != conclusion",
                     );
@@ -1220,7 +1264,7 @@ fn check_node<C>(
             }
             // (e) one premise per body literal.
             if premises.len() != clause.body.len() {
-                return Outcome::reject(
+                return Verdict::reject(
                     RejectionCode::InstantiationMismatch,
                     format!(
                         "premise count {} != body length {}",
@@ -1244,6 +1288,9 @@ fn check_node<C>(
             //     node's conclusion is its exact fact, so the exact cone #2256 kept for
             //     spelling-sensitive clauses now holds for every clause by construction.
             for (k, body_lit) in clause.body.iter().enumerate() {
+                // premises_pos / premises_neg: (f) begins examining premise k, counted by its own
+                // kind (a count premise is positive) before any of its checks.
+                tally.premise(&premises[k]);
                 match (&premises[k], body_lit) {
                     (Premise::Pos { node: p }, BodyLit::Pos(lit)) => {
                         // The cited node's conclusion must be EXACTLY the grounded body literal,
@@ -1253,13 +1300,13 @@ fn check_node<C>(
                         let premise = deriv.nodes[cited_offset(*p, i)].conclusion();
                         if !proved_equal_fast(lit, subst, premise) {
                             let Some(expected) = lit.substitute(subst).as_ground() else {
-                                return Outcome::reject(
+                                return Verdict::reject(
                                     RejectionCode::InstantiationMismatch,
                                     format!("body literal {k} not ground under subst"),
                                 );
                             };
                             if premise != &expected {
-                                return Outcome::reject(
+                                return Verdict::reject(
                                     RejectionCode::InstantiationMismatch,
                                     format!(
                                         "premise {k} conclusion != body literal {k} under subst"
@@ -1277,7 +1324,7 @@ fn check_node<C>(
                         BodyLit::Neg(lit),
                     ) => {
                         let Some(expected) = lit.substitute(subst).as_ground() else {
-                            return Outcome::reject(
+                            return Verdict::reject(
                                 RejectionCode::InstantiationMismatch,
                                 format!("body literal {k} not ground under subst"),
                             );
@@ -1287,7 +1334,7 @@ fn check_node<C>(
                         // sealed table, so a match under account equality would transfer an
                         // absence judged about one spelling to another.
                         if atom != &expected {
-                            return Outcome::reject(
+                            return Verdict::reject(
                                 RejectionCode::InstantiationMismatch,
                                 format!("neg premise {k} atom != body literal {k} under subst"),
                             );
@@ -1300,8 +1347,8 @@ fn check_node<C>(
                             deriv,
                             cert_status,
                         ) {
-                            Outcome::Accept => {}
-                            reject => return reject,
+                            Verdict::Accept => {}
+                            reject @ Verdict::Reject { .. } => return reject,
                         }
                     }
                     (
@@ -1329,14 +1376,14 @@ fn check_node<C>(
                                 c.count.erase_ground(),
                             )
                         }) else {
-                            return Outcome::reject(
+                            return Verdict::reject(
                                 RejectionCode::InstantiationMismatch,
                                 format!("count body literal {k} is not a Count under subst"),
                             );
                         };
                         let (g_pred, g_filter, g_project, g_count) = count_lit;
                         let (Some(g_filter), Some(g_count)) = (g_filter, g_count) else {
-                            return Outcome::reject(
+                            return Verdict::reject(
                                 RejectionCode::InstantiationMismatch,
                                 format!("count body literal {k} not ground under subst"),
                             );
@@ -1347,7 +1394,7 @@ fn check_node<C>(
                             || g_project != *project
                             || g_count != *k_claim
                         {
-                            return Outcome::reject(
+                            return Verdict::reject(
                                 RejectionCode::InstantiationMismatch,
                                 format!("count premise {k} != body literal {k} under subst"),
                             );
@@ -1362,12 +1409,12 @@ fn check_node<C>(
                             deriv,
                             cert_status,
                         ) {
-                            Outcome::Accept => {}
-                            reject => return reject,
+                            Verdict::Accept => {}
+                            reject @ Verdict::Reject { .. } => return reject,
                         }
                     }
                     (_, _) => {
-                        return Outcome::reject(
+                        return Verdict::reject(
                             RejectionCode::InstantiationMismatch,
                             format!("premise {k} polarity != body literal {k} polarity"),
                         );
@@ -1377,63 +1424,71 @@ fn check_node<C>(
             // (g) sealing / partition on the head predicate (local checks, §4.2/§4.4):
             //     a clause head must be intensional — not extensional, not theory-owned.
             if profile.leaves.extensional().contains(&conclusion.pred) {
-                return Outcome::reject(
+                return Verdict::reject(
                     RejectionCode::SealedViolation,
                     "rule head collides with an extensional predicate",
                 );
             }
             if profile.theory.owns(&conclusion.pred) {
-                return Outcome::reject(
+                return Verdict::reject(
                     RejectionCode::PredicatePartitionViolation,
                     "rule head predicate is owned by a theory",
                 );
             }
             // (h) THEN delegate metadata admissibility (§4 ob.2: structural-then-delegate).
+            // admissibility_checks: one `admissible` call.
+            tally.admissibility_checks += 1;
             match profile.admit.admissible(clause, meta, ctx) {
-                RuleOutcome::Admit => Outcome::Accept,
+                RuleOutcome::Admit => Verdict::Accept,
                 RuleOutcome::Reject { code } => {
-                    Outcome::reject(RejectionCode::RuleInadmissible, code)
+                    Verdict::reject(RejectionCode::RuleInadmissible, code)
                 }
             }
         }
 
         Node::Builtin { conclusion } => {
+            // builtin_nodes
+            tally.builtin_nodes += 1;
             depth[i] = 1;
+            // max_depth_reached
+            tally.reach_depth(depth[i]);
             if depth[i] > profile.limits.max_depth {
-                return Outcome::reject(RejectionCode::TooDeep, "depth 1 exceeds max_depth");
+                return Verdict::reject(RejectionCode::TooDeep, "depth 1 exceeds max_depth");
             }
             let owned = profile.theory.owns(&conclusion.pred);
             // partition: a builtin predicate must be theory-owned, and not also
             // extensional (overlap is a partition violation, §4.4).
             if !owned {
-                return Outcome::reject(
+                return Verdict::reject(
                     RejectionCode::PredicatePartitionViolation,
                     "no theory owns the builtin predicate",
                 );
             }
             if profile.leaves.extensional().contains(&conclusion.pred) {
-                return Outcome::reject(
+                return Verdict::reject(
                     RejectionCode::PredicatePartitionViolation,
                     "builtin predicate is also extensional",
                 );
             }
             // #3126: the ground verdict, which can say "not decided". The detail of a false is the
             // theory's own code, read before any conversion into the algebra.
+            // theory_decisions: one `decide_ground` call.
+            tally.theory_decisions += 1;
             match profile.theory.decide_ground(conclusion) {
-                Completion::Completed(TheoryDecision::Holds) => Outcome::Accept,
+                Completion::Completed(TheoryDecision::Holds) => Verdict::Accept,
                 Completion::Completed(TheoryDecision::Fails { code }) => {
-                    Outcome::reject(RejectionCode::BuiltinFailed, code)
+                    Verdict::reject(RejectionCode::BuiltinFailed, code)
                 }
                 Completion::LimitExceeded(never) => match never {},
                 // owns() said yes but decide disowns: an inconsistent theory.
-                Completion::NotCompleted(cause) if is_disowned(&cause) => Outcome::reject(
+                Completion::NotCompleted(cause) if is_disowned(&cause) => Verdict::reject(
                     RejectionCode::PredicatePartitionViolation,
                     "theory owns predicate but returned NotMine",
                 ),
                 // A stop is refused by name, never read as a decision (#3126).
                 Completion::NotCompleted(cause) => {
                     let (code, detail) = builtin_not_decided(cause);
-                    Outcome::reject(code, detail)
+                    Verdict::reject(code, detail)
                 }
             }
         }
@@ -1442,38 +1497,44 @@ fn check_node<C>(
             conclusion,
             evidence,
         } => {
+            // leaf_nodes
+            tally.leaf_nodes += 1;
             depth[i] = 1;
+            // max_depth_reached
+            tally.reach_depth(depth[i]);
             if depth[i] > profile.limits.max_depth {
-                return Outcome::reject(RejectionCode::TooDeep, "depth 1 exceeds max_depth");
+                return Verdict::reject(RejectionCode::TooDeep, "depth 1 exceeds max_depth");
             }
             let extensional = profile.leaves.extensional().contains(&conclusion.pred);
             let owned = profile.theory.owns(&conclusion.pred);
             // sealing / partition (§4.2/§4.4): a leaf may conclude only an
             // extensional predicate.
             if extensional && owned {
-                return Outcome::reject(
+                return Verdict::reject(
                     RejectionCode::PredicatePartitionViolation,
                     "leaf predicate is both extensional and theory-owned",
                 );
             }
             if !extensional {
                 return if owned {
-                    Outcome::reject(
+                    Verdict::reject(
                         RejectionCode::PredicatePartitionViolation,
                         "leaf predicate is owned by a theory, not extensional",
                     )
                 } else {
                     // not extensional and not a builtin ⇒ it is intensional: a leaf
                     // concluding an intensional predicate is the sealing error.
-                    Outcome::reject(
+                    Verdict::reject(
                         RejectionCode::SealedViolation,
                         "leaf concludes a non-extensional (intensional) predicate",
                     )
                 };
             }
+            // leaf_verifications: one `verify` call.
+            tally.leaf_verifications += 1;
             match profile.leaves.verify(conclusion, evidence, ctx) {
-                LeafOutcome::Admit => Outcome::Accept,
-                LeafOutcome::Reject { code } => Outcome::reject(RejectionCode::LeafRejected, code),
+                LeafOutcome::Admit => Verdict::Accept,
+                LeafOutcome::Reject { code } => Verdict::reject(RejectionCode::LeafRejected, code),
             }
         }
     }
@@ -1482,28 +1543,33 @@ fn check_node<C>(
 /// The certificate half of [`check_term_depths`] (its block (c)): every deep datum of one
 /// closed-model certificate that the cert path traverses recursively is within `max`. `Err` names
 /// the first datum over the bound, in the same words the derivation path reports. Shared with
-/// [`check_closed_model_chain`] (#2313), whose certificates are cited by no derivation.
-fn cert_depths_within(cert: &crate::ClosedModelCert, max: usize) -> Result<(), &'static str> {
+/// [`check_closed_model_chain`] (#2313), whose certificates are cited by no derivation. Each depth
+/// it measures goes into `tally` (`max_term_depth_reached`).
+fn cert_depths_within(
+    cert: &crate::ClosedModelCert,
+    max: usize,
+    tally: &mut report::Tally,
+) -> Result<(), &'static str> {
     for table in &cert.extensions {
         for fact in &table.rows {
-            if !ground_within(fact, max) {
+            if !ground_within(fact, max, tally) {
                 return Err("certificate extension row argument");
             }
         }
     }
     for domain in &cert.domains {
         for v in &domain.values {
-            if !crate::term::value_depth_le(v, max) {
+            if !tally.value_within(v, max) {
                 return Err("certificate domain value");
             }
         }
     }
     for edge in &cert.supports.0 {
-        if !ground_within(&edge.fact, max) {
+        if !ground_within(&edge.fact, max, tally) {
             return Err("certificate support-edge fact argument");
         }
         for term in edge.subst.values() {
-            if !term.depth_le(max) {
+            if !tally.term_within(term, max) {
                 return Err("certificate support-edge subst image");
             }
         }
@@ -1516,7 +1582,7 @@ fn cert_depths_within(cert: &crate::ClosedModelCert, max: usize) -> Result<(), &
                 // #2258 L3.3b: a count ref carries no atom; its values are the subst's.
                 SupportRef::CountLower { .. } => continue,
             };
-            if !ground_within(atom, max) {
+            if !ground_within(atom, max, tally) {
                 return Err("certificate support-ref atom argument");
             }
         }
@@ -1537,25 +1603,27 @@ fn cert_depths_within(cert: &crate::ClosedModelCert, max: usize) -> Result<(), &
 ///   all of which the cert path traverses recursively (`ground_key`/codec encode,
 ///   `erase_ground`, `domain_containing`).
 ///
-/// Returns [`Outcome::Accept`] when every term is within bound, else a
-/// `term_too_deep` rejection. Each `*_depth_le` call is itself non-recursive and cuts
-/// off at the bound, so this gate's own cost is bounded by `max_term_depth`, not by
-/// the (unbounded) depth of a pathological term.
+/// Returns [`Verdict::Accept`] when every term is within bound, else a
+/// `term_too_deep` rejection. Each measurement (`Term::depth_le`'s walk) is itself
+/// non-recursive and cuts off at the bound, so this gate's own cost is bounded by
+/// `max_term_depth`, not by the (unbounded) depth of a pathological term. Every depth it
+/// measures goes into `tally` (`max_term_depth_reached`).
 fn check_term_depths(
     program: &dyn Program,
     claim: &GroundLiteral,
     deriv: &Derivation,
     limits: &CheckLimits,
-) -> Outcome {
+    tally: &mut report::Tally,
+) -> Verdict {
     let max = limits.max_term_depth;
     let too_deep = |what: &str| {
-        Outcome::reject(
+        Verdict::reject(
             RejectionCode::TermTooDeep,
             format!("{what} nests deeper than max_term_depth {max}"),
         )
     };
     // (a) the claim.
-    if !ground_within(claim, max) {
+    if !ground_within(claim, max, tally) {
         return too_deep("claim argument");
     }
     // (b) every node conclusion + (for Rule) subst images, and every cited clause.
@@ -1568,7 +1636,7 @@ fn check_term_depths(
     // measured at every node.
     let mut clauses_within: BTreeSet<&ClauseId> = BTreeSet::new();
     for node in &deriv.nodes {
-        if !ground_within(node.conclusion(), max) {
+        if !ground_within(node.conclusion(), max, tally) {
             return too_deep("node conclusion argument");
         }
         if let Node::Rule {
@@ -1578,7 +1646,7 @@ fn check_term_depths(
         } = node
         {
             for term in subst.values() {
-                if !term.depth_le(max) {
+                if !tally.term_within(term, max) {
                     return too_deep("subst image term");
                 }
             }
@@ -1589,21 +1657,21 @@ fn check_term_depths(
                 continue;
             }
             if let Some(clause) = program.clause(clause_id) {
-                if !goal_within(&clause.head, max) {
+                if !goal_within(&clause.head, max, tally) {
                     return too_deep("cited clause head argument");
                 }
                 for bl in &clause.body {
                     match bl {
                         BodyLit::Pos(l) | BodyLit::Neg(l) => {
-                            if !l.args.iter().all(|t| t.depth_le(max)) {
+                            if !l.args.iter().all(|t| tally.term_within(t, max)) {
                                 return too_deep("cited clause body-literal argument");
                             }
                         }
                         // ADR 0023: a Count body literal carries filter terms + the
                         // count slot term, all of which the trusted path substitutes.
                         BodyLit::Count(c) => {
-                            if !c.filter.iter().all(|(_, t)| t.depth_le(max))
-                                || !c.count.depth_le(max)
+                            if !c.filter.iter().all(|(_, t)| tally.term_within(t, max))
+                                || !tally.term_within(&c.count, max)
                             {
                                 return too_deep("cited clause count-literal argument");
                             }
@@ -1618,7 +1686,7 @@ fn check_term_depths(
     //     all-positive derivation `closed_world` is empty, so this is a no-op and the
     //     positive path is byte-identical (it never reaches a `term_too_deep`).
     for cert in &deriv.closed_world {
-        if let Err(what) = cert_depths_within(cert, max) {
+        if let Err(what) = cert_depths_within(cert, max, tally) {
             return too_deep(what);
         }
     }
@@ -1629,15 +1697,13 @@ fn check_term_depths(
             for premise in premises {
                 match premise {
                     Premise::Neg { atom, .. } => {
-                        if !ground_within(atom, max) {
+                        if !ground_within(atom, max, tally) {
                             return too_deep("negated premise atom argument");
                         }
                     }
                     Premise::Count { filter, k, .. } => {
-                        if !filter
-                            .iter()
-                            .all(|(_, v)| crate::term::value_depth_le(v, max))
-                            || !crate::term::value_depth_le(k, max)
+                        if !filter.iter().all(|(_, v)| tally.value_within(v, max))
+                            || !tally.value_within(k, max)
                         {
                             return too_deep("count premise filter/k value");
                         }
@@ -1647,17 +1713,19 @@ fn check_term_depths(
             }
         }
     }
-    Outcome::Accept
+    Verdict::Accept
 }
 
-/// Every argument of a [`GroundLiteral`] nests within `max` (iterative cutoff).
-fn ground_within(lit: &GroundLiteral, max: usize) -> bool {
-    lit.args.iter().all(|v| crate::term::value_depth_le(v, max))
+/// Every argument of a [`GroundLiteral`] nests within `max` (iterative cutoff), each measured
+/// into `tally`.
+fn ground_within(lit: &GroundLiteral, max: usize, tally: &mut report::Tally) -> bool {
+    lit.args.iter().all(|v| tally.value_within(v, max))
 }
 
-/// Every argument term of a [`Goal`](crate::literal::Goal) nests within `max`.
-fn goal_within(goal: &crate::literal::Goal, max: usize) -> bool {
-    goal.args.iter().all(|t| t.depth_le(max))
+/// Every argument term of a [`Goal`](crate::literal::Goal) nests within `max`, each measured into
+/// `tally`.
+fn goal_within(goal: &crate::literal::Goal, max: usize, tally: &mut report::Tally) -> bool {
+    goal.args.iter().all(|t| tally.term_within(t, max))
 }
 
 /// The `Builtin` predicates in `deriv` that **no theory bound by this profile owns** — the
@@ -1685,8 +1753,8 @@ fn goal_within(goal: &crate::literal::Goal, max: usize) -> bool {
 /// It does **not** mean `check` will accept. It answers **one** condition — theory ownership.
 /// Two other conditions raise the same structural code and are untouched here, correctly so:
 /// a builtin predicate that is **also extensional** (a genuine partition overlap), and a theory
-/// whose `owns()` says yes while `decide()` returns `NotMine` (an inconsistent theory). Both are
-/// real defects that this query is not about, and both still reject.
+/// whose `owns()` says yes while `decide_ground()` disowns the atom (an inconsistent theory). Both
+/// are real defects that this query is not about, and both still reject.
 ///
 /// So: **empty means no capability refusal will occur, never that the account is valid.** Read
 /// as a verifiability oracle it would be a check whose PASS is compatible with the thing still
@@ -1696,8 +1764,8 @@ fn goal_within(goal: &crate::literal::Goal, max: usize) -> bool {
 ///
 /// Additive and non-breaking: a helper adapter over existing contract types, adding no
 /// `RejectionCode` variant and moving no vector. It reads `Node::Builtin` conclusions and
-/// `Theory::owns` and nothing else — no `decide()` call, so it is **total and side-effect-free**
-/// even against a theory whose `decide` is expensive.
+/// `Theory::owns` and nothing else — no `decide_ground()` call, so it is **total and
+/// side-effect-free** even against a theory whose `decide_ground` is expensive.
 ///
 /// Order is the derivation node order, deduplicated on first appearance, so the result is
 /// deterministic for a given derivation.
@@ -1725,24 +1793,24 @@ pub fn profile_decides_all_builtins<C>(deriv: &Derivation, profile: &CheckProfil
 }
 
 /// The `Builtin` conclusions this profile's theory **owns but disowns** — `owns(pred)` is
-/// `true` while `decide_ground(conclusion)` reports the disowning fault, which is what a
-/// [`TheoryOutcome::NotMine`](crate::spi::TheoryOutcome::NotMine) from `decide` becomes (#3126). A
-/// theory that stopped (a work cap) is not listed: it did not disown the atom.
+/// `true` while `decide_ground(conclusion)` reports the disowning fault,
+/// [`TheoryGround::disowned`](crate::TheoryGround) (#3126). A theory that stopped (a work cap) is
+/// not listed: it did not disown the atom.
 ///
 /// A non-empty result is a **verifier-side defect**: the bound [`Theory`](crate::spi::Theory)
-/// violates the coherence obligation of §5, which requires `decide` to reach a verdict on
+/// violates the coherence obligation of §5, which requires `decide_ground` to reach a verdict on
 /// every atom whose predicate `owns` claims. `check` rejects this with the structural code
 /// [`RejectionCode::PredicatePartitionViolation`] — correctly, since the account cannot be
 /// verified by this profile — but a consumer reading that code alone is pointed at the
 /// **producer** for what is a bug in the host's own theory binding. This query is the
 /// attribution the code cannot carry (issue #1378): it names the atoms that expose it.
 ///
-/// ## ⚠ Unlike [`unowned_builtin_predicates`], this one CALLS `decide`
+/// ## ⚠ Unlike [`unowned_builtin_predicates`], this one CALLS `decide_ground`
 ///
 /// Ownership is a property of a *predicate*, but incoherence is only observable per *atom*,
 /// so the question cannot be answered without deciding. This therefore costs what the
 /// corresponding part of `check` costs and is **not** side-effect-free against a theory whose
-/// `decide` is expensive or stateful. Its value is **attribution after a rejection**, not
+/// `decide_ground` is expensive or stateful. Its value is **attribution after a rejection**, not
 /// avoidance before one — prefer the sibling query when a cheap pre-flight is all you need.
 ///
 /// ## ⛔ An empty result does NOT certify the theory coherent
@@ -1757,7 +1825,7 @@ pub fn profile_decides_all_builtins<C>(deriv: &Derivation, profile: &CheckProfil
 /// Additive and non-breaking: a helper adapter over existing contract types, adding no
 /// `RejectionCode` variant and moving no vector. Order is derivation node order, deduplicated
 /// on first appearance, so the result is deterministic for a given derivation. The dedup test
-/// precedes the `decide` call, so a repeated offending atom is decided once.
+/// precedes the `decide_ground` call, so a repeated offending atom is decided once.
 pub fn incoherent_builtin_atoms<C>(
     deriv: &Derivation,
     profile: &CheckProfile<C>,

@@ -6,7 +6,7 @@
 //! a pure, total, deterministic function of ground args, non-derivable). So their
 //! *meaning* is a shared, certifiable artifact rather than a search-only Rust builtin.
 //! The search-side builtins (`logos_core::builtins::{builtin_contains, builtin_starts_with,
-//! builtin_ends_with}`) stay in `core` as the A1 fast path; this `decide` reproduces them
+//! builtin_ends_with}`) stay in `core` as the A1 fast path; this `decide_ground` reproduces them
 //! byte-for-byte over the SAME raw `Atom` bytes — the §7 dual-conformance law, pinned by
 //! `vectors/text.json` and mirrored tri-core (`contract/{go,ts}`).
 //!
@@ -14,7 +14,7 @@
 //!
 //! `owns(pred)`: by NAME only (any arity) — `contains starts_with ends_with`. There is no
 //! nested expression grammar (unlike arithmetic operators), so nothing else to exclude.
-//! `decide(atom)` on a ground atom: a non-UTF-8 predicate → `Fails{text_unknown_predicate}`
+//! `decide_ground(atom)` on a ground atom: a non-UTF-8 predicate → `Fails{text_unknown_predicate}`
 //! (defensive); an owned name at arity ≠ 2 → `Fails{text_bad_arity}`; both args bare
 //! `Atom`s with the byte test true → `Holds`; a false test or a non-`Atom` arg (a compound,
 //! or the `utf8-text` *embedding*, which is a `Tuple`) → `Fails{text_does_not_hold}`.
@@ -24,7 +24,7 @@
 //! hold). An empty needle / prefix / suffix holds (every byte-slice contains/starts
 //! with/ends with the empty slice).
 
-use crate::{ComponentIdentity, GroundLiteral, Symbol, Term, Theory, TheoryOutcome};
+use crate::{ComponentIdentity, GroundLiteral, Symbol, Term, Theory, TheoryGround};
 
 /// The byte-string relation names this theory owns. Owned by NAME only.
 const TEXT_PREDICATES: &[&[u8]] = &[b"contains", b"starts_with", b"ends_with"];
@@ -115,20 +115,16 @@ impl Theory for TextTheory {
         crate::spi::DecisionCompletion::StopsAreTyped
     }
 
-    fn decide(&self, atom: &GroundLiteral) -> TheoryOutcome {
+    fn decide_ground(&self, atom: &GroundLiteral) -> TheoryGround {
         // Not one of ours: a routing safety net (`check` routes by `owns`, so this is
         // unreachable on a correctly-routed call — but stay total).
         if !owns_name(&atom.pred) {
-            return TheoryOutcome::NotMine;
+            return TheoryGround::disowned();
         }
         let name = match std::str::from_utf8(atom.pred.bytes()) {
             Ok(name) => name,
             // A non-UTF-8 predicate cannot be a registered text relation.
-            Err(_) => {
-                return TheoryOutcome::Fails {
-                    code: "text_unknown_predicate".into(),
-                }
-            }
+            Err(_) => return TheoryGround::fails("text_unknown_predicate"),
         };
         let args: Vec<Term> = atom.args.iter().map(Term::from_value).collect();
         match name {
@@ -137,9 +133,7 @@ impl Theory for TextTheory {
             "ends_with" => decide_relation(&args, |text, suffix| text.ends_with(suffix)),
             // Owned name routed here but not handled above — unreachable (the name set is
             // exactly the match arms above), but stay total.
-            _ => TheoryOutcome::Fails {
-                code: "text_does_not_hold".into(),
-            },
+            _ => TheoryGround::fails("text_does_not_hold"),
         }
     }
 }
@@ -148,16 +142,12 @@ impl Theory for TextTheory {
 /// then `test(arg0_bytes, arg1_bytes)`. Mirrors the search-side builtins
 /// (`builtin_contains` et al.): a non-atom arg or a false test is `text_does_not_hold`;
 /// a non-2 arity has no such relation (`text_bad_arity`).
-fn decide_relation(args: &[Term], test: impl Fn(&[u8], &[u8]) -> bool) -> TheoryOutcome {
+fn decide_relation(args: &[Term], test: impl Fn(&[u8], &[u8]) -> bool) -> TheoryGround {
     if args.len() != 2 {
-        return TheoryOutcome::Fails {
-            code: "text_bad_arity".into(),
-        };
+        return TheoryGround::fails("text_bad_arity");
     }
     match (atom_bytes(&args[0]), atom_bytes(&args[1])) {
-        (Some(lhs), Some(rhs)) if test(lhs, rhs) => TheoryOutcome::Holds,
-        _ => TheoryOutcome::Fails {
-            code: "text_does_not_hold".into(),
-        },
+        (Some(lhs), Some(rhs)) if test(lhs, rhs) => TheoryGround::holds(),
+        _ => TheoryGround::fails("text_does_not_hold"),
     }
 }

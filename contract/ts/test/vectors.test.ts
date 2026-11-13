@@ -32,17 +32,18 @@ import {
   PredicateSet,
   type RuleAdmissibility,
   RuleOutcome,
-  type Subst,
+  Subst,
   Symbol,
   Term,
   type Theory,
-  TheoryOutcome,
+  TheoryGround,
   type CheckLimits,
   type CheckProfile,
   defaultLimits,
   BuiltinNode,
   LeafNode,
   RuleNode,
+  VarId,
 } from "../src/index.js";
 
 // =================== the `demo_v1` profile (shared by name) ===================
@@ -70,15 +71,15 @@ class LtTheory implements Theory {
   owns(pred: Symbol): boolean {
     return pred.equals(Symbol.of("lt"));
   }
-  decide(atom: GroundLiteral): TheoryOutcome {
+  decideGround(atom: GroundLiteral): TheoryGround {
     const args = atom.args;
-    if (args.length !== 2) return TheoryOutcome.Fails("lt_arity");
+    if (args.length !== 2) return TheoryGround.fails("lt_arity");
     const a = args[0]!;
     const b = args[1]!;
     if (a.kind === "atom" && b.kind === "atom" && bytesLess(a.bytes(), b.bytes())) {
-      return TheoryOutcome.Holds;
+      return TheoryGround.holds();
     }
-    return TheoryOutcome.Fails("not_less_than");
+    return TheoryGround.fails("not_less_than");
   }
 }
 
@@ -118,7 +119,7 @@ test("host band: builtin_failed", () => {
   // lt(b, a): b > a, so the theory Fails -> builtin_failed, sub-code in detail.
   const deriv = new Derivation([new BuiltinNode(lt("b", "a"))], 0);
   const profile = demoProfile(defaultLimits());
-  const got = check(new MapProgram(), lt("b", "a"), deriv, undefined, profile);
+  const got = check(new MapProgram(), lt("b", "a"), deriv, undefined, profile).verdict;
   assert.equal(got.kind, "reject");
   if (got.kind === "reject") {
     assert.equal(got.code, "builtin_failed");
@@ -147,7 +148,7 @@ test("host band: leaf_rejected", () => {
     admit: new AlwaysAdmit<void>(),
     limits: defaultLimits(),
   };
-  const got = check(new MapProgram(), edge, deriv, undefined, profile);
+  const got = check(new MapProgram(), edge, deriv, undefined, profile).verdict;
   assert.equal(got.kind, "reject");
   if (got.kind === "reject") {
     assert.equal(got.code, "leaf_rejected");
@@ -172,7 +173,7 @@ test("host band: rule_inadmissible", () => {
   );
   const edgeAa = GroundLiteral.of("edge", [ontosValue("a"), ontosValue("a")]);
   const greetA = GroundLiteral.of("greet", [ontosValue("a")]);
-  const subst: Subst = new Map([["X", Term.atom(new TextEncoder().encode("a"))]]);
+  const subst: Subst = new Subst([[VarId.of("X"), Term.atom(new TextEncoder().encode("a"))]]);
   const deriv = new Derivation(
     [
       new LeafNode(edgeAa, Evidence.none()),
@@ -186,7 +187,7 @@ test("host band: rule_inadmissible", () => {
     admit: new DenyAdmit(),
     limits: defaultLimits(),
   };
-  const got = check(program, greetA, deriv, undefined, profile);
+  const got = check(program, greetA, deriv, undefined, profile).verdict;
   assert.equal(got.kind, "reject");
   if (got.kind === "reject") {
     assert.equal(got.code, "rule_inadmissible");
@@ -207,9 +208,9 @@ test("rule head collides with extensional is sealed", () => {
   );
   const edgeBa = GroundLiteral.of("edge", [ontosValue("b"), ontosValue("a")]);
   const edgeAb = GroundLiteral.of("edge", [ontosValue("a"), ontosValue("b")]);
-  const subst: Subst = new Map([
-    ["X", Term.atom(new TextEncoder().encode("a"))],
-    ["Y", Term.atom(new TextEncoder().encode("b"))],
+  const subst: Subst = new Subst([
+    [VarId.of("X"), Term.atom(new TextEncoder().encode("a"))],
+    [VarId.of("Y"), Term.atom(new TextEncoder().encode("b"))],
   ]);
   const deriv = new Derivation(
     [
@@ -219,7 +220,7 @@ test("rule head collides with extensional is sealed", () => {
     1,
   );
   const profile = demoProfile(defaultLimits());
-  const got = check(program, edgeAb, deriv, undefined, profile);
+  const got = check(program, edgeAb, deriv, undefined, profile).verdict;
   assert.equal(got.kind, "reject");
   if (got.kind === "reject") {
     assert.equal(got.code, "sealed_violation");
@@ -237,9 +238,9 @@ test("rule head owned by theory is partition violation", () => {
   );
   const edgeAb = GroundLiteral.of("edge", [ontosValue("a"), ontosValue("b")]);
   const ltAb = GroundLiteral.of("lt", [ontosValue("a"), ontosValue("b")]);
-  const subst: Subst = new Map([
-    ["X", Term.atom(new TextEncoder().encode("a"))],
-    ["Y", Term.atom(new TextEncoder().encode("b"))],
+  const subst: Subst = new Subst([
+    [VarId.of("X"), Term.atom(new TextEncoder().encode("a"))],
+    [VarId.of("Y"), Term.atom(new TextEncoder().encode("b"))],
   ]);
   const deriv = new Derivation(
     [
@@ -249,7 +250,7 @@ test("rule head owned by theory is partition violation", () => {
     1,
   );
   const profile = demoProfile(defaultLimits());
-  const got = check(program, ltAb, deriv, undefined, profile);
+  const got = check(program, ltAb, deriv, undefined, profile).verdict;
   assert.equal(got.kind, "reject");
   if (got.kind === "reject") {
     assert.equal(got.code, "predicate_partition_violation");

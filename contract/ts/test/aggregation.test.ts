@@ -49,15 +49,16 @@ import {
   RelationTable,
   RuleNode,
   StratumPrefix,
-  type Subst,
+  Subst,
   Symbol,
   Term,
   type Theory,
-  TheoryOutcome,
+  TheoryGround,
   edbTableHash,
   Evidence as EvidenceOps,
   LeafNode,
   WorldMemo,
+  VarId,
 } from "../src/index.js";
 
 // ================================= test profile =================================
@@ -67,8 +68,8 @@ class NoTheory implements Theory {
   owns(_pred: Symbol): boolean {
     return false;
   }
-  decide(_atom: GroundLiteral): TheoryOutcome {
-    return TheoryOutcome.Fails("no_theory");
+  decideGround(_atom: GroundLiteral): TheoryGround {
+    return TheoryGround.fails("no_theory");
   }
 }
 
@@ -189,9 +190,9 @@ function validCert(program: MapProgram): ClosedModelCert {
 }
 
 function countSubst(k: number): Subst {
-  return new Map<string, Term>([
-    ["O", Term.atom(new TextEncoder().encode("o1"))],
-    ["N", Term.fromValue(intV(k))],
+  return new Subst([
+    [VarId.of("O"), Term.atom(new TextEncoder().encode("o1"))],
+    [VarId.of("N"), Term.fromValue(intV(k))],
   ]);
 }
 
@@ -215,9 +216,9 @@ function run(program: MapProgram, claim: GroundLiteral, deriv: Derivation): Outc
 }
 
 function assertReject(outcome: Outcome, expected: string): void {
-  assert.equal(outcome.kind, "reject", `expected reject ${expected}, got ${outcome.kind}`);
-  if (outcome.kind === "reject") {
-    assert.equal(outcome.code, expected, `expected ${expected}, got ${outcome.code} (${outcome.detail})`);
+  assert.equal(outcome.verdict.kind, "reject", `expected reject ${expected}, got ${outcome.verdict.kind}`);
+  if (outcome.verdict.kind === "reject") {
+    assert.equal(outcome.verdict.code, expected, `expected ${expected}, got ${outcome.verdict.code} (${outcome.verdict.detail})`);
   }
 }
 
@@ -227,14 +228,14 @@ test("accept count rows matching filter", () => {
   const program = baseProgram();
   const deriv = countDerivation(C_ELIGIBLE_COUNT, "eligible_count", ProjectSpec.rows(), 4, validCert(program));
   const out = run(program, GroundLiteral.of("eligible_count", [av("o1")]), deriv);
-  assert.equal(out.kind, "accept", out.kind === "reject" ? `${out.code} (${out.detail})` : "");
+  assert.equal(out.verdict.kind, "accept", out.verdict.kind === "reject" ? `${out.verdict.code} (${out.verdict.detail})` : "");
 });
 
 test("accept count_distinct excludes null", () => {
   const program = baseProgram();
   const deriv = countDerivation(C_ELIGIBLE_DISTINCT, "eligible_distinct", ProjectSpec.distinct(2), 2, validCert(program));
   const out = run(program, GroundLiteral.of("eligible_distinct", [av("o1")]), deriv);
-  assert.equal(out.kind, "accept", out.kind === "reject" ? `${out.code} (${out.detail})` : "");
+  assert.equal(out.verdict.kind, "accept", out.verdict.kind === "reject" ? `${out.verdict.code} (${out.verdict.detail})` : "");
 });
 
 // =================================== REJECT ===================================
@@ -356,7 +357,7 @@ test("reject stale EDB (cert_edb_mismatch)", () => {
 test("reject count_mismatch — filter genuinely applied (o2 has 1 row, claim 4)", () => {
   const program = baseProgram();
   const cx = boundContext(program);
-  const subst = new Map<string, Term>([["O", Term.atom(new TextEncoder().encode("o2"))], ["N", Term.fromValue(intV(4))]]);
+  const subst = new Subst([[VarId.of("O"), Term.atom(new TextEncoder().encode("o2"))], [VarId.of("N"), Term.fromValue(intV(4))]]);
   const node = new RuleNode(
     GroundLiteral.of("eligible_count", [av("o2")]),
     new ClauseId(C_ELIGIBLE_COUNT),
@@ -371,7 +372,7 @@ test("reject count_mismatch — filter genuinely applied (o2 has 1 row, claim 4)
 test("accept count — filter applied to o2 gives 1 row, claim 1", () => {
   const program = baseProgram();
   const cx = boundContext(program);
-  const subst = new Map<string, Term>([["O", Term.atom(new TextEncoder().encode("o2"))], ["N", Term.fromValue(intV(1))]]);
+  const subst = new Subst([[VarId.of("O"), Term.atom(new TextEncoder().encode("o2"))], [VarId.of("N"), Term.fromValue(intV(1))]]);
   const node = new RuleNode(
     GroundLiteral.of("eligible_count", [av("o2")]),
     new ClauseId(C_ELIGIBLE_COUNT),
@@ -381,7 +382,7 @@ test("accept count — filter applied to o2 gives 1 row, claim 1", () => {
   );
   const deriv = new Derivation([node], 0, [validCertFor(program, cx)]);
   const out = checkWithCertContext(program, GroundLiteral.of("eligible_count", [av("o2")]), deriv, undefined, aggProfile(), cx);
-  assert.equal(out.kind, "accept", out.kind === "reject" ? `${out.code} (${out.detail})` : "");
+  assert.equal(out.verdict.kind, "accept", out.verdict.kind === "reject" ? `${out.verdict.code} (${out.verdict.detail})` : "");
 });
 
 test("reject cert_out_of_range — cited cert index does not exist", () => {
@@ -478,9 +479,9 @@ function scoreCertEmptyGroup(): ClosedModelCert {
 
 // <head>(g) :- agg(score(g, V), V, k), citing the score cert.
 function foldDerivation(clauseID: string, headPred: string, group: string, project: ProjectSpec, k: number, cert: ClosedModelCert): Derivation {
-  const subst = new Map<string, Term>([
-    ["G", Term.atom(new TextEncoder().encode(group))],
-    ["N", Term.fromValue(intV(k))],
+  const subst = new Subst([
+    [VarId.of("G"), Term.atom(new TextEncoder().encode(group))],
+    [VarId.of("N"), Term.fromValue(intV(k))],
   ]);
   const node = new RuleNode(
     GroundLiteral.of(headPred, [av(group)]),
@@ -500,22 +501,22 @@ function runFold(claimPred: string, group: string, deriv: Derivation): Outcome {
 test("accept integer sum: 3 + 7 + 1 = 11 over the sealed g1 column", () => {
   const deriv = foldDerivation(C_SCORE_SUM, "score_sum", "g1", ProjectSpec.sum(1), 11, scoreCert());
   const out = runFold("score_sum", "g1", deriv);
-  assert.equal(out.kind, "accept", out.kind === "reject" ? `${out.code} (${out.detail})` : "");
+  assert.equal(out.verdict.kind, "accept", out.verdict.kind === "reject" ? `${out.verdict.code} (${out.verdict.detail})` : "");
 });
 
 test("accept integer min / max over the sealed g1 column: min = 1, max = 7", () => {
   const dmin = foldDerivation(C_SCORE_MIN, "score_min", "g1", ProjectSpec.min(1), 1, scoreCert());
   const omin = runFold("score_min", "g1", dmin);
-  assert.equal(omin.kind, "accept", omin.kind === "reject" ? `${omin.code} (${omin.detail})` : "");
+  assert.equal(omin.verdict.kind, "accept", omin.verdict.kind === "reject" ? `${omin.verdict.code} (${omin.verdict.detail})` : "");
   const dmax = foldDerivation(C_SCORE_MAX, "score_max", "g1", ProjectSpec.max(1), 7, scoreCert());
   const omax = runFold("score_max", "g1", dmax);
-  assert.equal(omax.kind, "accept", omax.kind === "reject" ? `${omax.code} (${omax.detail})` : "");
+  assert.equal(omax.verdict.kind, "accept", omax.verdict.kind === "reject" ? `${omax.verdict.code} (${omax.verdict.detail})` : "");
 });
 
 test("accept empty sum = 0: no score rows match the in-domain group empty_grp", () => {
   const deriv = foldDerivation(C_SCORE_SUM, "score_sum", "empty_grp", ProjectSpec.sum(1), 0, scoreCertEmptyGroup());
   const out = runFold("score_sum", "empty_grp", deriv);
-  assert.equal(out.kind, "accept", out.kind === "reject" ? `${out.code} (${out.detail})` : "");
+  assert.equal(out.verdict.kind, "accept", out.verdict.kind === "reject" ? `${out.verdict.code} (${out.verdict.detail})` : "");
 });
 
 test("reject empty min: min of an empty set is undefined (agg_empty_undefined)", () => {
@@ -558,9 +559,9 @@ test("reject a sum over a NON-INT column: fold column 0 (the group atom) (count_
     supports: [],
     limitsDecl: { certFacts: 4, domainValues: 6, supportEdges: 0, ruleGroundings: 1000, joinSteps: 10000, certBytes: 8192 },
   });
-  const subst = new Map<string, Term>([
-    ["G", Term.atom(new TextEncoder().encode("g1"))],
-    ["N", Term.fromValue(intV(0))],
+  const subst = new Subst([
+    [VarId.of("G"), Term.atom(new TextEncoder().encode("g1"))],
+    [VarId.of("N"), Term.fromValue(intV(0))],
   ]);
   const node = new RuleNode(
     GroundLiteral.of("score_bad", [av("g1")]),
@@ -653,7 +654,7 @@ test("#2569: a world cited by many answers is verified once", () => {
   const memo = new WorldMemo(program, aggProfile(), undefined, boundContext(program));
   const deriv = memoDeriv(validCert(program));
   for (let i = 0; i < 5; i++) {
-    assert.equal(checkWithWorldMemo(memo, memoClaim(), deriv).kind, "accept", `answer ${i}`);
+    assert.equal(checkWithWorldMemo(memo, memoClaim(), deriv).verdict.kind, "accept", `answer ${i}`);
   }
   assert.equal(memo.certificatesVerified, 1, "five answers citing one certificate verify it once");
 });
@@ -674,10 +675,10 @@ test("a verifier can change the producer's pin without changing the memo's verif
     },
   };
   const memo = new WorldMemo(program, { ...profile, leaves }, undefined, boundContext(program));
-  assert.equal(checkWithWorldMemo(memo, memoClaim(), deriv).kind, "accept");
+  assert.equal(checkWithWorldMemo(memo, memoClaim(), deriv).verdict.kind, "accept");
   const fresh = memoFresh(program, profile, memoClaim(), deriv);
   assertReject(fresh, "cert_context_mismatch");
-  assert.deepEqual(checkWithWorldMemo(memo, memoClaim(), deriv), fresh);
+  assert.deepEqual(checkWithWorldMemo(memo, memoClaim(), deriv).verdict, fresh.verdict);
   assert.equal(memo.certificatesVerified, 2);
 });
 
@@ -692,11 +693,11 @@ test("a consumer cannot inject a valid world status or alter the memo's bound pi
   const valid = memoDeriv(validCert(program));
   context.profileHash.fill(0);
   memo.certContext.profileHash.fill(0);
-  assert.equal(checkWithWorldMemo(memo, memoClaim(), valid).kind, "accept");
+  assert.equal(checkWithWorldMemo(memo, memoClaim(), valid).verdict.kind, "accept");
   const invalid = memoDeriv(certWith(program, { profileHash: new Uint8Array(32) }));
   const expected = memoFresh(program, profile, memoClaim(), invalid);
   assertReject(expected, "cert_context_mismatch");
-  assert.deepEqual(checkWithWorldMemo(memo, memoClaim(), invalid), expected);
+  assert.deepEqual(checkWithWorldMemo(memo, memoClaim(), invalid).verdict, expected.verdict);
   assert.equal(memo.certificatesVerified, 2);
   assert.equal(Reflect.get(WorldMemo.prototype, "statuses"), undefined);
 });
@@ -706,7 +707,7 @@ test("#2569: a changed certificate is a miss with the fresh verdict", () => {
   const prof = aggProfile();
   const memo = new WorldMemo(program, prof, undefined, boundContext(program));
   const valid = memoDeriv(validCert(program));
-  assert.equal(checkWithWorldMemo(memo, memoClaim(), valid).kind, "accept");
+  assert.equal(checkWithWorldMemo(memo, memoClaim(), valid).verdict.kind, "accept");
   // The control, exact: which single changes a fresh check rejects. The size declaration above the
   // real size is a change the checker ACCEPTS, and it must miss all the same: the memo keys on the
   // certificate, never on the verdict.
@@ -715,14 +716,14 @@ test("#2569: a changed certificate is a miss with the fresh verdict", () => {
     const before = memo.certificatesVerified;
     const deriv = memoDeriv(m.cert);
     const expected = memoFresh(program, prof, memoClaim(), deriv);
-    assert.deepEqual(checkWithWorldMemo(memo, memoClaim(), deriv), expected, `${m.what}: the memo's verdict is not the fresh one`);
+    assert.deepEqual(checkWithWorldMemo(memo, memoClaim(), deriv).verdict, expected.verdict, `${m.what}: the memo's verdict is not the fresh one`);
     assert.equal(memo.certificatesVerified, before + 1, `${m.what}: a changed certificate must miss`);
     assert.equal(
-      expected.kind !== "accept",
+      expected.verdict.kind !== "accept",
       rejecting.has(m.what),
       `${m.what}: the control's expected verdict, ${JSON.stringify(expected)}`,
     );
-    assert.equal(checkWithWorldMemo(memo, memoClaim(), valid).kind, "accept", `${m.what}: the valid world after it`);
+    assert.equal(checkWithWorldMemo(memo, memoClaim(), valid).verdict.kind, "accept", `${m.what}: the valid world after it`);
   }
 });
 
@@ -749,11 +750,11 @@ test("#2569: an in-place edit of a checked certificate is a miss", () => {
     const memo = new WorldMemo(program, prof, undefined, boundContext(program));
     const cert = certWith(program, { limitsDecl: { ...validCert(program).limitsDecl } });
     const deriv = memoDeriv(cert);
-    assert.equal(checkWithWorldMemo(memo, memoClaim(), deriv).kind, "accept", `${e.what}: the valid world`);
+    assert.equal(checkWithWorldMemo(memo, memoClaim(), deriv).verdict.kind, "accept", `${e.what}: the valid world`);
     e.edit(cert);
     const expected = memoFresh(program, prof, memoClaim(), deriv);
-    assert.notEqual(expected.kind, "accept", `${e.what}: control, the edited certificate must be rejected fresh`);
-    assert.deepEqual(checkWithWorldMemo(memo, memoClaim(), deriv), expected, `${e.what}: the memo's verdict`);
+    assert.notEqual(expected.verdict.kind, "accept", `${e.what}: control, the edited certificate must be rejected fresh`);
+    assert.deepEqual(checkWithWorldMemo(memo, memoClaim(), deriv).verdict, expected.verdict, `${e.what}: the memo's verdict`);
     assert.equal(memo.certificatesVerified, 2, `${e.what}: an in-place edit must miss`);
   }
 });
@@ -765,15 +766,15 @@ test("#2569: a limit changed through the bound profile is a miss", () => {
   const prof = aggProfile();
   const memo = new WorldMemo(program, prof, undefined, boundContext(program));
   const deriv = memoDeriv(validCert(program));
-  assert.equal(checkWithWorldMemo(memo, memoClaim(), deriv).kind, "accept", "the loose limits");
+  assert.equal(checkWithWorldMemo(memo, memoClaim(), deriv).verdict.kind, "accept", "the loose limits");
   const loose = prof.limits;
   const writable = prof as { limits: typeof loose };
   writable.limits = { ...loose, maxCertFacts: 4 }; // the valid certificate seals five facts
   const tight = memoFresh(program, prof, memoClaim(), deriv);
-  assert.notEqual(tight.kind, "accept", "control: the tighter limit must reject");
-  assert.deepEqual(checkWithWorldMemo(memo, memoClaim(), deriv), tight, "tightened");
+  assert.notEqual(tight.verdict.kind, "accept", "control: the tighter limit must reject");
+  assert.deepEqual(checkWithWorldMemo(memo, memoClaim(), deriv).verdict, tight.verdict, "tightened");
   writable.limits = loose;
-  assert.equal(checkWithWorldMemo(memo, memoClaim(), deriv).kind, "accept", "loosened again");
+  assert.equal(checkWithWorldMemo(memo, memoClaim(), deriv).verdict.kind, "accept", "loosened again");
   assert.equal(memo.certificatesVerified, 3, "each change of limits re-verifies");
 });
 
@@ -799,8 +800,8 @@ test("#2569: a mixed sequence through one memo is the fresh sequence", () => {
     [memoClaim(), valid], // miss 7
   ];
   steps.forEach(([claim, deriv], i) => {
-    assert.deepEqual(checkWithWorldMemo(memo, claim, deriv), memoFresh(program, prof, claim, deriv), `step ${i}`);
+    assert.deepEqual(checkWithWorldMemo(memo, claim, deriv).verdict, memoFresh(program, prof, claim, deriv).verdict, `step ${i}`);
   });
-  assert.equal(memoFresh(program, prof, row, positive).kind, "accept", "the positive control accepts");
+  assert.equal(memoFresh(program, prof, row, positive).verdict.kind, "accept", "the positive control accepts");
   assert.equal(memo.certificatesVerified, 7, "seven misses, two hits, and positive answers never evict the world");
 });

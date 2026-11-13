@@ -15,6 +15,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/Bitspark/logos-contract/contract/go/completion"
 )
 
 type fragmentExpect struct {
@@ -47,7 +49,9 @@ func (o fragmentOwns) Owns(pred Symbol) bool {
 	return false
 }
 
-func (fragmentOwns) Decide(GroundLiteral) TheoryOutcome { return TheoryNotMine{} }
+func (fragmentOwns) DecideGround(GroundLiteral) completion.TheoryGround {
+	return completion.TheoryGroundDisowned()
+}
 
 func fragmentTerm(v any) Term {
 	switch x := v.(type) {

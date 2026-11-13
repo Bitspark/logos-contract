@@ -82,15 +82,15 @@ func runShapes3088(t *testing.T, shapes []shape3088, check func(Derivation) Outc
 		switch {
 		case s.detail == "":
 			if !got.IsAccept() {
-				t.Errorf("%s: an accepting row must accept, got %s: %s", s.name, negOutcomeString(got), got.Detail())
+				t.Errorf("%s: an accepting row must accept, got %s: %s", s.name, negOutcomeString(got), got.Verdict.Detail())
 			}
 			if !s.opaque && !encodes3088(s.deriv) {
 				t.Errorf("%s: the control must encode, or the encodability check below proves nothing", s.name)
 			}
-		case got.IsAccept() || got.Code() != UnknownNodeKind:
-			t.Errorf("%s: want reject:unknown_node_kind, got %s: %s", s.name, negOutcomeString(got), got.Detail())
-		case !strings.Contains(got.Detail(), s.detail):
-			t.Errorf("%s: the detail %q does not name the component %q", s.name, got.Detail(), s.detail)
+		case got.IsAccept() || got.Verdict.Code() != UnknownNodeKind:
+			t.Errorf("%s: want reject:unknown_node_kind, got %s: %s", s.name, negOutcomeString(got), got.Verdict.Detail())
+		case !strings.Contains(got.Verdict.Detail(), s.detail):
+			t.Errorf("%s: the detail %q does not name the component %q", s.name, got.Verdict.Detail(), s.detail)
 		}
 		if s.detail != "" && encodes3088(s.deriv) {
 			t.Errorf("%s: a refused shape ENCODES, so it is an account and its refusal is a narrowing under ADR 0035 D1 (a CHECKER_VERSION bump and D1's gate; seat:caa's ruling on #3088)", s.name)
@@ -204,7 +204,7 @@ func TestAnUntrustedCertificateComponentOfUnknownKindIsRefusedByName3088(t *test
 		if fresh.IsAccept() {
 			t.Fatal("a fresh check accepted the altered support")
 		}
-		if got := CheckWithWorldMemo(memo, claim, d); got.IsAccept() || got.Code() != fresh.Code() {
+		if got := CheckWithWorldMemo(memo, claim, d); got.IsAccept() || got.Verdict.Code() != fresh.Verdict.Code() {
 			t.Fatalf("altered support: memo returned %s, fresh check returned %s", got, fresh)
 		}
 		if memo.CertificatesVerified() != 2 {
@@ -262,15 +262,15 @@ func TestTheCertificateChainEntryRefusesAnUnknownComponentByName3088(t *testing.
 		return CheckClosedModelChain[unitCtx](program, []ClosedModelCert{cert(ref)}, unitCtx{}, profile, derived)
 	}
 	if got := chain(LowerStratumRef{Cert: NewCertId(0), Atom: NewGroundLiteral("base", x)}); !got.IsAccept() {
-		t.Fatalf("control: want accept, got %s: %s", negOutcomeString(got), got.Detail())
+		t.Fatalf("control: want accept, got %s: %s", negOutcomeString(got), got.Verdict.Detail())
 	}
 	for _, c := range []struct {
 		name string
 		ref  SupportRef
 	}{{"nil", nil}, {"a foreign ref embedding nil", foreignSupportRef3088{}}} {
 		got := chain(c.ref)
-		if got.IsAccept() || got.Code() != UnknownNodeKind || !strings.Contains(got.Detail(), "chain cert 0: support edge 0 ref 0") {
-			t.Errorf("%s: want reject:unknown_node_kind naming chain cert 0's ref, got %s: %s", c.name, negOutcomeString(got), got.Detail())
+		if got.IsAccept() || got.Verdict.Code() != UnknownNodeKind || !strings.Contains(got.Verdict.Detail(), "chain cert 0: support edge 0 ref 0") {
+			t.Errorf("%s: want reject:unknown_node_kind naming chain cert 0's ref, got %s: %s", c.name, negOutcomeString(got), got.Verdict.Detail())
 		}
 	}
 }

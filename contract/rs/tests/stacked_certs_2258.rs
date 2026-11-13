@@ -13,7 +13,7 @@ use logos_contract::{
     closure_join_cost, closure_join_cost_in_world, CertId, CertSizeDecl, CheckLimits, Clause,
     ClauseId, ClosedModelCert, ClosureWitness, FiniteDomain, Goal, GroundLiteral, MapProgram,
     RelationTable, StratumPrefix, Subst, SupportEdge, SupportRef, SupportWitness, Symbol, Term,
-    Theory, TheoryOutcome,
+    Theory, TheoryGround,
 };
 use ontos_core::Value;
 use std::collections::BTreeMap;
@@ -28,10 +28,8 @@ impl Theory for NoTheory {
     fn owns(&self, _: &Symbol) -> bool {
         false
     }
-    fn decide(&self, _: &GroundLiteral) -> TheoryOutcome {
-        TheoryOutcome::Fails {
-            code: "not_mine".into(),
-        }
+    fn decide_ground(&self, _: &GroundLiteral) -> TheoryGround {
+        TheoryGround::fails("not_mine")
     }
 }
 

@@ -52,6 +52,12 @@ function symKey(pred: Symbol): string {
 export class CertView {
   readonly cert: ClosedModelCert;
   readonly #lower: Map<string, { readonly index: number; readonly cert: ClosedModelCert }>;
+  /**
+   * #3111 `theoryDecisions`: the `decideGround` calls the support and closure gates made through
+   * this view, which `verifyCert` adds to the check's report once the gates end. The view is the one
+   * context both gates already share down to the deciding site. rs `CertView::decisions`.
+   */
+  #decisions = 0;
 
   constructor(
     cert: ClosedModelCert,
@@ -59,6 +65,16 @@ export class CertView {
   ) {
     this.cert = cert;
     this.#lower = lower;
+  }
+
+  /** #3111 `theoryDecisions`: one `decideGround` call made through this view. */
+  countDecision(): void {
+    this.#decisions += 1;
+  }
+
+  /** The `decideGround` calls made through this view so far. */
+  get theoryDecisions(): number {
+    return this.#decisions;
   }
 
   /** The table a sealed clause reads for `pred`: the cert's own if it seals `pred`, else the resolved lower cert's. */

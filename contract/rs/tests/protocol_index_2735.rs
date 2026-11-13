@@ -9,7 +9,7 @@ use logos_contract::derivation_wire::INDEX_MAX;
 use logos_contract::{
     check, decode_derivation_wire_v1, encode_derivation_wire_v1, index_offset, AlwaysAdmit, CertId,
     CheckLimits, CheckProfile, Derivation, Evidence, GroundLiteral, LeafOutcome, LeafVerifier,
-    MapProgram, Node, Outcome, PredicateSet, RejectionCode, Symbol, Theory, TheoryOutcome,
+    MapProgram, Node, Outcome, PredicateSet, RejectionCode, Symbol, Theory, TheoryGround, Verdict,
 };
 use ontos_core::Value;
 
@@ -22,8 +22,8 @@ impl Theory for NoTheory {
     fn owns(&self, _pred: &Symbol) -> bool {
         false
     }
-    fn decide(&self, _atom: &GroundLiteral) -> TheoryOutcome {
-        TheoryOutcome::NotMine
+    fn decide_ground(&self, _atom: &GroundLiteral) -> TheoryGround {
+        TheoryGround::disowned()
     }
     logos_contract::cannot_copy!(
         Theory,
@@ -98,14 +98,14 @@ fn the_offset_step_is_the_range_check_and_nothing_else_2735() {
 #[test]
 fn a_root_past_a_32_bit_offset_is_held_whole_and_refused_by_check_2735() {
     assert!(
-        matches!(verdict(&one_leaf(0)), Outcome::Accept),
+        verdict(&one_leaf(0)).is_accept(),
         "CONTROL: the same derivation rooted at its one node is accepted"
     );
     let d = one_leaf(PAST_32);
     assert_eq!(d.root, PAST_32, "the root is held as an integer");
     assert_eq!(d.root_offset(), None, "a root past the nodes has no offset");
-    match verdict(&d) {
-        Outcome::Reject { code, .. } => assert_eq!(code, RejectionCode::RootOutOfRange),
+    match verdict(&d).verdict {
+        Verdict::Reject { code, .. } => assert_eq!(code, RejectionCode::RootOutOfRange),
         other => panic!("want root_out_of_range, got {other:?}"),
     }
 }

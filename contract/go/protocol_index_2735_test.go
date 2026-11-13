@@ -40,7 +40,7 @@ func TestProtocolIndexIsAnIntegerNotAnOffset2735(t *testing.T) {
 		Limits: DefaultLimits(),
 	}
 	out := Check(NewMapProgram(), claim, d, struct{}{}, profile)
-	if got := out.Code().Code(); got != "root_out_of_range" {
+	if got := out.Verdict.Code().Code(); got != "root_out_of_range" {
 		t.Fatalf("want root_out_of_range, got %q", got)
 	}
 }

@@ -51,11 +51,12 @@ import {
   RelationTable,
   RuleNode,
   StratumPrefix,
-  type Subst,
+  Subst,
   Symbol,
   Term,
   type CheckProfile,
   defaultLimits,
+  VarId,
 } from "../src/index.js";
 
 function av(s: string): Value {
@@ -89,10 +90,10 @@ class Leaves implements LeafVerifier<void> {
 }
 
 function verdict(o: Outcome): string {
-  return o.kind === "accept" ? "ACCEPT" : o.code;
+  return o.verdict.kind === "accept" ? "ACCEPT" : o.verdict.code;
 }
 function subst(pairs: [string, Value][]): Subst {
-  return new Map(pairs.map(([v, value]) => [v, Term.fromValue(value)]));
+  return new Subst(pairs.map(([v, value]) => [new VarId(v), Term.fromValue(value)] as const));
 }
 const leaf = (g: GroundLiteral): Node => new LeafNode(g, Evidence.none());
 
@@ -239,7 +240,7 @@ function join(): Outcome {
 function hidden(): Outcome {
   const program = new MapProgram().with("allowed", new Clause(Goal.of("allowed", []), [Goal.of("seen", [Term.fromValue(listA)])]));
   const rows = [GroundLiteral.of("seen", [consA])];
-  const nodes: Node[] = [leaf(rows[0]!), new RuleNode(GroundLiteral.of("allowed", []), ClauseId.of("allowed"), new Map(), [0])];
+  const nodes: Node[] = [leaf(rows[0]!), new RuleNode(GroundLiteral.of("allowed", []), ClauseId.of("allowed"), new Subst(), [0])];
   return run(program, GroundLiteral.of("allowed", []), nodes, 1, ["seen"], rows);
 }
 

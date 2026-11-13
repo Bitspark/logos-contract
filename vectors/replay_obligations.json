@@ -6,8 +6,10 @@
     "go",
     "ts",
     "rs-cli",
-    "go-guest",
-    "ts-guest"
+    "go-guest-provider",
+    "go-guest-negotiated",
+    "ts-guest-provider",
+    "ts-guest-negotiated"
   ],
   "obliged": [
     "rs",
@@ -68,6 +70,45 @@
       "inputs": ["profile", "offset", "construction", "injected_cap"],
       "targets": {
         "rs": { "not_applicable": "host-embedding" },
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": { "excluded": "no-budget" }
+    },
+    "route_limit_applicability.json": {
+      "cases": [{ "path": "cases", "id": "name", "class": "interface" }],
+      "metadata": ["spi", "issue", "note"],
+      "assertions": ["expected_honored"],
+      "inputs": ["member"],
+      "input_reasons": {
+        "member": "fed: conformance/rs/tests/route_limit_applicability_4102.rs builds the guest member it names (sldnf or seminaive) and compares that member's own offers to expected_honored, never comparing it; static_decline_admission.json asserts a different member, a decline's gate member"
+      },
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": { "excluded": "no-budget" }
+    },
+    "limit_enforcement_wire.json": {
+      "cases": [
+        { "path": "run_limits", "id": "name", "class": "interface" },
+        { "path": "required_profiles", "id": "name", "class": "interface" },
+        { "path": "evaluate", "id": "name", "class": "interface" },
+        { "path": "derive", "id": "name", "class": "interface" }
+      ],
+      "metadata": ["spi", "issue", "note"],
+      "assertions": ["expected", "expected_arity", "expected_limit_enforcement"],
+      "inputs": [
+        "limits", "advisory", "wire", "limit_enforcement", "append", "required", "honored",
+        "search_nodes", "max_depth", "max_rounds", "wall_clock_ns", "int", "set",
+        "max_answers", "memory_bytes"
+      ],
+      "input_reasons": {
+        "wire": "fed: kernel/rs/tests/limit_enforcement_wire_vectors.rs builds the planted limits tuple element by element and decodes it, never comparing the field; the files that assert a `wire` assert their own encoders' bytes"
+      },
+      "targets": {
+        "rs": "replays",
         "go": "replays",
         "ts": "replays"
       },
@@ -291,7 +332,8 @@
       ],
       "assertions": [
         "carriers",
-        "excluded"
+        "excluded",
+        "advisory_when_unset"
       ],
       "targets": {
         "rs": "replays",
@@ -542,6 +584,7 @@
         "effective",
         "executed",
         "id",
+        "not_started",
         "note",
         "origin",
         "origins",
@@ -754,7 +797,8 @@
       ],
       "assertions": [
         "outcome",
-        "reject"
+        "reject",
+        "report"
       ],
       "inputs": [
         "X",
@@ -2189,6 +2233,7 @@
         "query",
         "rule",
         "rule_index",
+        "setter",
         "site",
         "subject",
         "token",
@@ -2794,6 +2839,159 @@
         "excluded": "no-budget"
       }
     },
+    "annotated_closed_model.json": {
+      "cases": [
+        { "path": "cases", "id": "name", "class": "interface" }
+      ],
+      "metadata": [
+        "spi",
+        "issue",
+        "note",
+        "profile",
+        "extensional",
+        "edb",
+        "program"
+      ],
+      "assertions": [
+        "outcome",
+        "expected",
+        "code"
+      ],
+      "inputs": [
+        "X",
+        "Y",
+        "Z",
+        "annotations",
+        "args",
+        "arity",
+        "atom",
+        "atom_str",
+        "body_refs",
+        "builtin",
+        "cert",
+        "cert_bytes",
+        "cert_facts",
+        "cert_semiring",
+        "clause",
+        "decimal",
+        "domain_values",
+        "domains",
+        "elements",
+        "extensions",
+        "fact",
+        "int",
+        "join_steps",
+        "level",
+        "limits_decl",
+        "lower_stratum",
+        "note",
+        "partial_scope",
+        "pred",
+        "predicates",
+        "rank",
+        "rows",
+        "rule_groundings",
+        "same_stratum",
+        "scope",
+        "semiring",
+        "subst",
+        "support_edges",
+        "supports",
+        "type_tag",
+        "values"
+      ],
+      "input_reasons": {
+        "cert_bytes": "fed: contract/go/negation_vectors_test.go:409 decodes it into the annotated cert's declared size, which the boolean check reads",
+        "level": "fed: contract/go/negation_vectors_test.go:379 decodes it into the annotated cert's stratum prefix, which the boolean check reads"
+      },
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "tri_core_required": true,
+      "relational": {
+        "runs": [
+          {
+            "section": "cases",
+            "when": [
+              {
+                "at": "outcome",
+                "in": [
+                  "accept"
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "annotated_closed_model_cert_digest.json": {
+      "cases": [
+        { "path": "fixtures", "id": "name", "class": "interface" }
+      ],
+      "metadata": [
+        "seam",
+        "note",
+        "prefixes"
+      ],
+      "assertions": [
+        "digest_hex",
+        "wire_hex"
+      ],
+      "inputs": [
+        "note"
+      ],
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "tri_core_required": true,
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "annotation_convergence.json": {
+      "cases": [
+        { "path": "programs", "id": "name", "class": "interface" },
+        { "path": "cases", "id": "name", "class": "interface" }
+      ],
+      "metadata": [
+        "seam",
+        "note",
+        "law_of_verdict"
+      ],
+      "assertions": [
+        "components",
+        "per_component",
+        "refused",
+        "verdict"
+      ],
+      "inputs": [
+        "bounded",
+        "edges",
+        "goal",
+        "program",
+        "record",
+        "semiring",
+        "source",
+        "strata"
+      ],
+      "input_reasons": {
+        "edges": "fed: kernel/rs/src/seam/annotation_vectors.rs builds the record's dependency edges from it, and the components it derives are the asserted value; identity_bytes.json pins the encoding, which this file never compares",
+        "strata": "fed: kernel/rs/src/seam/annotation_vectors.rs builds the record's strata from it, which order the components it derives; identity_bytes.json pins the encoding, which this file never compares"
+      },
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "tri_core_required": true,
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
     "negation.json": {
       "cases": [
         {
@@ -2812,7 +3010,8 @@
       ],
       "assertions": [
         "outcome",
-        "reject"
+        "reject",
+        "report"
       ],
       "inputs": [
         "S",
@@ -3081,6 +3280,87 @@
       "input_reasons": {
         "components": "fed: kernel/go/seam/nested_kernel_id_vectors_test.go:181 builds a composed path's components from the named kernels"
       },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "numeric.json": {
+      "cases": [
+        { "path": "builds", "id": "name", "class": "interface" },
+        { "path": "refusals", "id": "name", "class": "interface" }
+      ],
+      "metadata": [
+        "spi",
+        "issue",
+        "note"
+      ],
+      "assertions": [
+        "wire_hex",
+        "unserved_hex"
+      ],
+      "inputs": [
+        "add",
+        "base",
+        "decode_hex",
+        "form",
+        "identities",
+        "identity",
+        "note",
+        "numeric",
+        "offers",
+        "requirement",
+        "start",
+        "truth_domain"
+      ],
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "tri_core_required": true,
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "race_contract.json": {
+      "cases": [
+        { "path": "orderings", "id": "name", "class": "interface" },
+        { "path": "contracts", "id": "name", "class": "interface" },
+        { "path": "admissions", "id": "name", "class": "interface" }
+      ],
+      "metadata": [
+        "spi",
+        "issue",
+        "note"
+      ],
+      "assertions": [
+        "wire_hex",
+        "numeric_mode",
+        "expected",
+        "refusal"
+      ],
+      "inputs": [
+        "all",
+        "answer_mode",
+        "base",
+        "completeness_floor",
+        "contestants",
+        "contract",
+        "determinism",
+        "min_tier",
+        "multiplicity",
+        "note",
+        "numeric",
+        "ordering",
+        "semantics",
+        "truth_domain"
+      ],
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "tri_core_required": true,
       "relational": {
         "excluded": "no-budget"
       }
@@ -3802,6 +4082,7 @@
         "id",
         "negated",
         "note",
+        "plan_version",
         "predicates",
         "provider",
         "reason",
@@ -3824,6 +4105,7 @@
         "components",
         "envelope",
         "plans",
+        "racers",
         "revisions",
         "witness"
       ],
@@ -4002,6 +4284,64 @@
         "go": "replays",
         "ts": "replays"
       },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "route_default_disclosure.json": {
+      "cases": [
+        {
+          "path": "limit_applicability",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "served",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "distinct",
+          "id": "#index",
+          "class": "interface"
+        },
+        {
+          "path": "refused",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "spi",
+        "issue",
+        "note"
+      ],
+      "assertions": [
+        "wire_hex"
+      ],
+      "inputs": [
+        "a",
+        "b",
+        "defaulted",
+        "defaults",
+        "honored",
+        "note",
+        "of",
+        "provider",
+        "stratum",
+        "variant",
+        "wall_clock_ns",
+        "why"
+      ],
+      "input_reasons": {
+        "provider": "fed: kernel/rs/src/seam/default_disclosure_vectors.rs:93 builds the served implementation's provider from it"
+      },
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "tri_core_required": true,
       "relational": {
         "excluded": "no-budget"
       }
@@ -4285,6 +4625,150 @@
         "go": "replays",
         "ts": "replays"
       },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "semiring.json": {
+      "cases": [
+        { "path": "semirings", "id": "name", "class": "interface" },
+        { "path": "elements", "id": "name", "class": "interface" },
+        { "path": "ops", "id": "name", "class": "interface" },
+        { "path": "audits", "id": "name", "class": "interface" },
+        { "path": "decimal_parts", "id": "name", "class": "interface" },
+        { "path": "decimal_decode", "id": "name", "class": "interface" },
+        { "path": "products", "id": "name", "class": "interface" },
+        { "path": "product_ops", "id": "name", "class": "interface" },
+        { "path": "product_audits", "id": "name", "class": "interface" }
+      ],
+      "metadata": [
+        "seam",
+        "note",
+        "identity_prefix",
+        "law_bits",
+        "audit_order",
+        "audit_sample_limit",
+        "product_identity_prefix"
+      ],
+      "assertions": [
+        "declared_identity",
+        "laws",
+        "laws_byte",
+        "identity_digest_hex",
+        "zero",
+        "one",
+        "expected",
+        "verdict"
+      ],
+      "inputs": [
+        "a",
+        "atom",
+        "b",
+        "bigint",
+        "decimal",
+        "declares_also",
+        "int",
+        "kind",
+        "members",
+        "op",
+        "parts",
+        "product",
+        "samples",
+        "semiring",
+        "tuple",
+        "value"
+      ],
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "tri_core_required": true,
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "semiring_registry.json": {
+      "cases": [
+        { "path": "steps", "id": "name", "class": "interface" },
+        { "path": "queries", "id": "name", "class": "interface" }
+      ],
+      "metadata": [
+        "spi",
+        "issue",
+        "note"
+      ],
+      "assertions": [
+        "expected",
+        "refused",
+        "is_bound"
+      ],
+      "inputs": [
+        "config_digest",
+        "id",
+        "identity",
+        "int",
+        "note",
+        "samples",
+        "semiring",
+        "version"
+      ],
+      "input_reasons": {
+        "config_digest": "fed: kernel/go/runtime/semiring_registry_vectors_test.go decodes it into the identity the registry is asked whether it binds",
+        "id": "fed: kernel/go/runtime/semiring_registry_vectors_test.go decodes it into the identity the registry is asked whether it binds"
+      },
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "tri_core_required": true,
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "semiring_negotiation.json": {
+      "cases": [
+        { "path": "semirings", "id": "name", "class": "interface" },
+        { "path": "identities", "id": "name", "class": "interface" },
+        { "path": "satisfaction", "id": "name", "class": "interface" },
+        { "path": "annotations", "id": "name", "class": "interface" },
+        { "path": "malformed_annotations", "id": "name", "class": "interface" }
+      ],
+      "metadata": [
+        "spi",
+        "issue",
+        "note"
+      ],
+      "assertions": [
+        "semiring_id",
+        "semiring_version",
+        "identity_digest_hex",
+        "wire_hex",
+        "base_hex",
+        "parameters_hex",
+        "satisfies",
+        "expected"
+      ],
+      "inputs": [
+        "annotation",
+        "base",
+        "form",
+        "identities",
+        "identity",
+        "note",
+        "offer",
+        "requirement",
+        "semiring",
+        "truth_domain",
+        "why"
+      ],
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "tri_core_required": true,
       "relational": {
         "excluded": "no-budget"
       }
@@ -4583,6 +5067,11 @@
           "class": "interface"
         },
         {
+          "path": "reband.cases",
+          "id": "name",
+          "class": "interface"
+        },
+        {
           "path": "run_case_incomplete",
           "id": "#self",
           "class": "integration",
@@ -4608,7 +5097,10 @@
         "completion_wire.transition_control",
         "completion_wire.run_case_deferred",
         "completion_wire.incomplete_note",
-        "completion_wire.replayed_by"
+        "completion_wire.replayed_by",
+        "reband.note",
+        "reband.rule",
+        "reband.replayed_by"
       ],
       "assertions": [
         "answers",
@@ -4618,10 +5110,15 @@
         "cause"
       ],
       "inputs": [
+        "answer_count",
         "bounds",
         "chain_len",
         "doors",
+        "ended",
+        "engine_refusal",
+        "given",
         "goal",
+        "guarantee",
         "hand_derived",
         "independence",
         "k",
@@ -4632,6 +5129,7 @@
         "note",
         "program",
         "replayed_by",
+        "terminal",
         "value",
         "why"
       ],
@@ -5123,6 +5621,54 @@
         "excluded": "no-budget"
       }
     },
+    "stop_granularity_offer.json": {
+      "cases": [
+        {
+          "path": "limit_applicability",
+          "id": "name",
+          "class": "interface"
+        },
+        {
+          "path": "distinct",
+          "id": "#index",
+          "class": "interface"
+        },
+        {
+          "path": "refused",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "spi",
+        "issue",
+        "note"
+      ],
+      "assertions": [
+        "wire_hex"
+      ],
+      "inputs": [
+        "a",
+        "b",
+        "defaults",
+        "honored",
+        "note",
+        "of",
+        "stop_granularity_ns",
+        "wall_clock_ns",
+        "why"
+      ],
+      "targets": {
+        "rs": {
+          "unreplayed": "#4178"
+        },
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
     "stream_door.json": {
       "cases": [
         {
@@ -5203,6 +5749,70 @@
       },
       "relational": {
         "excluded": "no-budget"
+      }
+    },
+    "verification_reserve.json": {
+      "cases": [
+        {
+          "path": "cases",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "spi",
+        "issue",
+        "note"
+      ],
+      "assertions": [
+        "expected_reserve_ms",
+        "expected_engine_ms"
+      ],
+      "inputs": [
+        "verifies",
+        "wall_clock_ns"
+      ],
+      "targets": {
+        "rs": "replays",
+        "go": "replays",
+        "ts": "replays"
+      },
+      "relational": {
+        "excluded": "no-budget"
+      }
+    },
+    "run_model.json": {
+      "cases": [
+        {
+          "path": "cases",
+          "id": "name",
+          "class": "interface"
+        }
+      ],
+      "metadata": [
+        "schema",
+        "note",
+        "oracle",
+        "total",
+        "rules",
+        "group_dimensions",
+        "row_dimensions"
+      ],
+      "assertions": [
+        "expect"
+      ],
+      "inputs": [],
+      "targets": {
+        "rs": {
+          "unreplayed": "#4223"
+        },
+        "go": {
+          "unreplayed": "#4223"
+        },
+        "ts": "replays"
+      },
+      "relational": {
+        "excluded": "completion-not-readable"
       }
     }
   }

@@ -14,7 +14,7 @@ use logos_contract::{
     CertSizeDecl, CheckLimits, CheckProfile, Clause, ClauseId, ClosedModelCert, ClosureWitness,
     Derivation, Evidence, Goal, GroundLiteral, LeafOutcome, LeafVerifier, MapProgram, Node,
     NodeMeta, NonMemberProof, Outcome, PredicateSet, Premise, RejectionCode, RelationTable,
-    StratumPrefix, Subst, SupportWitness, Symbol, Term,
+    StratumPrefix, Subst, SupportWitness, Symbol, Term, Verdict,
 };
 
 struct NoLeaves(PredicateSet);
@@ -98,9 +98,9 @@ fn check_q(left: Term) -> Outcome {
 
 /// The rejection's typed code, `None` on an accept. Asserted by the code, never by its prose.
 fn code(outcome: &Outcome) -> Option<RejectionCode> {
-    match outcome {
-        Outcome::Accept => None,
-        Outcome::Reject { code, .. } => Some(*code),
+    match &outcome.verdict {
+        Verdict::Accept => None,
+        Verdict::Reject { code, .. } => Some(*code),
     }
 }
 

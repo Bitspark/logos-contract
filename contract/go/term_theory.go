@@ -31,7 +31,7 @@
 //
 // Owns(pred): by NAME only (any arity) — the five recognizers, six comparisons, univ, and
 // (since 1.1.0, #1611) unification + the control constants.
-// Decide(atom) on a ground atom:
+// DecideGround(atom) on a ground atom:
 //   - non-UTF-8 predicate            -> Fails{term_unknown_predicate}   (defensive)
 //   - recognizer not at arity 1
 //     OR comparison not at arity 2
@@ -53,6 +53,7 @@ import (
 	"bytes"
 	"unicode/utf8"
 
+	"github.com/Bitspark/logos-contract/contract/go/completion"
 	core "github.com/bitspark/ontos/core/go"
 	data "github.com/bitspark/ontos/data/go"
 )
@@ -154,18 +155,18 @@ func (TermTheory) Identity() ComponentIdentity {
 	)
 }
 
-// Decide decides an owned GROUND term atom, byte-identically to the Rust
-// TermTheory::decide. A ground term relation binds nothing, so it either Holds (the
+// DecideGround decides an owned GROUND term atom, byte-identically to the Rust
+// TermTheory::decide_ground. A ground term relation binds nothing, so it either Holds (the
 // relation is true) or Fails with a pinned host-band sub-code.
-func (t TermTheory) Decide(atom GroundLiteral) TheoryOutcome {
+func (t TermTheory) DecideGround(atom GroundLiteral) completion.TheoryGround {
 	// Not one of ours: a routing safety net (check routes by Owns, so this is
 	// unreachable on a correctly-routed call — but stay total). Mirrors Rust.
 	if !t.Owns(atom.Pred) {
-		return TheoryNotMine{}
+		return completion.TheoryGroundDisowned()
 	}
 	predBytes := atom.Pred.Bytes()
 	if !utf8.Valid(predBytes) {
-		return TheoryFails{Code: "term_unknown_predicate"}
+		return completion.TheoryGroundFails("term_unknown_predicate")
 	}
 
 	switch string(predBytes) {
@@ -211,7 +212,7 @@ func (t TermTheory) Decide(atom GroundLiteral) TheoryOutcome {
 	default:
 		// Owned name routed here but not handled above — unreachable (the name set is
 		// exactly the switch arms), but stay total.
-		return TheoryFails{Code: "term_does_not_hold"}
+		return completion.TheoryGroundFails("term_does_not_hold")
 	}
 }
 
@@ -282,40 +283,40 @@ func isNumber(v core.Value) bool {
 
 // decideRecognizer decides an arity-1 recognizer: arity must be 1; then test(arg0). A
 // non-1 arity has no such relation (term_bad_arity); a false test is term_does_not_hold.
-func decideRecognizer(args []core.Value, test func(core.Value) bool) TheoryOutcome {
+func decideRecognizer(args []core.Value, test func(core.Value) bool) completion.TheoryGround {
 	if len(args) != 1 {
-		return TheoryFails{Code: "term_bad_arity"}
+		return completion.TheoryGroundFails("term_bad_arity")
 	}
 	if test(args[0]) {
-		return TheoryHolds{}
+		return completion.TheoryGroundHolds()
 	}
-	return TheoryFails{Code: "term_does_not_hold"}
+	return completion.TheoryGroundFails("term_does_not_hold")
 }
 
 // decideComparison decides an arity-2 standard-order comparison: arity must be 2; then
 // accept iff accept(compareValues(arg0, arg1)). A non-2 arity has no such relation
 // (term_bad_arity); a false comparison is term_does_not_hold.
-func decideComparison(args []core.Value, accept func(int) bool) TheoryOutcome {
+func decideComparison(args []core.Value, accept func(int) bool) completion.TheoryGround {
 	if len(args) != 2 {
-		return TheoryFails{Code: "term_bad_arity"}
+		return completion.TheoryGroundFails("term_bad_arity")
 	}
 	if accept(compareValues(args[0], args[1])) {
-		return TheoryHolds{}
+		return completion.TheoryGroundHolds()
 	}
-	return TheoryFails{Code: "term_does_not_hold"}
+	return completion.TheoryGroundFails("term_does_not_hold")
 }
 
 // decideControl decides an arity-0 control constant (#1611): arity must be 0
 // (term_bad_arity otherwise); then `true` holds and `fail`/`false` are term_does_not_hold.
 // Mirrors Rust's decide_control.
-func decideControl(args []core.Value, holds bool) TheoryOutcome {
+func decideControl(args []core.Value, holds bool) completion.TheoryGround {
 	if len(args) != 0 {
-		return TheoryFails{Code: "term_bad_arity"}
+		return completion.TheoryGroundFails("term_bad_arity")
 	}
 	if holds {
-		return TheoryHolds{}
+		return completion.TheoryGroundHolds()
 	}
-	return TheoryFails{Code: "term_does_not_hold"}
+	return completion.TheoryGroundFails("term_does_not_hold")
 }
 
 // valueConsList builds the cons-list [e0, e1, … en] as a ground Value — the frozen `.`/2
@@ -353,18 +354,18 @@ func univListOf(v core.Value) (core.Value, bool) {
 // decideUniv decides the arity-2 univ relation `T =.. L`: arity must be 2; then Holds iff L
 // equals the univ image of T. A T that is not a labeled compound / atom -> univ_not_callable;
 // a mismatched L -> univ_mismatch. Mirrors Rust's decide_univ.
-func decideUniv(args []core.Value) TheoryOutcome {
+func decideUniv(args []core.Value) completion.TheoryGround {
 	if len(args) != 2 {
-		return TheoryFails{Code: "term_bad_arity"}
+		return completion.TheoryGroundFails("term_bad_arity")
 	}
 	expected, ok := univListOf(args[0])
 	if !ok {
-		return TheoryFails{Code: "univ_not_callable"}
+		return completion.TheoryGroundFails("univ_not_callable")
 	}
 	if compareValues(args[1], expected) == 0 {
-		return TheoryHolds{}
+		return completion.TheoryGroundHolds()
 	}
-	return TheoryFails{Code: "univ_mismatch"}
+	return completion.TheoryGroundFails("univ_mismatch")
 }
 
 // compareValues compares two GROUND terms by the standard order of terms — a total order

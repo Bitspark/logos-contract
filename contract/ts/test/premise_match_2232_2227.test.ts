@@ -39,11 +39,12 @@ import {
   RelationTable,
   RuleNode,
   StratumPrefix,
-  type Subst,
+  Subst,
   Symbol,
   Term,
   type CheckProfile,
   defaultLimits,
+  VarId,
 } from "../src/index.js";
 
 function av(s: string): Value {
@@ -80,11 +81,11 @@ function profile(extensional: string[], rows: readonly GroundLiteral[]): CheckPr
 }
 
 function verdict(o: Outcome): string {
-  return o.kind === "accept" ? "ACCEPT" : o.code;
+  return o.verdict.kind === "accept" ? "ACCEPT" : o.verdict.code;
 }
 
 function subst(pairs: [string, Value][]): Subst {
-  return new Map(pairs.map(([v, value]) => [v, Term.fromValue(value)]));
+  return new Subst(pairs.map(([v, value]) => [new VarId(v), Term.fromValue(value)] as const));
 }
 
 /** `self_neq(.(a,[]))` from `self_neq(X) :- cand(X), X \== X.`, citing `\==(.(a,[]), second)`. */
@@ -188,7 +189,7 @@ function negation(body: Value, sealed: Value[], premise: Value, domain: Value[])
     },
   });
   const deriv = new Derivation(
-    [new RuleNode(claim, ClauseId.of("r"), new Map(), [new NegPremise(GroundLiteral.of("seen", [premise]), 0)], NodeMeta.none())],
+    [new RuleNode(claim, ClauseId.of("r"), new Subst(), [new NegPremise(GroundLiteral.of("seen", [premise]), 0)], NodeMeta.none())],
     0,
     [cert],
   );

@@ -6,6 +6,8 @@ package contract
 import (
 	"bytes"
 	"testing"
+
+	"github.com/Bitspark/logos-contract/contract/go/completion"
 )
 
 func TestUnidentifiedComponentIsStable(t *testing.T) {
@@ -67,8 +69,10 @@ func TestAlwaysAdmitImplementsIdentified(t *testing.T) {
 // test-double: adversarial(relies on the default identity: the unidentified fallback under test)
 type unidentifiedFixture struct{}
 
-func (unidentifiedFixture) Owns(_ Symbol) bool                   { return false }
-func (unidentifiedFixture) Decide(_ GroundLiteral) TheoryOutcome { return TheoryNotMine{} }
+func (unidentifiedFixture) Owns(_ Symbol) bool { return false }
+func (unidentifiedFixture) DecideGround(_ GroundLiteral) completion.TheoryGround {
+	return completion.TheoryGroundDisowned()
+}
 
 func TestComponentWithoutIdentifiedFallsBackToUnidentified(t *testing.T) {
 	var component any = unidentifiedFixture{}

@@ -612,7 +612,7 @@ func TestAggregationVectors(t *testing.T) {
 			gotStr := negOutcomeString(got)
 			want := aggExpectedOutcome(t, c.Outcome)
 			if gotStr != want {
-				t.Fatalf("case %q: got %q, want %q (detail: %s)", c.Name, gotStr, want, got.Detail())
+				t.Fatalf("case %q: got %q, want %q (detail: %s)", c.Name, gotStr, want, got.Verdict.Detail())
 			}
 
 			// R3 (#2733, the checker's arm): an accepted case stays accepted under each raised

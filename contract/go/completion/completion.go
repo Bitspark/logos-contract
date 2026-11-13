@@ -111,7 +111,10 @@ const (
 	KindReplyUnreadable
 	// KindInconsistentTheory: a fault, a decider disowned a literal it was routed.
 	KindInconsistentTheory
-	// KindMalformedOutcome: a fault, a value no constructor could have built.
+	// KindMalformedOutcome: a fault, a value no constructor could have built, or a host's reply
+	// to a declared builtin that is not a value of the reply type: the host broke its channel's
+	// contract (#2734 3e-iii). A well-formed reply nested past the reader's depth is not this
+	// fault: it is KindReplyUnreadable, a capacity of the reader.
 	KindMalformedOutcome
 )
 
@@ -501,18 +504,12 @@ func Or[L any](a, b GroundOutcome[L]) GroundOutcome[L] { return higher(a, b, orR
 // FalseCode is the LANGUAGE's closed vocabulary, and the combinators fold over it; a theory's Fails
 // code is an OPEN value space every theory and consumer owns, and check carries it as the
 // builtin_failed detail. So the theory's code rides here as data, and DecisionOf is the one way into
-// the algebra. Rust's completion::TheoryDecision. The zero value is invalid.
+// the algebra. Rust's completion::TheoryDecision. The zero value is invalid; a theory builds one
+// through TheoryGroundHolds or TheoryGroundFails.
 type TheoryDecision struct {
 	arm  decisionArm
 	code string
 }
-
-// TheoryHolds is the theory's decision that the atom holds.
-func TheoryHolds() TheoryDecision { return TheoryDecision{arm: decisionHolds} }
-
-// TheoryFails is the theory's decision that the atom does not hold; code is the theory's own name
-// for why.
-func TheoryFails(code string) TheoryDecision { return TheoryDecision{arm: decisionFails, code: code} }
 
 // NoCallerLimit is the limit vocabulary of a producer no caller's limit reaches (Rust's
 // uninhabited engine::NoCallerLimit). Go cannot express an empty type, so every eliminator here
@@ -520,8 +517,31 @@ func TheoryFails(code string) TheoryDecision { return TheoryDecision{arm: decisi
 // call builds one.
 type NoCallerLimit struct{}
 
-// TheoryGround is what a theory's DecideGround returns: its decision, or not completed.
+// TheoryGround is what a theory's DecideGround returns (checker SPI v2, ADR 0036 D8 change 3): its
+// decision, or not completed. Completed(holds) and Completed(fails code) are the decision;
+// NotCompleted(cause) is a stop before the fact was established (a work cap, a capacity), never a
+// false; and an atom the theory does not own is the named inconsistent_theory fault,
+// TheoryGroundDisowned. A theory never reaches a caller's limit (NoCallerLimit). Rust's
+// logos_contract::TheoryGround.
 type TheoryGround = Completion[TheoryDecision, NoCallerLimit]
+
+// TheoryGroundHolds is the theory's decision that the atom holds. Rust's TheoryGround::holds.
+func TheoryGroundHolds() TheoryGround {
+	return Completed[TheoryDecision, NoCallerLimit](TheoryDecision{arm: decisionHolds})
+}
+
+// TheoryGroundFails is the theory's decision that the atom does not hold; code is the theory's own
+// name for why (surfaced under builtin_failed). Rust's TheoryGround::fails.
+func TheoryGroundFails(code string) TheoryGround {
+	return Completed[TheoryDecision, NoCallerLimit](TheoryDecision{arm: decisionFails, code: code})
+}
+
+// TheoryGroundDisowned is the answer for an atom whose predicate the theory does not own: the named
+// inconsistent_theory fault. Check routes by Theory.Owns, so a correctly-routed call never returns
+// it. Rust's TheoryGround::disowned.
+func TheoryGroundDisowned() TheoryGround {
+	return NotCompleted[TheoryDecision, NoCallerLimit](InconsistentTheory())
+}
 
 // TheoryCases eliminates a theory's answer, one method per case.
 type TheoryCases[L, R any] interface {

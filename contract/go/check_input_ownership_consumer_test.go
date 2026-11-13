@@ -88,7 +88,7 @@ func TestPublicCheckerBindsItsProofAndClaimBeforeAttestation(t *testing.T) {
 				if leaves.calls != 1 {
 					t.Fatalf("expected one attestation of the original fact, got %d", leaves.calls)
 				}
-				if out.IsAccept() != spec.accept || (!spec.accept && out.Code() != contract.RootConclusionMismatch) {
+				if out.IsAccept() != spec.accept || (!spec.accept && out.Verdict.Code() != contract.RootConclusionMismatch) {
 					t.Fatalf("captured proof and claim: want accept=%v, got %s", spec.accept, out)
 				}
 			})
@@ -129,7 +129,7 @@ func TestProofIsBoundBeforeTheFirstProgramLookup(t *testing.T) {
 				t.Fatalf("matching rule control: %s", control)
 			}
 			out := run(program, claim, proof, profile)
-			if lookups == 0 || out.IsAccept() || out.Code() != contract.RootConclusionMismatch {
+			if lookups == 0 || out.IsAccept() || out.Verdict.Code() != contract.RootConclusionMismatch {
 				t.Fatalf("a lookup changed the proposed root: %s (%d lookups)", out, lookups)
 			}
 		})
@@ -148,12 +148,12 @@ func TestMalformedClaimIsRefusedBeforeAttestation(t *testing.T) {
 			proof := contract.NewDerivation([]contract.Node{contract.LeafNode{Conc: fact, Evidence: contract.NoEvidence()}}, 0)
 			claim := contract.NewGroundLiteral("allowed", nil)
 			out := run(contract.NewMapProgram(), claim, proof, profile)
-			if out.IsAccept() || out.Code() != contract.UnknownNodeKind || leaves.calls != 0 {
+			if out.IsAccept() || out.Verdict.Code() != contract.UnknownNodeKind || leaves.calls != 0 {
 				t.Fatalf("malformed claim: %s (%d attestations)", out, leaves.calls)
 			}
 			profile.Limits.MaxNodes = 0
 			out = run(contract.NewMapProgram(), claim, proof, profile)
-			if out.IsAccept() || out.Code() != contract.TooManyNodes || leaves.calls != 0 {
+			if out.IsAccept() || out.Verdict.Code() != contract.TooManyNodes || leaves.calls != 0 {
 				t.Fatalf("header precedence: %s (%d attestations)", out, leaves.calls)
 			}
 		})
@@ -186,7 +186,7 @@ func TestVerifierArgumentCannotRetargetTheCapturedProof(t *testing.T) {
 					contract.LeafNode{Conc: fact, Evidence: contract.NoEvidence()},
 				}, 0)
 				out := run(contract.NewMapProgram(), claim, proof, profile)
-				if leaves.calls != 1 || out.IsAccept() != matching || (!matching && out.Code() != contract.RootConclusionMismatch) {
+				if leaves.calls != 1 || out.IsAccept() != matching || (!matching && out.Verdict.Code() != contract.RootConclusionMismatch) {
 					t.Fatalf("verifier argument alias: %s (%d attestations)", out, leaves.calls)
 				}
 			})

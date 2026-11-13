@@ -46,6 +46,9 @@ type negCase struct {
 		ClosedWorld []negJSONCert `json:"closed_world"`
 	} `json:"derivation"`
 	Outcome json.RawMessage `json:"outcome"`
+	// Report, where the row states one, is check()'s exact report (#4206): counters_version and
+	// the 17 counters by their snake_case names, hand-computed from the rules in report.rs.
+	Report map[string]any `json:"report"`
 }
 
 type negJSONPins struct {
@@ -623,6 +626,16 @@ func TestNegationVectors(t *testing.T) {
 	if len(vf.Cases) == 0 {
 		t.Fatal("no negation cases loaded")
 	}
+	// #4206: the report pin is vacuous if no row states a report.
+	reports := 0
+	for _, c := range vf.Cases {
+		if c.Report != nil {
+			reports++
+		}
+	}
+	if reports == 0 {
+		t.Fatal("no negation case states a report (#4206): the report pin would be vacuous")
+	}
 	for _, c := range vf.Cases {
 		t.Run(c.Name, func(t *testing.T) {
 			nodes := make([]Node, len(c.Derivation.Nodes))
@@ -687,7 +700,10 @@ func TestNegationVectors(t *testing.T) {
 			gotStr := negOutcomeString(got)
 			want := expectedOutcome(t, c.Outcome)
 			if gotStr != want {
-				t.Fatalf("case %q: got %q, want %q (detail: %s)", c.Name, gotStr, want, got.Detail())
+				t.Fatalf("case %q: got %q, want %q (detail: %s)", c.Name, gotStr, want, got.Verdict.Detail())
+			}
+			if c.Report != nil {
+				assertVectorReport(t, c.Name, got.Report, c.Report)
 			}
 
 			// #2569: the memoized check gives the same verdict on its miss and on its hit, and the
@@ -708,11 +724,65 @@ func TestNegationVectors(t *testing.T) {
 	}
 }
 
+// assertVectorReport asserts a row's stated report (#4206) against check()'s: counters_version and
+// every one of the 17 counters by its snake_case name. A counter the row states as an integer is
+// pinned exactly; one it states as "counted" (its value depends on the checker's order of work) must
+// be counted, and its value is not pinned. A row states all of them, so a counter the row omits, or
+// a name no counter has, fails too.
+func assertVectorReport(t *testing.T, name string, got CheckReport, want map[string]any) {
+	t.Helper()
+	counters := []struct {
+		name  string
+		count ReportCount
+	}{
+		{"nodes_walked", got.NodesWalked},
+		{"rule_nodes", got.RuleNodes},
+		{"builtin_nodes", got.BuiltinNodes},
+		{"leaf_nodes", got.LeafNodes},
+		{"premises_pos", got.PremisesPos},
+		{"premises_neg", got.PremisesNeg},
+		{"theory_decisions", got.TheoryDecisions},
+		{"leaf_verifications", got.LeafVerifications},
+		{"admissibility_checks", got.AdmissibilityChecks},
+		{"certs_verified", got.CertsVerified},
+		{"certs_memo_hits", got.CertsMemoHits},
+		{"cert_tables_read", got.CertTablesRead},
+		{"cert_rows_read", got.CertRowsRead},
+		{"join_steps_used", got.JoinStepsUsed},
+		{"groundings_enumerated", got.GroundingsEnumerated},
+		{"max_depth_reached", got.MaxDepthReached},
+		{"max_term_depth_reached", got.MaxTermDepthReached},
+	}
+	if v, ok := want["counters_version"].(float64); !ok || int(v) != int(got.CountersVersion) {
+		t.Errorf("case %q: report.counters_version = %d, the row states %v", name, got.CountersVersion, want["counters_version"])
+	}
+	for _, c := range counters {
+		w, ok := want[c.name]
+		if !ok {
+			t.Errorf("case %q: the row's report does not state %s", name, c.name)
+			continue
+		}
+		n, counted := c.count.Get()
+		if s, isText := w.(string); isText {
+			if s != "counted" || !counted {
+				t.Errorf("case %q: report.%s = %v, the row states %q", name, c.name, c.count, s)
+			}
+			continue
+		}
+		if f, isNum := w.(float64); !isNum || !counted || n != int(f) {
+			t.Errorf("case %q: report.%s = %v, the row states %v", name, c.name, c.count, w)
+		}
+	}
+	if len(want) != len(counters)+1 {
+		t.Errorf("case %q: the row's report states %d keys, want counters_version and the %d counters", name, len(want), len(counters))
+	}
+}
+
 func negOutcomeString(o Outcome) string {
 	if o.IsAccept() {
 		return "accept"
 	}
-	return "reject:" + o.Code().Code()
+	return "reject:" + o.Verdict.Code().Code()
 }
 
 func setLimitIf(dst *int, src *int) {

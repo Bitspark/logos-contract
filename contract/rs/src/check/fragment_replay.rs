@@ -12,7 +12,7 @@ use crate::cert::{CertSizeDecl, ClosedModelCert, ClosureWitness, StratumPrefix, 
 use crate::fragment::{classify_sealed_clause, Outside, ScopeGraph, SealContext};
 use crate::literal::{Goal, GroundLiteral, Symbol};
 use crate::program::{BodyLit, Clause, CountLit, MapProgram, PredicateRef, ProjectSpec};
-use crate::spi::{Theory, TheoryOutcome};
+use crate::spi::{Theory, TheoryGround};
 use crate::term::{Term, VarId};
 use serde_json::Value;
 
@@ -29,8 +29,8 @@ impl Theory for Owns {
     fn owns(&self, pred: &Symbol) -> bool {
         self.0.contains(pred)
     }
-    fn decide(&self, _: &GroundLiteral) -> TheoryOutcome {
-        TheoryOutcome::NotMine
+    fn decide_ground(&self, _: &GroundLiteral) -> TheoryGround {
+        TheoryGround::disowned()
     }
 }
 

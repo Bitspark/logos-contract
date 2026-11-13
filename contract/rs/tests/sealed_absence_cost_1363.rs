@@ -82,8 +82,8 @@ use logos_contract::{
     program_digest, CertContext, CertId, CertSizeDecl, CheckLimits, CheckProfile, Clause, ClauseId,
     ClosedModelCert, ClosureWitness, CompleteProgram, Derivation, Evidence, FiniteDomain, Goal,
     GroundLiteral, Hash, LeafOutcome, LeafVerifier, MapProgram, Node, NodeMeta, NonMemberProof,
-    Outcome, PredicateSet, Premise, RelationTable, StratumPrefix, Subst, SupportEdge, SupportRef,
-    SupportWitness, Symbol, Term, Theory, TheoryOutcome,
+    PredicateSet, Premise, RelationTable, StratumPrefix, Subst, SupportEdge, SupportRef,
+    SupportWitness, Symbol, Term, Theory, TheoryGround, Verdict,
 };
 use ontos_core::Value;
 use std::collections::BTreeMap;
@@ -152,8 +152,8 @@ impl Theory for NoTheory {
     fn owns(&self, _p: &Symbol) -> bool {
         false
     }
-    fn decide(&self, _a: &GroundLiteral) -> TheoryOutcome {
-        TheoryOutcome::NotMine
+    fn decide_ground(&self, _a: &GroundLiteral) -> TheoryGround {
+        TheoryGround::disowned()
     }
 }
 
@@ -316,13 +316,13 @@ fn measure(rows: usize, dom: usize) -> (usize, u128, bool) {
     let t0 = Instant::now();
     let outcome = check_with_cert_context(&program, &goal, &deriv, &(), &prof, &cx);
     let micros = t0.elapsed().as_micros();
-    if let Outcome::Reject { code, detail } = &outcome {
+    if let Verdict::Reject { code, detail } = &outcome.verdict {
         println!(
             "   REJECT rows={rows} dom={dom}: {} ({detail})",
             code.code()
         );
     }
-    (bytes, micros, matches!(outcome, Outcome::Accept))
+    (bytes, micros, outcome.is_accept())
 }
 
 // ================================== the probe ==================================

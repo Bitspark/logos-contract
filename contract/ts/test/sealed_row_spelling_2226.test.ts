@@ -41,6 +41,8 @@ import {
   Term,
   type CheckProfile,
   defaultLimits,
+  Subst,
+  VarId,
 } from "../src/index.js";
 
 function av(s: string): Value {
@@ -73,7 +75,7 @@ class Leaves implements LeafVerifier<void> {
 }
 
 function verdict(o: Outcome): string {
-  return o.kind === "accept" ? "ACCEPT" : o.code;
+  return o.verdict.kind === "accept" ? "ACCEPT" : o.verdict.code;
 }
 
 /** `r :- \+ seen(.(a,[]))` (plus `extra`) with a Neg premise seen(.(a,[])), EXACTLY the body literal. */
@@ -116,7 +118,7 @@ function negation(
   });
   const claim = GroundLiteral.of("r", []);
   const deriv = new Derivation(
-    [new RuleNode(claim, ClauseId.of("r_rule"), new Map(), [new NegPremise(GroundLiteral.of("seen", [consA]), 0)], NodeMeta.none())],
+    [new RuleNode(claim, ClauseId.of("r_rule"), new Subst(), [new NegPremise(GroundLiteral.of("seen", [consA]), 0)], NodeMeta.none())],
     0,
     [cert],
   );
@@ -149,7 +151,7 @@ function routeI(row: Value, supportX: Value): Outcome {
   const edge = new SupportEdge(
     GroundLiteral.of("seen", [row]),
     ClauseId.of("seen_rule"),
-    new Map([["X", Term.fromValue(supportX)]]),
+    new Subst([[VarId.of("X"), Term.fromValue(supportX)]]),
     [SupportRef.lowerStratum(0, GroundLiteral.of("src", [supportX]))],
     1,
   );

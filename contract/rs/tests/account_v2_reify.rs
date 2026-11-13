@@ -18,8 +18,8 @@
 
 use logos_contract::{
     canonicalize_lists, check, CheckLimits, CheckProfile, Clause, ClauseId, Derivation, Evidence,
-    Goal, GroundLiteral, LeafOutcome, LeafVerifier, MapProgram, Node, NodeMeta, Outcome,
-    PredicateSet, Premise, Subst, Symbol, Term, Theory, TheoryOutcome,
+    Goal, GroundLiteral, LeafOutcome, LeafVerifier, MapProgram, Node, NodeMeta, PredicateSet,
+    Premise, Subst, Symbol, Term, Theory, TheoryGround, Verdict,
 };
 use ontos_core::Value;
 use std::collections::BTreeMap;
@@ -37,8 +37,8 @@ impl Theory for NoTheory {
     fn owns(&self, _pred: &Symbol) -> bool {
         false
     }
-    fn decide(&self, _atom: &GroundLiteral) -> TheoryOutcome {
-        TheoryOutcome::NotMine
+    fn decide_ground(&self, _atom: &GroundLiteral) -> TheoryGround {
+        TheoryGround::disowned()
     }
 }
 
@@ -171,9 +171,10 @@ fn reified_list_derivation_is_refused_3022() {
         1,
     );
     // The claim is the reified form (a consumer that speaks the `list` profile).
-    match check(&program, &wrap_list, &deriv, &(), &profile(leaves)) {
-        Outcome::Reject { code, .. } => assert_eq!(code.code(), "instantiation_mismatch"),
-        Outcome::Accept => panic!("a reified conclusion is not the instantiated head (#3022)"),
+    let outcome = check(&program, &wrap_list, &deriv, &(), &profile(leaves));
+    match outcome.verdict {
+        Verdict::Reject { code, .. } => assert_eq!(code.code(), "instantiation_mismatch"),
+        Verdict::Accept => panic!("a reified conclusion is not the instantiated head (#3022)"),
     }
 }
 
@@ -201,9 +202,10 @@ fn reified_node_is_refused_before_a_cons_claim_is_read_3022() {
         1,
     );
     let cons_claim = gl("wrap", cons_list(&elems));
-    match check(&program, &cons_claim, &deriv, &(), &profile(leaves)) {
-        Outcome::Reject { code, .. } => assert_eq!(code.code(), "instantiation_mismatch"),
-        Outcome::Accept => panic!("a reified node is refused at its own head (#3022)"),
+    let outcome = check(&program, &cons_claim, &deriv, &(), &profile(leaves));
+    match outcome.verdict {
+        Verdict::Reject { code, .. } => assert_eq!(code.code(), "instantiation_mismatch"),
+        Verdict::Accept => panic!("a reified node is refused at its own head (#3022)"),
     }
 }
 
@@ -231,9 +233,10 @@ fn default_cons_derivation_still_accepts() {
         1,
     );
     let cons_claim = gl("wrap", cons_list(&elems));
+    let outcome = check(&program, &cons_claim, &deriv, &(), &profile(leaves));
     assert_eq!(
-        check(&program, &cons_claim, &deriv, &(), &profile(leaves)),
-        Outcome::Accept,
+        outcome.verdict,
+        Verdict::Accept,
         "the frozen cons-form derivation must still accept (additive)"
     );
 }
@@ -264,13 +267,14 @@ fn reified_wrong_order_list_is_rejected() {
         ],
         1,
     );
-    match check(&program, &wrong, &deriv, &(), &profile(leaves)) {
-        Outcome::Reject { code, .. } => assert_eq!(
+    let outcome = check(&program, &wrong, &deriv, &(), &profile(leaves));
+    match outcome.verdict {
+        Verdict::Reject { code, .. } => assert_eq!(
             code.code(),
             "instantiation_mismatch",
             "a wrong-order reified list must REJECT (no conflation)"
         ),
-        Outcome::Accept => panic!("wrong-order reified list was wrongly ACCEPTED (unsound)"),
+        Verdict::Accept => panic!("wrong-order reified list was wrongly ACCEPTED (unsound)"),
     }
 }
 
@@ -305,9 +309,10 @@ fn improper_tail_not_conflated_with_proper_list() {
         ],
         1,
     );
-    match check(&program, &dishonest, &deriv, &(), &profile(leaves)) {
-        Outcome::Reject { code, .. } => assert_eq!(code.code(), "instantiation_mismatch"),
-        Outcome::Accept => {
+    let outcome = check(&program, &dishonest, &deriv, &(), &profile(leaves));
+    match outcome.verdict {
+        Verdict::Reject { code, .. } => assert_eq!(code.code(), "instantiation_mismatch"),
+        Verdict::Accept => {
             panic!("an improper cons claimed as a proper list was wrongly ACCEPTED (unsound)")
         }
     }
@@ -337,9 +342,10 @@ fn default_distinct_cons_still_rejects() {
     );
     // Claim a DIFFERENT list than the root concludes.
     let other_claim = gl("wrap", cons_list(&[atomv("z")]));
-    match check(&program, &other_claim, &deriv, &(), &profile(leaves)) {
-        Outcome::Reject { code, .. } => assert_eq!(code.code(), "root_conclusion_mismatch"),
-        Outcome::Accept => panic!("a distinct cons root matched the claim (unsound)"),
+    let outcome = check(&program, &other_claim, &deriv, &(), &profile(leaves));
+    match outcome.verdict {
+        Verdict::Reject { code, .. } => assert_eq!(code.code(), "root_conclusion_mismatch"),
+        Verdict::Accept => panic!("a distinct cons root matched the claim (unsound)"),
     }
 }
 
@@ -467,9 +473,10 @@ fn reified_leaf_matches_cons_edb() {
         }],
         0,
     );
+    let outcome = check(&program, &leaf_list, &deriv, &(), &profile(leaves));
     assert_eq!(
-        check(&program, &leaf_list, &deriv, &(), &profile(leaves)),
-        Outcome::Accept,
+        outcome.verdict,
+        Verdict::Accept,
         "a reified leaf must match the cons-form EDB-of-record"
     );
 
@@ -483,8 +490,9 @@ fn reified_leaf_matches_cons_edb() {
         }],
         0,
     );
-    match check(&program, &absent, &deriv2, &(), &profile(leaves2)) {
-        Outcome::Reject { code, .. } => assert_eq!(code.code(), "leaf_rejected"),
-        Outcome::Accept => panic!("a leaf absent from the EDB was wrongly admitted"),
+    let outcome = check(&program, &absent, &deriv2, &(), &profile(leaves2));
+    match outcome.verdict {
+        Verdict::Reject { code, .. } => assert_eq!(code.code(), "leaf_rejected"),
+        Verdict::Accept => panic!("a leaf absent from the EDB was wrongly admitted"),
     }
 }

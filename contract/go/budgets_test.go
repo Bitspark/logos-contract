@@ -20,9 +20,6 @@ func TestBudgetsListEveryCheckLimitsBudgetOnce2733(t *testing.T) {
 	v := reflect.ValueOf(&limits).Elem()
 	for i := 0; i < v.NumField(); i++ {
 		name := v.Type().Field(i).Name
-		if name == "TermIdentity" {
-			continue // not a budget: INERT since #3022
-		}
 		field, ok := v.Field(i).Addr().Interface().(*int)
 		if !ok {
 			t.Fatalf("CheckLimits.%s is not an int budget: place it in Budgets or here", name)
