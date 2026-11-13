@@ -1,6 +1,6 @@
 [package]
 name = "logos-contract"
-version = "0.26.0"
+version = "0.27.0"
 description = "logos-contract: the FIRM proof account (Term/Literal/Clause/Derivation) + the STABLE-v1 checker SPI (check/Theory/LeafVerifier/RuleAdmissibility) over ontos. The shared artifact a check-only consumer binds and an engine produces. See docs/spec/logos-contract.md."
 edition = "2021"
 license = "MIT OR Apache-2.0"
@@ -18,9 +18,9 @@ path = "src/lib.rs"
 # ontos-core-only siblings). These are public crates.io packages; the contract
 # requires no private Ontos or Logos source dependency.
 [dependencies]
-ontos-core = { package = "bitspark-ontos-core", version = "0.13.0" }
-ontos-codec = { package = "bitspark-ontos-codec", version = "0.13.0" }
-ontos-data = { package = "bitspark-ontos-data", version = "0.13.0" }
+ontos-core = { package = "bitspark-ontos-core", version = "0.17.0" }
+ontos-codec = { package = "bitspark-ontos-codec", version = "0.17.0" }
+ontos-data = { package = "bitspark-ontos-data", version = "0.17.0" }
 sha2 = "0.10"
 # The Shelf-B prelude loader (ADR 0016 / src/prelude.rs) deserializes the curated-data
 # manifest `prelude/<name>@<version>.json`. The JSON parser is NOT the trust boundary: the

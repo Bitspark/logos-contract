@@ -477,6 +477,20 @@ impl PartialOrd for BigInt {
     }
 }
 
+impl BigInt {
+    /// The canonical `int` embedding as an ontos value: what [`to_int_term`](Self::to_int_term)
+    /// erases to. The element constructor of the integer-carried semirings.
+    pub(crate) fn to_int_value(&self) -> ontos_core::Value {
+        match self.to_i128() {
+            Some(n) => ontos_data::encode_int(n),
+            None => {
+                let label = ontos_core::Value::atom(INT_LABEL.to_vec());
+                ontos_core::Value::tuple(vec![label, ontos_core::Value::atom(self.to_payload())])
+            }
+        }
+    }
+}
+
 // #endregion
 // ---------------------------------------------------------------------------
 // Magnitude arithmetic — big-endian, base-256, leading-zero-stripped

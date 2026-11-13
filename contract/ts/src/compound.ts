@@ -12,7 +12,7 @@
 //
 // check requires exactly one theory to own each builtin predicate. The members a compound
 // holds MUST own DISJOINT predicate sets; if two members claim the same predicate,
-// decide routes it to the FIRST owner (deterministic, but a mis-binding) — keep the
+// decideGround routes it to the FIRST owner (deterministic, but a mis-binding) — keep the
 // member predicate sets disjoint, as the standard theories (arithmetic vs text) are by
 // construction.
 //
@@ -31,8 +31,8 @@ import { hashFromBytes } from "./cert.js";
 import { newArithmeticTheory } from "./arithmetic.js";
 import { type GroundLiteral, Symbol } from "./literal.js";
 import { newListTheory } from "./list_theory.js";
-import { fault, notCompleted, type TheoryGround } from "./completion.js";
-import { ComponentIdentity, completionOf, decideGround, DecisionCompletion, type Theory, TheoryOutcome } from "./spi.js";
+import { TheoryGround } from "./completion.js";
+import { ComponentIdentity, completionOf, DecisionCompletion, type Theory } from "./spi.js";
 import { newTermTheory } from "./term_theory.js";
 import { newTextTheory } from "./text.js";
 
@@ -64,37 +64,23 @@ export class CompoundTheory implements Theory {
   }
 
   /**
-   * Routes the atom to the FIRST member that owns its predicate (members own disjoint
-   * sets, so "first" is "the" owner). No member owns it → NotMine — a routing safety net;
-   * check routes by owns, so a correctly-routed call always finds an owner.
-   */
-  decide(atom: GroundLiteral): TheoryOutcome {
-    for (const t of this.theories) {
-      if (t.owns(atom.pred)) {
-        return t.decide(atom);
-      }
-    }
-    return TheoryOutcome.NotMine;
-  }
-
-  /**
-   * Forwarded to the FIRST member that owns the atom's predicate (#3126), through that member's
-   * own ground verdict, never the default: the default would read a member's `not_mine` (the
-   * answer a stopping member gives its legacy `decide`) as a fault instead of the member's own
-   * non-completion. No member owns it: the `inconsistent_theory` fault. Mirrors Rust/Go.
+   * Routes the atom to the FIRST member that owns its predicate (members own disjoint sets, so
+   * "first" is "the" owner), and forwards its answer, a non-completion included. No member owns it:
+   * {@link TheoryGround.disowned}, a routing safety net; check routes by owns, so a correctly-routed
+   * call always finds an owner. Mirrors Rust/Go.
    */
   decideGround(atom: GroundLiteral): TheoryGround {
     for (const t of this.theories) {
       if (t.owns(atom.pred)) {
-        return decideGround(t, atom);
+        return t.decideGround(atom);
       }
     }
-    return notCompleted(fault("inconsistent_theory"));
+    return TheoryGround.disowned();
   }
 
   /**
-   * #3142: the declaration of the member that decides `pred`, routed as {@link decide} routes (the
-   * first owner). A predicate no member owns reads undeclared naming the compound.
+   * #3142: the declaration of the member that decides `pred`, routed as {@link decideGround}
+   * routes (the first owner). A predicate no member owns reads undeclared naming the compound.
    */
   completion(pred: Symbol): DecisionCompletion {
     for (const t of this.theories) {

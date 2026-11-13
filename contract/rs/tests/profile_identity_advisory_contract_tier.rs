@@ -22,7 +22,7 @@
 use logos_contract::{
     unidentified_profile_slots, unidentified_profile_slots_allowing, AlwaysAdmit, CheckLimits,
     CheckProfile, ComponentIdentity, Evidence, GroundLiteral, LeafOutcome, LeafVerifier, NodeMeta,
-    PredicateSet, ProfileSlot, RuleAdmissibility, RuleOutcome, Symbol, Theory, TheoryOutcome,
+    PredicateSet, ProfileSlot, RuleAdmissibility, RuleOutcome, Symbol, Theory, TheoryGround,
 };
 use serde_json::Value as Json;
 
@@ -38,8 +38,8 @@ impl Theory for VecTheory {
     fn owns(&self, _pred: &Symbol) -> bool {
         false
     }
-    fn decide(&self, _atom: &GroundLiteral) -> TheoryOutcome {
-        TheoryOutcome::NotMine
+    fn decide_ground(&self, _atom: &GroundLiteral) -> TheoryGround {
+        TheoryGround::disowned()
     }
     fn identity(&self) -> ComponentIdentity {
         self.identity

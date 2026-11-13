@@ -34,7 +34,7 @@
 //! # Dual-conformance (§7)
 //!
 //! When the bound theory owns a predicate, the engine emits a `Builtin` account node for
-//! a ground goal of that predicate, and `check` re-decides it with this same `decide`.
+//! a ground goal of that predicate, and `check` re-decides it with this same `decide_ground`.
 //! `check` re-decides a `Builtin` node on its own spelling, exactly (#2232; every site is
 //! structural since #3022), so a `Builtin` node concluding a `list(…)` relation is one
 //! `check()` re-accepts — the dual-conformance law.
@@ -42,14 +42,14 @@
 //! # Judgments
 //!
 //! `owns(pred)`: by NAME only (any arity) — `length`, `nth0`, `last`.
-//! `decide(atom)` on a ground atom: a non-UTF-8 predicate → `Fails{list_unknown_predicate}`
+//! `decide_ground(atom)` on a ground atom: a non-UTF-8 predicate → `Fails{list_unknown_predicate}`
 //! (defensive); an owned name at the wrong arity → `Fails{list_bad_arity}`; the relation
 //! true → `Holds`; the relation false (a non-`list` argument, an out-of-range index, a
 //! count/element mismatch, an empty list for `last`) → `Fails{list_does_not_hold}`.
 
 use ontos_core::Value;
 
-use crate::{ComponentIdentity, GroundLiteral, Symbol, Theory, TheoryOutcome};
+use crate::{ComponentIdentity, GroundLiteral, Symbol, Theory, TheoryGround};
 
 /// The predicate names this theory owns. Owned by NAME only (any arity); a wrong arity is
 /// then a `list_bad_arity` failure, exactly as [`TermTheory`](crate::term_theory) handles
@@ -119,20 +119,16 @@ impl Theory for ListTheory {
         crate::spi::DecisionCompletion::StopsAreTyped
     }
 
-    fn decide(&self, atom: &GroundLiteral) -> TheoryOutcome {
+    fn decide_ground(&self, atom: &GroundLiteral) -> TheoryGround {
         // Not one of ours: a routing safety net (`check` routes by `owns`, so this is
         // unreachable on a correctly-routed call — but stay total).
         if !owns_name(&atom.pred) {
-            return TheoryOutcome::NotMine;
+            return TheoryGround::disowned();
         }
         let name = match std::str::from_utf8(atom.pred.bytes()) {
             Ok(name) => name,
             // A non-UTF-8 predicate cannot be a registered list relation.
-            Err(_) => {
-                return TheoryOutcome::Fails {
-                    code: "list_unknown_predicate".into(),
-                }
-            }
+            Err(_) => return TheoryGround::fails("list_unknown_predicate"),
         };
         match name {
             "length" => decide_length(&atom.args),
@@ -140,9 +136,7 @@ impl Theory for ListTheory {
             "last" => decide_last(&atom.args),
             // Owned name routed here but not handled above — unreachable (the name set is
             // exactly the match arms above), but stay total.
-            _ => TheoryOutcome::Fails {
-                code: "list_does_not_hold".into(),
-            },
+            _ => TheoryGround::fails("list_does_not_hold"),
         }
     }
 }
@@ -156,30 +150,26 @@ fn list_elements(value: &Value) -> Option<Vec<Value>> {
 }
 
 /// A `Holds` shorthand for a passing relation.
-fn holds() -> TheoryOutcome {
-    TheoryOutcome::Holds
+fn holds() -> TheoryGround {
+    TheoryGround::holds()
 }
 
 /// A `Fails{list_does_not_hold}` shorthand: the arguments are well-formed shape-wise but
 /// the relation is false (non-`list` argument, out-of-range index, count/element
 /// mismatch, or an empty list for `last`).
-fn does_not_hold() -> TheoryOutcome {
-    TheoryOutcome::Fails {
-        code: "list_does_not_hold".into(),
-    }
+fn does_not_hold() -> TheoryGround {
+    TheoryGround::fails("list_does_not_hold")
 }
 
 /// A `Fails{list_bad_arity}` shorthand: an owned name at an arity with no such relation.
-fn bad_arity() -> TheoryOutcome {
-    TheoryOutcome::Fails {
-        code: "list_bad_arity".into(),
-    }
+fn bad_arity() -> TheoryGround {
+    TheoryGround::fails("list_bad_arity")
 }
 
 /// `length(list(e0..e_{n-1}), int(n))`: arity must be 2; then `arg0` must be a `list`
 /// embedding of `n` elements AND `arg1` must be the canonical `int` embedding of that same
 /// `n`. A non-`list` `arg0`, a non-`int` `arg1`, or a count mismatch is `list_does_not_hold`.
-fn decide_length(args: &[Value]) -> TheoryOutcome {
+fn decide_length(args: &[Value]) -> TheoryGround {
     if args.len() != 2 {
         return bad_arity();
     }
@@ -203,7 +193,7 @@ fn decide_length(args: &[Value]) -> TheoryOutcome {
 /// `arg2` structurally equal to the `i`-th element. A non-`int` index, a non-`list`,
 /// an out-of-range index, or an element mismatch is `list_does_not_hold`. (Prolog / SWI
 /// argument order: index, list, element.)
-fn decide_nth0(args: &[Value]) -> TheoryOutcome {
+fn decide_nth0(args: &[Value]) -> TheoryGround {
     if args.len() != 3 {
         return bad_arity();
     }
@@ -232,7 +222,7 @@ fn decide_nth0(args: &[Value]) -> TheoryOutcome {
 /// `last(list(e0..e_{n-1}), e_{n-1})`: arity must be 2; then `arg0` must be a NON-EMPTY
 /// `list` embedding and `arg1` structurally equal to its last element. A non-`list`, an
 /// empty list, or a mismatch is `list_does_not_hold`.
-fn decide_last(args: &[Value]) -> TheoryOutcome {
+fn decide_last(args: &[Value]) -> TheoryGround {
     if args.len() != 2 {
         return bad_arity();
     }
@@ -248,6 +238,7 @@ fn decide_last(args: &[Value]) -> TheoryOutcome {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::completion::{Completion, TheoryDecision};
 
     fn atomv(s: &str) -> Value {
         Value::atom(s.as_bytes().to_vec())
@@ -263,14 +254,15 @@ mod tests {
     }
 
     fn holds(t: &ListTheory, pred: &str, args: Vec<Value>) {
-        assert!(
-            matches!(t.decide(&lit(pred, args)), TheoryOutcome::Holds),
+        assert_eq!(
+            t.decide_ground(&lit(pred, args)),
+            TheoryGround::holds(),
             "{pred} should Hold"
         );
     }
     fn fails(t: &ListTheory, pred: &str, args: Vec<Value>, code: &str) {
-        let outcome = t.decide(&lit(pred, args));
-        let TheoryOutcome::Fails { code: got } = &outcome else {
+        let outcome = t.decide_ground(&lit(pred, args));
+        let Completion::Completed(TheoryDecision::Fails { code: got }) = &outcome else {
             panic!("{pred}: want Fails{{{code}}}, got {outcome:?}");
         };
         assert_eq!(got, code, "{pred} fail-code");
@@ -445,9 +437,9 @@ mod tests {
     #[test]
     fn not_mine_routing_safety_net() {
         let t = ListTheory::new();
-        assert!(matches!(
-            t.decide(&lit("member", vec![atomv("a")])),
-            TheoryOutcome::NotMine
-        ));
+        assert_eq!(
+            t.decide_ground(&lit("member", vec![atomv("a")])),
+            TheoryGround::disowned()
+        );
     }
 }

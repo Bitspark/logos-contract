@@ -17,8 +17,8 @@
 
 use logos_contract::{
     check, AlwaysAdmit, CheckLimits, CheckProfile, Clause, ClauseId, Derivation, Evidence, Goal,
-    GroundLiteral, LeafOutcome, LeafVerifier, MapProgram, Node, NodeMeta, Outcome, PredicateSet,
-    Premise, Subst, Symbol, Term, Theory, TheoryOutcome,
+    GroundLiteral, LeafOutcome, LeafVerifier, MapProgram, Node, NodeMeta, PredicateSet, Premise,
+    Subst, Symbol, Term, Theory, TheoryGround, Verdict,
 };
 use ontos_core::Value;
 use std::collections::BTreeMap;
@@ -36,8 +36,8 @@ impl Theory for NoTheory {
     fn owns(&self, _pred: &Symbol) -> bool {
         false
     }
-    fn decide(&self, _atom: &GroundLiteral) -> TheoryOutcome {
-        TheoryOutcome::NotMine
+    fn decide_ground(&self, _atom: &GroundLiteral) -> TheoryGround {
+        TheoryGround::disowned()
     }
 }
 
@@ -175,13 +175,13 @@ fn reject_locally_invalid_root_unreachable_node() {
         &(),
         &profile(),
     );
-    match outcome {
-        Outcome::Reject { ref code, .. } => assert_eq!(
+    match outcome.verdict {
+        Verdict::Reject { ref code, .. } => assert_eq!(
             code.code(),
             "sealed_violation",
             "an invalid uncited node must reject with its own local error, got {outcome:?}"
         ),
-        Outcome::Accept => {
+        Verdict::Accept => {
             panic!("an invalid (sealing-violating) uncited node must still reject")
         }
     }

@@ -4,7 +4,7 @@
 //
 // This lifts the positive-Datalog-only scope of host-side certification to the text
 // relations: a program that uses contains/2, starts_with/2, ends_with/2 can now be
-// CHECKED in TS, because the same decide() that the Rust core uses is reproduced here
+// CHECKED in TS, because the same decision the Rust core makes is reproduced here
 // byte-for-byte. All three cores agree on EVERY ground text atom — the §7
 // dual-conformance law, pinned by vectors/text.json.
 //
@@ -28,7 +28,7 @@
 //
 // owns(pred): by NAME only (any arity) — contains, starts_with, ends_with. There is no
 // nested expression grammar (unlike arithmetic operators), so nothing else to exclude.
-// decide(atom) on a ground atom:
+// decideGround(atom) on a ground atom:
 //   - non-UTF-8 predicate             -> Fails{text_unknown_predicate}  (defensive)
 //   - owned name, arity != 2          -> Fails{text_bad_arity}
 //   - both args bare Atoms, test true -> Holds
@@ -43,8 +43,9 @@
 import { decodeUtf8 } from "./utf8.js";
 import { Atom, type Value } from "@bitspark/ontos-core";
 
+import { TheoryGround } from "./completion.js";
 import { Symbol, type GroundLiteral } from "./literal.js";
-import { ComponentIdentity, DecisionCompletion, type Theory, TheoryOutcome } from "./spi.js";
+import { ComponentIdentity, DecisionCompletion, type Theory } from "./spi.js";
 
 const utf8Encoder = new TextEncoder();
 
@@ -79,14 +80,14 @@ export class TextTheory implements Theory {
 
   /**
    * Decides an owned GROUND text atom, byte-identically to the Rust/Go
-   * TextTheory.decide. A ground text relation binds nothing, so it either Holds (the
+   * TextTheory.decide_ground. A ground text relation binds nothing, so it either Holds (the
    * byte test is true) or Fails with a pinned host-band sub-code.
    */
-  decide(atom: GroundLiteral): TheoryOutcome {
+  decideGround(atom: GroundLiteral): TheoryGround {
     // Not one of ours: a routing safety net (check routes by owns, so this is
     // unreachable on a correctly-routed call — but stay total). Mirrors Rust/Go.
     if (!this.owns(atom.pred)) {
-      return TheoryOutcome.NotMine;
+      return TheoryGround.disowned();
     }
     // An owned name is always valid UTF-8 (the names are ASCII), but mirror Rust's
     // from_utf8 / Go's utf8.Valid guard so the non-UTF-8 defensive arm carries the
@@ -95,7 +96,7 @@ export class TextTheory implements Theory {
     try {
       name = decodeUtf8(atom.pred.bytes());
     } catch {
-      return TheoryOutcome.Fails("text_unknown_predicate");
+      return TheoryGround.fails("text_unknown_predicate");
     }
 
     switch (name) {
@@ -108,7 +109,7 @@ export class TextTheory implements Theory {
       default:
         // Owned name routed here but not handled above — unreachable (the name set is
         // exactly the switch arms), but stay total.
-        return TheoryOutcome.Fails("text_does_not_hold");
+        return TheoryGround.fails("text_does_not_hold");
     }
   }
 
@@ -155,16 +156,16 @@ function atomBytes(v: Value): Uint8Array | undefined {
 function decideTextRelation(
   args: readonly Value[],
   test: (text: Uint8Array, sub: Uint8Array) => boolean,
-): TheoryOutcome {
+): TheoryGround {
   if (args.length !== 2) {
-    return TheoryOutcome.Fails("text_bad_arity");
+    return TheoryGround.fails("text_bad_arity");
   }
   const lhs = atomBytes(args[0]!);
   const rhs = atomBytes(args[1]!);
   if (lhs !== undefined && rhs !== undefined && test(lhs, rhs)) {
-    return TheoryOutcome.Holds;
+    return TheoryGround.holds();
   }
-  return TheoryOutcome.Fails("text_does_not_hold");
+  return TheoryGround.fails("text_does_not_hold");
 }
 
 /**

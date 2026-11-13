@@ -51,7 +51,6 @@ import {
   MapProgram,
   type Node,
   NodeMeta,
-  Outcome,
   PredicateRef,
   PredicateSet,
   ProjectSpec,
@@ -59,7 +58,7 @@ import {
   RelationTable,
   RuleNode,
   StratumPrefix,
-  type Subst,
+  Subst,
   type SupportEdge,
   SupportEdge as SupportEdgeClass,
   type SupportRef,
@@ -67,12 +66,13 @@ import {
   Symbol,
   Term,
   type Theory,
-  TheoryOutcome,
+  TheoryGround,
   type CheckProfile,
   defaultLimits,
   CHECK_BUDGETS,
   type CheckLimits,
   WorldMemo,
+  VarId,
 } from "../src/index.js";
 import { assertLengthReading2605 } from "./support/cert_len_2605.js";
 import { eachBudgetRaised, r3Domain, r3Raised } from "./support/r3_domain.js";
@@ -100,8 +100,8 @@ class NoTheory implements Theory {
   owns(_pred: Symbol): boolean {
     return false;
   }
-  decide(_atom: GroundLiteral): TheoryOutcome {
-    return TheoryOutcome.Fails("no_theory");
+  decideGround(_atom: GroundLiteral): TheoryGround {
+    return TheoryGround.fails("no_theory");
   }
 }
 
@@ -194,8 +194,8 @@ function bodyLitFromJson(j: any): BodyLit {
 }
 
 function substFromJson(j: any): Subst {
-  const subst: Subst = new Map();
-  for (const [name, term] of Object.entries(j)) subst.set(name, termFromJson(term));
+  const subst: Subst = new Subst();
+  for (const [name, term] of Object.entries(j)) subst.set(new VarId(name), termFromJson(term));
   return subst;
 }
 
@@ -377,15 +377,15 @@ for (const c of doc.cases) {
     const caseProfile: CheckProfile<void> = { ...profile, limits: caseLimits(c.name, c.limits) };
 
     const got = checkWithCertContext(program, claim, deriv, undefined, caseProfile, ctx);
-    const gotOutcome = Outcome.isAccept(got) ? "accept" : { reject: (got as { code: string }).code };
-    assert.deepEqual(gotOutcome, c.outcome, `case ${c.name}: detail=${(got as any).detail ?? ""}`);
+    const gotOutcome = got.verdict.kind === "accept" ? "accept" : { reject: got.verdict.code };
+    assert.deepEqual(gotOutcome, c.outcome, `case ${c.name}: detail=${got.verdict.kind === "reject" ? got.verdict.detail : ""}`);
 
     // R3 (#2733, the checker's arm): an accepted case stays accepted under each raised budget,
     // alone and together, to the declared table's value.
     if (domain.has(c.name)) {
       for (const rb of eachBudgetRaised(caseProfile.limits, raised)) {
         const again = checkWithCertContext(program, claim, deriv, undefined, { ...caseProfile, limits: rb.limits }, ctx);
-        assert.deepEqual(again, got, `case ${c.name}: raising ${rb.name} changed the verdict`);
+        assert.deepEqual(again.verdict, got.verdict, `case ${c.name}: raising ${rb.name} changed the verdict`);
       }
     }
 
@@ -393,7 +393,7 @@ for (const c of doc.cases) {
     // verifies nothing.
     const memo = new WorldMemo(program, caseProfile, undefined, ctx);
     for (const pass of [0, 1]) {
-      assert.deepEqual(checkWithWorldMemo(memo, claim, deriv), got, `case ${c.name}: memo pass ${pass}`);
+      assert.deepEqual(checkWithWorldMemo(memo, claim, deriv).verdict, got.verdict, `case ${c.name}: memo pass ${pass}`);
     }
     if (memo.certificatesVerified === closedWorld.length && closedWorld.length > 0) {
       memoizedWorlds += 1;
@@ -407,8 +407,8 @@ test("#2569 control: some aggregation case reaches the memo's verification", () 
   assert.ok(memoizedWorlds > 0, "no case filled the memo: the miss-then-hit check is vacuous");
 });
 
-test("raising each budget preserves the other native limits and term identity", () => {
-  const base: CheckLimits = { ...defaultLimits(), maxNodes: 1, maxDepth: 2, termIdentity: "exact" };
+test("raising each budget preserves the other native limits", () => {
+  const base: CheckLimits = { ...defaultLimits(), maxNodes: 1, maxDepth: 2 };
   const expected = eachBudgetRaised(base, 3);
   assert.deepEqual(expected.map(row => row.name), ["max_nodes", "max_depth", "every"]);
   assert.deepEqual(eachBudgetRaised(Object.create(base), 3), expected);

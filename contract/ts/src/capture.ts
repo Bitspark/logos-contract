@@ -1,4 +1,4 @@
-import { type CheckLimitError, type CheckLimits, type Outcome, captureCheckLimits } from "./check.js";
+import { type CheckLimitError, type CheckLimits, type Verdict, captureCheckLimits } from "./check.js";
 import { type ClosedModelCert, hashFromBytes } from "./cert.js";
 import type { CertContext } from "./cert_check.js";
 import { type Derivation } from "./derivation.js";
@@ -6,23 +6,20 @@ import { hasNativeTermShape, nativeSubst } from "./native_copy.js";
 import { copyClosedWorld, copyDerivation } from "./proof_copy.js";
 import { Term, type Subst } from "./term.js";
 import { OctetWidthError } from "./octets.js";
-import { wellFormedUtf16 } from "./utf8.js";
 
-export type CaptureResult<T> = { readonly kind: "captured"; readonly value: T } | Extract<Outcome, { kind: "reject" }>;
+export type CaptureResult<T> = { readonly kind: "captured"; readonly value: T } | Extract<Verdict, { kind: "reject" }>;
 
-function budgetFault(error: CheckLimitError): Extract<Outcome, { kind: "reject" }> {
+function budgetFault(error: CheckLimitError): Extract<Verdict, { kind: "reject" }> {
   return { kind: "reject", code: "invalid_check_limits", detail: error.message };
 }
 
 // The native term algebra is closed. Test the private fields before reading a
-// child or calling a method. A prototype alone cannot supply immutable data.
-function substitutionShapeFault(subst: Subst, limits: CheckLimits): Extract<Outcome, { kind: "reject" }> | undefined {
-  for (const [name, term] of subst) {
-    if (typeof name !== "string" || !wellFormedUtf16(name)) {
-      return { kind: "reject", code: "unknown_node_kind", detail: "invalid substitution variable" };
-    }
+// child or calling a method. A prototype alone cannot supply immutable data. A key
+// needs no test: a `Subst` holds only plain `VarId`s, whose names passed §2a (#3288).
+function substitutionShapeFault(subst: Subst, limits: CheckLimits): Extract<Verdict, { kind: "reject" }> | undefined {
+  for (const [id, term] of subst) {
     if (!hasNativeTermShape(term, limits.maxTermDepth)) {
-      return { kind: "reject", code: "unknown_node_kind", detail: `substitution image of ${name} is not a native term` };
+      return { kind: "reject", code: "unknown_node_kind", detail: `substitution image of ${id.asStr()} is not a native term` };
     }
   }
   return undefined;
@@ -39,13 +36,13 @@ export function captureSubst(subst: Subst, limits: CheckLimits): CaptureResult<S
     answer = nativeSubst(subst);
   } catch (error) {
     if (!(error instanceof TypeError)) throw error;
-    return { kind: "reject", code: "unknown_node_kind", detail: "a substitution must be a map" };
+    return { kind: "reject", code: "unknown_node_kind", detail: "a substitution must be a Subst" };
   }
   const fault = substitutionShapeFault(answer, limits);
   if (fault !== undefined) return fault;
-  for (const [name, term] of answer) {
+  for (const [id, term] of answer) {
     if (!Term.depthLe(term, limits.maxTermDepth)) {
-      return { kind: "reject", code: "term_too_deep", detail: `substitution image of ${name} exceeds max_term_depth ${limits.maxTermDepth}` };
+      return { kind: "reject", code: "term_too_deep", detail: `substitution image of ${id.asStr()} exceeds max_term_depth ${limits.maxTermDepth}` };
     }
   }
   return { kind: "captured", value: answer };
@@ -84,7 +81,7 @@ export function captureDerivation(proof: Derivation, limits: CheckLimits): Captu
   }
 }
 
-function supportShapeFault(world: readonly ClosedModelCert[], limits: CheckLimits): Extract<Outcome, { kind: "reject" }> | undefined {
+function supportShapeFault(world: readonly ClosedModelCert[], limits: CheckLimits): Extract<Verdict, { kind: "reject" }> | undefined {
   for (const cert of world) {
     for (const edge of cert.supports) {
       const fault = substitutionShapeFault(edge.subst, limits);

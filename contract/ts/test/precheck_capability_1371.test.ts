@@ -4,7 +4,7 @@
  * The two that matter are the NEGATIVE ones:
  *   - "an empty result does not promise acceptance" — the form-33 guard. Empty means no
  *     capability refusal will occur, NOT that `check` will accept.
- *   - "never calls decide" — proven by a theory whose `decide` throws.
+ *   - "never calls decideGround" — proven by a theory whose `decideGround` throws.
  */
 
 import test from "node:test";
@@ -27,7 +27,7 @@ import {
   profileDecidesAllBuiltins,
   type Symbol,
   type Theory,
-  TheoryOutcome,
+  TheoryGround,
   unownedBuiltinPredicates,
 } from "../src/index.js";
 
@@ -37,28 +37,28 @@ import {
 // test-double: consumer(owns no predicate: the theory-less host)
 const unboundTheory: Theory = {
   owns: () => false,
-  decide: () => TheoryOutcome.NotMine,
+  decideGround: () => TheoryGround.disowned(),
 };
 
 /** Owns everything and decides it holds. */
 // test-double: consumer(owns every predicate and holds it)
 const owningTheory: Theory = {
   owns: () => true,
-  decide: () => TheoryOutcome.Holds,
+  decideGround: () => TheoryGround.holds(),
 };
 
 /** Owns exactly one named predicate. */
 const ownsOnly = (name: string): Theory => ({
   owns: (pred: Symbol) => new TextDecoder().decode(pred.bytes()) === name,
-  decide: () => TheoryOutcome.Holds,
+  decideGround: () => TheoryGround.holds(),
 });
 
 /** Owns everything and THROWS if asked to decide — the query must never call it. */
 // test-double: adversarial(throws if asked to decide)
 const explodingTheory: Theory = {
   owns: () => true,
-  decide: () => {
-    throw new Error("the pre-check query must not call decide()");
+  decideGround: () => {
+    throw new Error("the pre-check query must not call decideGround()");
   },
 };
 
@@ -154,7 +154,7 @@ test("an empty result does not promise acceptance", () => {
   );
 
   const claim = GroundLiteral.of("=:=", [av("a"), av("a")]);
-  const outcome = check(new MapProgram(), claim, d, undefined, p);
+  const outcome = check(new MapProgram(), claim, d, undefined, p).verdict;
 
   assert.equal(
     outcome.kind,
@@ -168,8 +168,8 @@ test("an empty result does not promise acceptance", () => {
 });
 
 // Total and side-effect-free: it consults owns() only. Proven rather than asserted —
-// this theory throws if decide is ever reached.
-test("never calls decide", () => {
+// this theory throws if decideGround is ever reached.
+test("never calls decideGround", () => {
   const p = profile(explodingTheory, emptyLeaves());
   const d = deriv("=:=", ">", "<");
   assert.deepEqual(unownedBuiltinPredicates(d, p), []);

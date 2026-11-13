@@ -30,7 +30,7 @@ use logos_contract::{
     Derivation, Evidence, FiniteDomain, Goal, GroundLiteral, Hash, LeafOutcome, LeafVerifier,
     MapProgram, Node, NodeMeta, NonMemberProof, Outcome, PredicateSet, Premise, RelationTable,
     StratumPrefix, Subst, SupportEdge, SupportRef, SupportWitness, Symbol, Term, Theory,
-    TheoryOutcome,
+    TheoryGround, Verdict,
 };
 use ontos_core::Value;
 use serde_json::{json, Value as Json};
@@ -183,10 +183,8 @@ impl Theory for NoTheory {
     fn owns(&self, _: &Symbol) -> bool {
         false
     }
-    fn decide(&self, _: &GroundLiteral) -> TheoryOutcome {
-        TheoryOutcome::Fails {
-            code: "no_theory".into(),
-        }
+    fn decide_ground(&self, _: &GroundLiteral) -> TheoryGround {
+        TheoryGround::fails("no_theory")
     }
 }
 
@@ -353,9 +351,9 @@ fn run(claim: &str, deriv: &Derivation) -> Outcome {
 }
 
 fn code_of(outcome: Outcome) -> String {
-    match outcome {
-        Outcome::Accept => "accept".to_string(),
-        Outcome::Reject { code, .. } => code.code().to_string(),
+    match outcome.verdict {
+        Verdict::Accept => "accept".to_string(),
+        Verdict::Reject { code, .. } => code.code().to_string(),
     }
 }
 

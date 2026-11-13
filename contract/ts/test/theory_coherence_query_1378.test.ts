@@ -1,14 +1,14 @@
 /*
  * The arm-3 attribution query (#1378) — the TS third of the tri-core surface.
  *
- * `check` rejects an `owns()`-yes / `decide()`-NotMine theory with the structural code
+ * `check` rejects an `owns()`-yes / `decideGround()`-disowns theory with the structural code
  * `predicate_partition_violation`. That code is correct — the account cannot be verified by
  * this profile — but it points a consumer at the PRODUCER for a defect in the verifier's own
  * theory binding. Per the #1382 ruling on the sibling arm a new `RejectionCode` member is
  * v1-breaking in all three cores, so the attribution is a query rather than vocabulary.
  *
  * The two that matter are:
- *   - "arm 1 is not reported as incoherent" — arm 1 also answers NotMine and shares the
+ *   - "arm 1 is not reported as incoherent" — arm 1 also disowns the atom and shares the
  *     rejection code, so a query keyed on the outcome alone would conflate them.
  *   - "an empty result does not certify the theory coherent" — the documented limit,
  *     executable (form 33).
@@ -31,30 +31,30 @@ import {
   type LeafVerifier,
   PredicateSet,
   type Theory,
-  TheoryOutcome,
+  TheoryGround,
 } from "../src/index.js";
 
 // --------------------------------- theories ---------------------------------
 
-/** Arm 3: `owns()` says yes, `decide()` disowns. The defect under test. */
-// test-double: adversarial(owns a predicate yet decides NotMine: the defect under test)
+/** Arm 3: `owns()` says yes, `decideGround()` disowns. The defect under test. */
+// test-double: adversarial(owns a predicate yet disowns its atoms: the defect under test)
 const disowningTheory: Theory = {
   owns: () => true,
-  decide: () => TheoryOutcome.NotMine,
+  decideGround: () => TheoryGround.disowned(),
 };
 
 /** A coherent theory: owns it and decides it. */
 // test-double: consumer(owns every predicate and holds it)
 const owningTheory: Theory = {
   owns: () => true,
-  decide: () => TheoryOutcome.Holds,
+  decideGround: () => TheoryGround.holds(),
 };
 
-/** Arm 1: a host binding no theory. `decide` also answers NotMine. */
+/** Arm 1: a host binding no theory. `decideGround` also disowns. */
 // test-double: consumer(owns no predicate: the theory-less host)
 const unboundTheory: Theory = {
   owns: () => false,
-  decide: () => TheoryOutcome.NotMine,
+  decideGround: () => TheoryGround.disowned(),
 };
 
 // ---------------------------------- harness ----------------------------------
@@ -113,7 +113,7 @@ test("a coherent theory yields nothing", () => {
   );
 });
 
-// ⭐ THE DISCRIMINATING CONTROL. Arm 1 also answers NotMine and `check` gives it the SAME
+// ⭐ THE DISCRIMINATING CONTROL. Arm 1 also disowns the atom and `check` gives it the SAME
 // rejection code. A query keyed on the outcome alone would report arm 1 too — naming a defect
 // in a theory the host never bound, which is the misattribution inverted rather than fixed.
 test("arm 1 (unbound theory) is not reported as incoherent", () => {

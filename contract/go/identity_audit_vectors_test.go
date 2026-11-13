@@ -18,6 +18,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/Bitspark/logos-contract/contract/go/completion"
 )
 
 type identityAuditSpec struct {
@@ -89,17 +91,21 @@ func identityAuditFrom(t *testing.T, spec identityAuditSpec) ComponentIdentity {
 // test-double: consumer(an explicitly identified theory for the identity audit)
 type pinnedIdentityTheory struct{ identity ComponentIdentity }
 
-func (pinnedIdentityTheory) Owns(Symbol) bool                   { return false }
-func (pinnedIdentityTheory) Decide(GroundLiteral) TheoryOutcome { return TheoryNotMine{} }
-func (p pinnedIdentityTheory) Identity() ComponentIdentity      { return p.identity }
+func (pinnedIdentityTheory) Owns(Symbol) bool { return false }
+func (pinnedIdentityTheory) DecideGround(GroundLiteral) completion.TheoryGround {
+	return completion.TheoryGroundDisowned()
+}
+func (p pinnedIdentityTheory) Identity() ComponentIdentity { return p.identity }
 
 // defaultedIdentityTheory does NOT implement the Identified seam — the unidentified
 // reading the audit exists to detect.
 // test-double: adversarial(relies on the default identity: the unidentified reading the audit detects)
 type defaultedIdentityTheory struct{}
 
-func (defaultedIdentityTheory) Owns(Symbol) bool                   { return false }
-func (defaultedIdentityTheory) Decide(GroundLiteral) TheoryOutcome { return TheoryNotMine{} }
+func (defaultedIdentityTheory) Owns(Symbol) bool { return false }
+func (defaultedIdentityTheory) DecideGround(GroundLiteral) completion.TheoryGround {
+	return completion.TheoryGroundDisowned()
+}
 
 func TestIdentityAuditVectorsReplay(t *testing.T) {
 	f := loadIdentityAudit(t)

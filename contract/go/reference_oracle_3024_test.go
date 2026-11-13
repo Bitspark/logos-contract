@@ -383,7 +383,7 @@ func TestAReferenceSemanticsAgreesWithCheckOnGeneratedPrograms3024(t *testing.T)
 
 		// accept: the reference least model.
 		if got := verdict(rows, edges); !got.IsAccept() {
-			t.Fatalf("program %d: the reference model is refused %s: %s%s", n, got.Code().Code(), got.Detail(), describe())
+			t.Fatalf("program %d: the reference model is refused %s: %s%s", n, got.Verdict.Code().Code(), got.Verdict.Detail(), describe())
 		}
 		accepted++
 
@@ -412,7 +412,7 @@ func TestAReferenceSemanticsAgreesWithCheckOnGeneratedPrograms3024(t *testing.T)
 				}
 			}
 			rest := append(append([]oracleEdge3024(nil), edges[:i]...), edges[i+1:]...)
-			if got := verdict(fewer, rest); got.IsAccept() || got.Code() != CertNotClosed {
+			if got := verdict(fewer, rest); got.IsAccept() || got.Verdict.Code() != CertNotClosed {
 				t.Fatalf("program %d: dropping the derivable %s gave %s, want cert_not_closed%s", n, key, negOutcomeString(got), describe())
 			}
 			closure++

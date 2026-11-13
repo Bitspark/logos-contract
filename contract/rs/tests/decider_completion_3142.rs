@@ -8,7 +8,7 @@
 use logos_contract::list_theory::ListTheory;
 use logos_contract::term_theory::TermTheory;
 use logos_contract::{
-    standard_theory, ArithmeticTheory, GroundLiteral, Symbol, TextTheory, Theory, TheoryOutcome,
+    standard_theory, ArithmeticTheory, GroundLiteral, Symbol, TextTheory, Theory, TheoryGround,
 };
 use serde_json::Value as Json;
 
@@ -22,8 +22,8 @@ impl Theory for DeclaresNothing {
     fn owns(&self, pred: &Symbol) -> bool {
         pred.bytes() == b"p"
     }
-    fn decide(&self, _atom: &GroundLiteral) -> TheoryOutcome {
-        TheoryOutcome::Holds
+    fn decide_ground(&self, _atom: &GroundLiteral) -> TheoryGround {
+        TheoryGround::holds()
     }
 }
 
@@ -37,8 +37,8 @@ impl Theory for StopsUntyped {
     fn owns(&self, pred: &Symbol) -> bool {
         pred.bytes() == b"q"
     }
-    fn decide(&self, _atom: &GroundLiteral) -> TheoryOutcome {
-        TheoryOutcome::Holds
+    fn decide_ground(&self, _atom: &GroundLiteral) -> TheoryGround {
+        TheoryGround::holds()
     }
     fn completion(&self, _pred: &Symbol) -> logos_contract::DecisionCompletion {
         logos_contract::DecisionCompletion::may_not_complete(

@@ -58,7 +58,8 @@ func (m *WorldMemo[C]) CertificatesVerified() int {
 // CertContext, with the derivation's closed world verified through the memo. The verdict is
 // exactly CheckWithCertContext's: only step 3a, the per-certificate verification, can be served
 // from the memo; the prechecks, the forward pass over the derivation's own nodes and every
-// premise's own checks run on every call.
+// premise's own checks run on every call. The outcome's report counts a hit's certificates as
+// CertsMemoHits, and a miss's verification as the check's own work (#3111).
 func CheckWithWorldMemo[C any](m *WorldMemo[C], claim GroundLiteral, deriv Derivation) Outcome {
 	return checkNative(m.program, claim, deriv, m.ctx, *m.profile, m.certContext, m)
 }

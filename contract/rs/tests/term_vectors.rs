@@ -1,6 +1,6 @@
 //! Rust replay of the cross-core THEORY-DECISION agreement vector `vectors/term.json`.
 //!
-//! The [`TermTheory`] `decide` is asserted to reproduce the committed vector on every
+//! The [`TermTheory`] `decide_ground` is asserted to reproduce the committed vector on every
 //! ground term atom (the A0 recognizers + standard-order comparisons). The SAME file is
 //! replayed by the Go binding (`contract/go/term_vectors_test.go`) and the TS binding
 //! (`contract/ts/test/term_vectors.test.ts`), so one oracle — the search-side builtins
@@ -11,11 +11,12 @@
 //! diverge.
 //!
 //! Per `vectors/README.md`, the vector is *hand-authored from the spec*; this replay
-//! re-derives every outcome through the REAL `TermTheory::decide` — the committed file is
+//! re-derives every outcome through the REAL `TermTheory::decide_ground` — the committed file is
 //! checked against the oracle, not trusted blind.
 
+use logos_contract::completion::{Completion, TheoryDecision};
 use logos_contract::intval::BigInt;
-use logos_contract::{GroundLiteral, Symbol, Term, TermTheory, Theory, TheoryOutcome};
+use logos_contract::{GroundLiteral, Symbol, Term, TermTheory, Theory, TheoryGround};
 use serde_json::Value as Json;
 
 // This source is in `contract/rs/tests/`, so `include_str!` (relative to the source file)
@@ -72,11 +73,11 @@ fn build_atom(entry: &Json) -> GroundLiteral {
 }
 
 /// Assert the actual outcome matches the pinned `"holds" | {"fails": code}` outcome.
-fn assert_outcome(name: &str, expected: &Json, got: &TheoryOutcome) {
+fn assert_outcome(name: &str, expected: &Json, got: &TheoryGround) {
     if let Some(s) = expected.as_str() {
         assert_eq!(s, "holds", "{name}: unknown string outcome {s:?}");
         assert!(
-            matches!(got, TheoryOutcome::Holds),
+            *got == TheoryGround::holds(),
             "{name}: want Holds, got {got:?}"
         );
         return;
@@ -85,7 +86,7 @@ fn assert_outcome(name: &str, expected: &Json, got: &TheoryOutcome) {
         panic!("{name}: outcome is neither \"holds\" nor {{fails}}: {expected}")
     });
     match got {
-        TheoryOutcome::Fails { code: got_code } => {
+        Completion::Completed(TheoryDecision::Fails { code: got_code }) => {
             assert_eq!(got_code, code, "{name}: fail-code mismatch");
         }
         other => panic!("{name}: want Fails{{{code}}}, got {other:?}"),
@@ -105,7 +106,7 @@ fn replay_decision_vectors_match_the_oracle() {
     for entry in decisions {
         let name = entry["name"].as_str().unwrap_or("<unnamed>");
         let atom = build_atom(entry);
-        let got = theory.decide(&atom);
+        let got = theory.decide_ground(&atom);
         assert_outcome(name, &entry["outcome"], &got);
     }
 }

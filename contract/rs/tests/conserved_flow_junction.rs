@@ -44,7 +44,7 @@ use logos_contract::{
     ClosedModelCert, ClosureWitness, CompleteProgram, CountLit, Derivation, Evidence, FiniteDomain,
     Goal, GroundLiteral, Hash, LeafOutcome, LeafVerifier, Literal, MapProgram, Node, NodeMeta,
     Outcome, PredicateRef, PredicateSet, Premise, ProjectSpec, RelationTable, StratumPrefix, Subst,
-    SupportWitness, Symbol, Term,
+    SupportWitness, Symbol, Term, Verdict,
 };
 use ontos_core::Value;
 use std::collections::BTreeMap;
@@ -331,14 +331,14 @@ fn run(rows: Vec<GroundLiteral>, deriv: &Derivation, c: &str) -> Outcome {
 }
 
 fn assert_reject(outcome: Outcome, expected: &str) {
-    match outcome {
-        Outcome::Reject { code, detail } => assert_eq!(
+    match outcome.verdict {
+        Verdict::Reject { code, detail } => assert_eq!(
             code.code(),
             expected,
             "expected {expected}, got {} ({detail})",
             code.code()
         ),
-        Outcome::Accept => panic!("expected reject {expected}, got Accept"),
+        Verdict::Accept => panic!("expected reject {expected}, got Accept"),
     }
 }
 

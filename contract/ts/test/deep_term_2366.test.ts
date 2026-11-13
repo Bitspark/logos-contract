@@ -5,7 +5,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { Term, type Subst } from "../src/index.js";
+import { Term, Subst, VarId } from "../src/index.js";
 
 const N = 20_000;
 const enc = new TextEncoder();
@@ -35,7 +35,7 @@ test("eraseGround erases a 20,000-element list, and fromValue restores it", () =
 });
 
 test("substitute grounds the variable at the bottom of a 20,000-element list", () => {
-  const subst: Subst = new Map([["T", nil]]);
+  const subst: Subst = new Subst([[VarId.of("T"), nil]]);
   const out = Term.substitute(list(N, Term.var("T")), subst);
   assert.equal(Term.isGround(out), true);
   assert.ok(out.equals(list(N, nil)));

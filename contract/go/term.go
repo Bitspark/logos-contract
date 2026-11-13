@@ -335,16 +335,28 @@ func fromValueRun(work []fromValueFrame) Term {
 // defeat the purpose). An Atom/Var has depth 1; a Tuple has depth 1 + max(child
 // depth). Returns false as soon as a path exceeds `max`, without descending further.
 func TermDepthLE(t Term, max int) bool {
+	return termDepthCapped(t, max) <= max
+}
+
+// termDepthCapped is the depth TermDepthLE measures, by the same walk and the same cutoff: the
+// term's depth when it is at most max, else max + 1, the first level past max, where the walk
+// stops. check reports the deepest term it measured (#3111, max_term_depth_reached), so the
+// measurement is read rather than only compared. rs Term::depth_capped.
+func termDepthCapped(t Term, max int) int {
 	type item struct {
 		term  Term
 		level int
 	}
+	deepest := 0
 	work := []item{{term: t, level: 1}}
 	for len(work) > 0 {
 		it := work[len(work)-1]
 		work = work[:len(work)-1]
 		if it.level > max {
-			return false
+			return it.level
+		}
+		if it.level > deepest {
+			deepest = it.level
 		}
 		if tup, ok := it.term.(TupleTerm); ok {
 			for _, c := range tup.children {
@@ -352,7 +364,7 @@ func TermDepthLE(t Term, max int) bool {
 			}
 		}
 	}
-	return true
+	return deepest
 }
 
 // ValueDepthLE reports whether the ontos `value` nests no deeper than `max` levels —
@@ -362,16 +374,27 @@ func TermDepthLE(t Term, max int) bool {
 // codec encode, etc.) would overflow on a pathologically deep value, so the trusted
 // checker measures depth without recursing and rejects an over-deep value first.
 func ValueDepthLE(value core.Value, max int) bool {
+	return valueDepthCapped(value, max) <= max
+}
+
+// valueDepthCapped is the depth ValueDepthLE measures, by the same walk and the same cutoff: the
+// value's depth when it is at most max, else max + 1, where the walk stops (termDepthCapped's
+// analogue, #3111). rs value_depth_capped.
+func valueDepthCapped(value core.Value, max int) int {
 	type item struct {
 		value core.Value
 		level int
 	}
+	deepest := 0
 	work := []item{{value: value, level: 1}}
 	for len(work) > 0 {
 		it := work[len(work)-1]
 		work = work[:len(work)-1]
 		if it.level > max {
-			return false
+			return it.level
+		}
+		if it.level > deepest {
+			deepest = it.level
 		}
 		if tup, ok := it.value.(core.Tuple); ok {
 			for _, c := range tup.Items() {
@@ -379,7 +402,7 @@ func ValueDepthLE(value core.Value, max int) bool {
 			}
 		}
 	}
-	return true
+	return deepest
 }
 
 // ===========================================================================

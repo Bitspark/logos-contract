@@ -269,6 +269,8 @@ fn resolve_support_ref(
                     "support builtin ref {k} predicate not theory-owned"
                 )));
             }
+            // theory_decisions: one `decide_ground` call, counted on the view.
+            view.count_decision();
             match theory.decide_ground(atom) {
                 Completion::Completed(TheoryDecision::Holds) => Ok(()),
                 Completion::LimitExceeded(never) => match never {},

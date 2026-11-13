@@ -20,7 +20,7 @@ import (
 )
 
 // checkWellFormed refuses the first derivation component of unknown or absent kind.
-func checkWellFormed(deriv Derivation, limits CheckLimits) Outcome {
+func checkWellFormed(deriv Derivation, limits CheckLimits) Verdict {
 	max := limits.MaxTermDepth
 	for i, node := range deriv.Nodes {
 		if d := wellFormedNode(node, max); d != "" {

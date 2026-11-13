@@ -195,7 +195,7 @@ func TestLeafPremiseRoute2256ExactCone(t *testing.T) {
 	}
 	for _, tc := range cases {
 		if got := pmVerdict(tc.got); got != tc.want {
-			t.Errorf("%s: %s (%s), want %s", tc.name, got, tc.got.Detail(), tc.want)
+			t.Errorf("%s: %s (%s), want %s", tc.name, got, tc.got.Verdict.Detail(), tc.want)
 		}
 	}
 }

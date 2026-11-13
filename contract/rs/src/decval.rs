@@ -634,6 +634,18 @@ impl PartialOrd for BigDecimal {
     }
 }
 
+impl BigDecimal {
+    /// The canonical `decimal` embedding as an ontos value: what
+    /// [`to_decimal_term`](Self::to_decimal_term) erases to. The element constructor of the
+    /// decimal-carried semirings.
+    pub(crate) fn to_decimal_value(&self) -> ontos_core::Value {
+        let label = ontos_core::Value::atom(DECIMAL_LABEL.to_vec());
+        let mantissa = self.mantissa.to_int_value();
+        let exponent = BigInt::from_i128(self.exponent).to_int_value();
+        ontos_core::Value::tuple(vec![label, mantissa, exponent])
+    }
+}
+
 /// Compare two **same-sign** decimals by magnitude (called with `(self, other)` for the
 /// non-negative case and `(other, self)` for the negative case so the caller's reversal
 /// is uniform). Decides by magnitude order; only aligns within a shared decade.

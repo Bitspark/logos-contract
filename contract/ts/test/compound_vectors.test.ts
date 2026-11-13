@@ -22,7 +22,7 @@ import {
   GroundLiteral,
   Symbol,
   type Theory,
-  type TheoryOutcome,
+  TheoryGround,
   TextTheory,
 } from "../src/index.js";
 
@@ -101,10 +101,10 @@ function buildCompound(members: readonly string[]): CompoundTheory {
   return new CompoundTheory(theories);
 }
 
-function expectOutcome(name: string, raw: unknown, got: TheoryOutcome): void {
+function expectOutcome(name: string, raw: unknown, got: TheoryGround): void {
   if (typeof raw === "string") {
     assert.equal(raw, "holds", `${name}: unknown string outcome ${JSON.stringify(raw)}`);
-    assert.equal(got.kind, "holds", `${name}: want Holds, got ${JSON.stringify(got)}`);
+    assert.deepEqual(got, TheoryGround.holds(), `${name}: want Holds, got ${JSON.stringify(got)}`);
     return;
   }
   const fails = (raw as { fails?: unknown })?.fails;
@@ -113,10 +113,11 @@ function expectOutcome(name: string, raw: unknown, got: TheoryOutcome): void {
     true,
     `${name}: outcome is neither "holds" nor {"fails": code}: ${JSON.stringify(raw)}`,
   );
-  assert.equal(got.kind, "fails", `${name}: want Fails{${String(fails)}}, got ${JSON.stringify(got)}`);
-  if (got.kind === "fails") {
-    assert.equal(got.code, fails, `${name}: want fail code ${String(fails)}, got ${got.code}`);
-  }
+  assert.deepEqual(
+    got,
+    TheoryGround.fails(String(fails)),
+    `${name}: want Fails{${String(fails)}}, got ${JSON.stringify(got)}`,
+  );
 }
 
 function toHex(bytes: Uint8Array): string {
@@ -133,7 +134,7 @@ test("CompoundTheory routes every pinned vector decision to the owning member", 
   assert.equal(vf.decisions.length > 0, true, "no decision vectors loaded");
   for (const d of vf.decisions) {
     const args = d.args.map(buildArg);
-    const got = theory.decide(GroundLiteral.of(d.pred, args));
+    const got = theory.decideGround(GroundLiteral.of(d.pred, args));
     expectOutcome(d.name, d.outcome, got);
   }
 });

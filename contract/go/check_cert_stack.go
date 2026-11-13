@@ -45,6 +45,24 @@ type lowerSeal struct {
 type certView struct {
 	cert  ClosedModelCert
 	lower map[Symbol]lowerSeal
+	// record is the annotated check's recording hook (ADR 0031 D5, check_annotated.go), nil on the
+	// checker's own path. When set, the closure join hands it each grounding it emits, with whether
+	// the body is decided, and verifies nothing about that grounding (joinStage).
+	record func(subst Subst, decided bool)
+	// tally is the check's report accumulator (#3111), set by verifyCert once the view is
+	// resolved: the support and closure gates count their DecideGround calls through it
+	// (theory_decisions), since the view is the one context both already share down to the
+	// deciding site (rs CertView::decisions).
+	tally *checkTally
+}
+
+// countDecision counts one DecideGround call made through this view (#3111 theory_decisions). A
+// view built by the annotated check (check_annotated.go) carries no tally, since that check returns
+// no work report, so the count is skipped there.
+func (v certView) countDecision() {
+	if v.tally != nil {
+		v.tally.theoryDecisions++
+	}
 }
 
 // ownView reads only the certificate's own tables: every certificate before #2258 (a).

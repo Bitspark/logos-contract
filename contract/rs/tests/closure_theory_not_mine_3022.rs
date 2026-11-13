@@ -1,10 +1,10 @@
 //! #3022 step 4 (research 0028 A8), the negative witness `uabszqyzof` asked for on #3037: a
 //! closed-model certificate's closure reads a theory-owned body literal through `theory_truth`, and
-//! a theory that OWNS the predicate but decides `NotMine` is refused
-//! `predicate_partition_violation`, never read as false. Both polarities are planted, each against
-//! its control, a theory that decides `Fails`, which is what `NotMine` used to be read as. The same
-//! four cases are pinned in contract/go (`closure_theory_not_mine_3022_test.go`) and contract/ts
-//! (`test/closure_theory_not_mine_3022.test.ts`).
+//! a theory that OWNS the predicate but disowns it ([`TheoryGround::disowned`], v1's `NotMine`) is
+//! refused `predicate_partition_violation`, never read as false. Both polarities are planted, each
+//! against its control, a theory that decides `Fails`, which is what a disowning used to be read
+//! as. The same four cases are pinned in contract/go (`closure_theory_not_mine_3022_test.go`) and
+//! contract/ts (`test/closure_theory_not_mine_3022.test.ts`).
 //!
 //! - positive: `r(X) :- d(X), q(X).` over `d(a)`, `r` sealed EMPTY. Read as false, `NotMine` left
 //!   the body false, so the empty table looked closed and the certificate was accepted.
@@ -16,12 +16,12 @@ use logos_contract::{
     CheckLimits, CheckProfile, Clause, ClauseId, ClosedModelCert, ClosureWitness, Evidence,
     FiniteDomain, Goal, GroundLiteral, Hash, LeafOutcome, LeafVerifier, MapProgram, Outcome,
     PredicateSet, RelationTable, StratumPrefix, Subst, SupportEdge, SupportRef, SupportWitness,
-    Symbol, Term, Theory, TheoryOutcome,
+    Symbol, Term, Theory, TheoryGround, Verdict,
 };
 use ontos_core::Value;
 use std::collections::BTreeMap;
 
-struct QTheory(TheoryOutcome);
+struct QTheory(TheoryGround);
 // test-double: consumer(owns q and decides it with one fixed outcome)
 impl Theory for QTheory {
     logos_contract::cannot_copy!(
@@ -31,7 +31,7 @@ impl Theory for QTheory {
     fn owns(&self, pred: &Symbol) -> bool {
         pred.bytes() == b"q"
     }
-    fn decide(&self, _atom: &GroundLiteral) -> TheoryOutcome {
+    fn decide_ground(&self, _atom: &GroundLiteral) -> TheoryGround {
         self.0.clone()
     }
 }
@@ -71,7 +71,7 @@ fn chain(
     program: &MapProgram,
     r_rows: Vec<GroundLiteral>,
     edges: Vec<SupportEdge>,
-    outcome: TheoryOutcome,
+    outcome: TheoryGround,
 ) -> Outcome {
     let pin: Hash = [7u8; 32];
     let cert = ClosedModelCert {
@@ -112,7 +112,7 @@ fn chain(
 }
 
 /// The positive polarity: `q(a)` filters the only clause, and `r` is sealed empty.
-fn positive(outcome: TheoryOutcome) -> Outcome {
+fn positive(outcome: TheoryGround) -> Outcome {
     let program = MapProgram::new().with(
         "r_q",
         Clause::new(
@@ -125,7 +125,7 @@ fn positive(outcome: TheoryOutcome) -> Outcome {
 
 /// The negated polarity: `\+ q(a)` filters the second clause, and `r(a)` is sealed, supported by
 /// the first.
-fn negated(outcome: TheoryOutcome) -> Outcome {
+fn negated(outcome: TheoryGround) -> Outcome {
     let program = MapProgram::new()
         .with(
             "r_d",
@@ -155,37 +155,35 @@ fn negated(outcome: TheoryOutcome) -> Outcome {
 }
 
 fn verdict(outcome: &Outcome) -> String {
-    match outcome {
-        Outcome::Accept => "accept".to_string(),
-        Outcome::Reject { code, detail } => format!("{} ({detail})", code.code()),
+    match &outcome.verdict {
+        Verdict::Accept => "accept".to_string(),
+        Verdict::Reject { code, detail } => format!("{} ({detail})", code.code()),
     }
 }
 
 #[test]
 fn a_closure_literal_whose_owning_theory_decides_not_mine_is_refused_in_either_polarity_3022() {
-    let fails = || TheoryOutcome::Fails {
-        code: "q_does_not_hold".into(),
-    };
+    let fails = || TheoryGround::fails("q_does_not_hold");
     let cases = [
         ("positive control: q decides Fails", positive(fails()), None),
         (
             "positive witness: q owned, decides NotMine",
-            positive(TheoryOutcome::NotMine),
+            positive(TheoryGround::disowned()),
             Some("predicate_partition_violation"),
         ),
         ("negated control: q decides Fails", negated(fails()), None),
         (
             "negated witness: q owned, decides NotMine",
-            negated(TheoryOutcome::NotMine),
+            negated(TheoryGround::disowned()),
             Some("predicate_partition_violation"),
         ),
     ];
     // Every mismatch at once, so a failure shows each case rather than the first.
     let mismatches: Vec<String> = cases
         .iter()
-        .filter(|(_, outcome, want)| match (want, outcome) {
-            (None, Outcome::Accept) => false,
-            (Some(code), Outcome::Reject { code: got, .. }) => got.code() != *code,
+        .filter(|(_, outcome, want)| match (want, &outcome.verdict) {
+            (None, Verdict::Accept) => false,
+            (Some(code), Verdict::Reject { code: got, .. }) => got.code() != *code,
             _ => true,
         })
         .map(|(name, outcome, want)| {

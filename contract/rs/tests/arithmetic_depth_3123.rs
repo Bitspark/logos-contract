@@ -13,7 +13,7 @@ use logos_contract::{
     ArithmeticTheory, CertContext, CertSizeDecl, CheckLimits, CheckProfile, Clause,
     ClosedModelCert, ClosureWitness, Derivation, Evidence, FiniteDomain, Goal, GroundLiteral, Hash,
     LeafOutcome, LeafVerifier, MapProgram, Node, Outcome, PredicateSet, RelationTable,
-    StratumPrefix, SupportWitness, Symbol, Term, Theory, TheoryOutcome,
+    StratumPrefix, SupportWitness, Symbol, Term, Theory, TheoryGround, Verdict,
 };
 use ontos_core::Value;
 
@@ -55,12 +55,12 @@ fn deep_one_v(levels: usize) -> Value {
     e
 }
 
-fn decide(pred: &str, lhs: Value, rhs: Value) -> TheoryOutcome {
-    ArithmeticTheory::new().decide(&GroundLiteral::new(pred, [lhs, rhs]))
+fn decide_ground(pred: &str, lhs: Value, rhs: Value) -> TheoryGround {
+    ArithmeticTheory::new().decide_ground(&GroundLiteral::new(pred, [lhs, rhs]))
 }
 
-fn holds(outcome: &TheoryOutcome) -> bool {
-    matches!(outcome, TheoryOutcome::Holds)
+fn holds(outcome: &TheoryGround) -> bool {
+    *outcome == TheoryGround::holds()
 }
 
 /// The theory decides a deep expression by its value, in both polarities.
@@ -71,27 +71,27 @@ fn the_theory_decides_a_deep_expression_by_its_value_3123() {
         let cases = [
             (
                 "1 =:= E holds",
-                decide("=:=", int_v(1), deep_one_v(levels)),
+                decide_ground("=:=", int_v(1), deep_one_v(levels)),
                 true,
             ),
             (
                 "2 =\\= E holds",
-                decide("=\\=", int_v(2), deep_one_v(levels)),
+                decide_ground("=\\=", int_v(2), deep_one_v(levels)),
                 true,
             ),
             (
                 "1 =\\= E fails",
-                decide("=\\=", int_v(1), deep_one_v(levels)),
+                decide_ground("=\\=", int_v(1), deep_one_v(levels)),
                 false,
             ),
             (
                 "1 is E holds",
-                decide("is", int_v(1), deep_one_v(levels)),
+                decide_ground("is", int_v(1), deep_one_v(levels)),
                 true,
             ),
             (
                 "0 < E holds",
-                decide("<", int_v(0), deep_one_v(levels)),
+                decide_ground("<", int_v(0), deep_one_v(levels)),
                 true,
             ),
         ];
@@ -112,7 +112,7 @@ fn a_hundred_thousand_level_expression_is_decided_on_a_small_stack_3123() {
         .stack_size(512 * 1024)
         .spawn(|| {
             let atom = GroundLiteral::new("=:=", [int_v(1), deep_one_v(100_000)]);
-            let got = ArithmeticTheory::new().decide(&atom);
+            let got = ArithmeticTheory::new().decide_ground(&atom);
             // `ontos_core::Value`'s drop recurses once per level, so the 100,000-level value is
             // leaked rather than dropped on this small stack. The evaluation is what is measured.
             std::mem::forget(atom);
@@ -154,9 +154,9 @@ fn arith_profile(limits: CheckLimits) -> CheckProfile<()> {
 }
 
 fn verdict(outcome: &Outcome) -> String {
-    match outcome {
-        Outcome::Accept => "accept".to_string(),
-        Outcome::Reject { code, detail } => format!("{} ({detail})", code.code()),
+    match &outcome.verdict {
+        Verdict::Accept => "accept".to_string(),
+        Verdict::Reject { code, detail } => format!("{} ({detail})", code.code()),
     }
 }
 
@@ -218,9 +218,9 @@ fn a_deep_builtin_node_is_decided_by_value_or_refused_by_the_callers_budget_3123
             ),
         ];
         for (what, got, want) in cases {
-            let ok = match (want, &got) {
-                (None, Outcome::Accept) => true,
-                (Some(code), Outcome::Reject { code: c, .. }) => c.code() == code,
+            let ok = match (want, &got.verdict) {
+                (None, Verdict::Accept) => true,
+                (Some(code), Verdict::Reject { code: c, .. }) => c.code() == code,
                 _ => false,
             };
             if !ok {
@@ -352,10 +352,10 @@ fn a_certificate_sealing_r_empty_is_judged_by_the_comparisons_value_3123() {
         ..CheckLimits::default()
     };
     let refused_as =
-        |o: &Outcome, code: &str| matches!(o, Outcome::Reject { code: c, .. } if c.code() == code);
+        |o: &Verdict, code: &str| matches!(o, Verdict::Reject { code: c, .. } if c.code() == code);
     let not_closed =
-        |o: &Outcome| refused_as(o, "cert_not_closed") || refused_as(o, "term_too_deep");
-    let closed = |o: &Outcome| matches!(o, Outcome::Accept) || refused_as(o, "term_too_deep");
+        |o: &Verdict| refused_as(o, "cert_not_closed") || refused_as(o, "term_too_deep");
+    let closed = |o: &Verdict| matches!(o, Verdict::Accept) || refused_as(o, "term_too_deep");
     let mut wrong = Vec::new();
     for (name, levels) in DEPTHS {
         for limits in [CheckLimits::default(), wide] {
@@ -380,9 +380,9 @@ fn a_certificate_sealing_r_empty_is_judged_by_the_comparisons_value_3123() {
                 let got = r_sealed_empty(&program, limits);
                 // r(a) in the model: sealing r empty must be refused. Otherwise it is accepted.
                 let ok = if r_a_holds {
-                    not_closed(&got)
+                    not_closed(&got.verdict)
                 } else {
-                    closed(&got)
+                    closed(&got.verdict)
                 };
                 if !ok {
                     wrong.push(format!(

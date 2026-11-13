@@ -18,7 +18,7 @@ import (
 //     emits. Branch on these, not on detail.
 //   - host-extension band (STABLE v1 *mechanism*; sub-code set open) — the three
 //     wrappers a delegated extension point raises; the seam's own sub-code is
-//     carried in Outcome.Detail.
+//     carried in Verdict.Detail.
 //   - configuration: the supplied profile cannot run a check.
 type RejectionCode int
 
@@ -256,72 +256,72 @@ func (c RejectionCode) IsStructural() bool {
 	}
 }
 
-// Outcome is the result of check. It is a closed sum: either Accept or a Reject
-// carrying a code + diagnostic detail. Modelled as a struct (not an interface) so
-// it is a plain value; IsAccept distinguishes the two.
-type Outcome struct {
+// Verdict is what check decided: accept, or reject with a code and its diagnostic detail. A closed
+// sum modelled as a struct (not an interface), so it is a plain comparable value: two verdicts are
+// == exactly when they are the same decision. IsAccept distinguishes the two arms. Rust's
+// check::Verdict.
+type Verdict struct {
 	accept bool
 	code   RejectionCode
 	detail string
 }
 
-// Accept is the accepting outcome.
-func Accept() Outcome { return Outcome{accept: true} }
+// Accept is the accepting verdict.
+func Accept() Verdict { return Verdict{accept: true} }
 
-// reject builds a rejecting outcome with a code and diagnostic detail.
-func reject(code RejectionCode, detail string) Outcome {
-	return Outcome{accept: false, code: code, detail: detail}
+// reject builds a rejecting verdict with a code and diagnostic detail.
+func reject(code RejectionCode, detail string) Verdict {
+	return Verdict{accept: false, code: code, detail: detail}
 }
 
-// IsAccept reports whether the outcome is Accept.
-func (o Outcome) IsAccept() bool { return o.accept }
+// IsAccept reports whether the verdict is Accept.
+func (v Verdict) IsAccept() bool { return v.accept }
 
 // Code returns the rejection code; valid only when !IsAccept.
-func (o Outcome) Code() RejectionCode { return o.code }
+func (v Verdict) Code() RejectionCode { return v.code }
 
 // Detail returns the diagnostic detail; valid only when !IsAccept.
-func (o Outcome) Detail() string { return o.detail }
+func (v Verdict) Detail() string { return v.detail }
 
 // String renders a diagnostic form.
-func (o Outcome) String() string {
-	if o.accept {
+func (v Verdict) String() string {
+	if v.accept {
 		return "Accept"
 	}
-	return fmt.Sprintf("Reject{%s: %s}", o.code.Code(), o.detail)
+	return fmt.Sprintf("Reject{%s: %s}", v.code.Code(), v.detail)
 }
 
-// TermIdentity is the TERM IDENTITY (#2226, §4.3). INERT since #3022 (seat:caa's ruling on
-// #3037): Check ignores it and compares every site structurally, and the check-profile digest does
-// not fold it, so two profiles that differ only here give identical verdicts and share one digest.
-// Pinned inert by vectors/exact_claims.json, which the conformance harness drives under each
-// identity, and by the completeness gate's exact_answer_set test under each identity.
+// Outcome is the result of check (checker SPI v2, ADR 0036 D8 change 5, #3111): its Verdict, and
+// the CheckReport of the work it performed. Rust's check::Outcome.
 //
-// It is slated for DELETION in #3022's step 5: out of CheckLimits (ADR 0035 D1) and its pins out of
-// the negotiation wire. It does not move to the representation axis: how a list is spelled on
-// display is the consumer's rendering choice, not a property of what is certified. The zero value
-// is TermIdentityReifyLists, the default.
-type TermIdentity uint8
-
-const (
-	// TermIdentityReifyLists is the default tag (#159). Inert, as is TermIdentityExact.
-	TermIdentityReifyLists TermIdentity = iota
-	// TermIdentityExact is the other tag (#2226). Inert: Check gives the verdict it gives under the
-	// default.
-	TermIdentityExact
-)
-
-// Tag is the stable tag: "reify_lists" or "exact".
-func (t TermIdentity) Tag() string {
-	if t == TermIdentityExact {
-		return "exact"
-	}
-	return "reify_lists"
+// Equality is the verdict's. Two outcomes are equal when their verdicts are, whatever their reports
+// say, so a counter can never turn a verdict test red (the coordinator's ruling of 2026-11-12).
+// Compare with Equal, or compare the Verdict fields: Outcome is deliberately NOT comparable with ==,
+// which would compare the reports' counters as well, so such a comparison does not compile. Read
+// Report where the work is asked about.
+type Outcome struct {
+	Verdict Verdict
+	Report  CheckReport
+	// A zero-size array of funcs makes the struct not comparable: == on two outcomes is a compile
+	// error rather than a silent comparison of their counters.
+	_ [0]func()
 }
+
+// IsAccept reports whether the outcome's verdict is Accept.
+func (o Outcome) IsAccept() bool { return o.Verdict.IsAccept() }
+
+// Equal reports whether two outcomes carry the same verdict. Their reports are not compared (Rust's
+// PartialEq for Outcome).
+func (o Outcome) Equal(other Outcome) bool { return o.Verdict == other.Verdict }
+
+// String renders the verdict's diagnostic form, the part of the outcome its equality reads. The
+// report is read by its fields.
+func (o Outcome) String() string { return o.Verdict.String() }
 
 // CheckLimits holds the checker's BEHAVIOUR PARAMETERS (§4.3): budgets on the *untrusted*
-// supplied derivation, plus the INERT TermIdentity. The budgets are distinct from search-effort
-// limits: they bound *proof size on verify*, and the node cap is a hard, deterministic rejection
-// checked *before any node delegation*.
+// supplied derivation. (Checker SPI v2, ADR 0036 D8 change 1, #3111: the inert term identity is
+// deleted.) The budgets are distinct from search-effort limits: they bound *proof size on verify*,
+// and the node cap is a hard, deterministic rejection checked *before any node delegation*.
 type CheckLimits struct {
 	// MaxNodes is the max total node count (> MaxNodes → too_many_nodes).
 	MaxNodes int
@@ -356,12 +356,6 @@ type CheckLimits struct {
 	// candidate examined at one body literal, #1829); tripped incrementally during the
 	// scan.
 	MaxJoinSteps int
-
-	// ---- the term identity (#2226), INERT since #3022 ----
-
-	// TermIdentity is INERT (#3022): Check ignores it and the check-profile digest does not fold
-	// it. Slated for deletion in #3022's step 5 (ADR 0035 D1); see TermIdentity.
-	TermIdentity TermIdentity
 }
 
 // DefaultLimits returns the standard check limits. Mirrors arche-core's
@@ -381,7 +375,6 @@ func DefaultLimits() CheckLimits {
 		MaxSupportEdges:   1_000_000,
 		MaxRuleGroundings: 10_000_000,
 		MaxJoinSteps:      100_000_000,
-		TermIdentity:      TermIdentityReifyLists,
 	}
 }
 
@@ -392,9 +385,8 @@ type Budget struct {
 }
 
 // Budgets is every budget a caller can raise, by its name, in declaration order (#2733, R3): the
-// one list of the checker's budgets, which every reader takes rather than keeping its own.
-// TermIdentity is not a budget and is not listed. A test counts the struct's fields by reflection,
-// so a new field fails until it is placed here.
+// one list of the checker's budgets, which every reader takes rather than keeping its own. A test
+// counts the struct's fields by reflection, so a new field fails until it is placed here.
 func (l *CheckLimits) Budgets() []Budget {
 	return []Budget{
 		{"max_nodes", &l.MaxNodes},
@@ -657,6 +649,13 @@ func Check[C any](program Program, claim GroundLiteral, deriv Derivation, ctx C,
 // chain rejects as cert_out_of_range, because it has no cert to seal anything. A vacuous accept
 // would certify a completeness claim that nothing backs. Mirrors rs check_closed_model_chain.
 func CheckClosedModelChain[C any](program Program, certs []ClosedModelCert, ctx C, profile *CheckProfile[C], certContext CertContext) Outcome {
+	var tally checkTally
+	verdict := verifyChain(program, certs, ctx, profile, certContext, &tally)
+	return tally.outcome(verdict)
+}
+
+// verifyChain is CheckClosedModelChain's verdict, its work counted into tally (rs verify_chain).
+func verifyChain[C any](program Program, certs []ClosedModelCert, ctx C, profile *CheckProfile[C], certContext CertContext, tally *checkTally) Verdict {
 	captured := *profile
 	profile = &captured
 	if err := profile.Limits.Validate(); err != nil {
@@ -673,7 +672,7 @@ func CheckClosedModelChain[C any](program Program, certs []ClosedModelCert, ctx 
 		}
 	}
 	for own, cert := range certs {
-		if what := certDepthsWithin(cert, profile.Limits.MaxTermDepth); what != "" {
+		if what := certDepthsWithin(cert, profile.Limits.MaxTermDepth, tally); what != "" {
 			return reject(TermTooDeep, fmt.Sprintf("chain cert %d: %s nests deeper than max_term_depth %d", own, what, profile.Limits.MaxTermDepth))
 		}
 	}
@@ -690,7 +689,7 @@ func CheckClosedModelChain[C any](program Program, certs []ClosedModelCert, ctx 
 	readProgram := worldProgram(program)
 	for _, own := range verificationOrder(certs) {
 		place := certPlace{own: own, worldLen: len(certs)}
-		st := verifyCert(certs[own], place, certs, status, verified, readProgram, profile, ctx, certContext, profile.Limits)
+		st := verifyCert(certs[own], place, certs, status, verified, readProgram, profile, ctx, certContext, profile.Limits, tally)
 		if !st.valid {
 			return reject(st.code, fmt.Sprintf("chain cert %d: %s", own, st.detail))
 		}
@@ -715,12 +714,27 @@ func CheckWithCertContext[C any](program Program, claim GroundLiteral, deriv Der
 // checkNative binds the proposed account and requested fact before program
 // lookup or verification. A memo can provide the already owned world and its
 // statuses. The forward pass always reads the same world that was verified.
+//
+// One report accumulator is threaded through the whole check (#3111), never held in ambient
+// state; the outcome carries the verdict and the work counted up to it.
 func checkNative[C any](
 	program Program, claim GroundLiteral, proof Derivation, ctx C,
 	profile CheckProfile[C], certContext CertContext, memo *WorldMemo[C],
 ) Outcome {
-	if out := checkDerivationShape(proof, profile.Limits); !out.IsAccept() {
-		return out
+	var tally checkTally
+	verdict := checkCounted(program, claim, proof, ctx, profile, certContext, memo, &tally)
+	return tally.outcome(verdict)
+}
+
+// checkCounted is checkNative's verdict, its work counted into tally. The refusals before the
+// depth pass (the limits, the derivation header, the shape boundary) count nothing; the depth pass
+// counts only max_term_depth_reached.
+func checkCounted[C any](
+	program Program, claim GroundLiteral, proof Derivation, ctx C,
+	profile CheckProfile[C], certContext CertContext, memo *WorldMemo[C], tally *checkTally,
+) Verdict {
+	if v := checkDerivationShape(proof, profile.Limits); !v.IsAccept() {
+		return v
 	}
 	if why := wellFormedLiteral(claim, profile.Limits.MaxTermDepth, "claim"); why != "" {
 		return reject(UnknownNodeKind, why)
@@ -740,22 +754,29 @@ func checkNative[C any](
 	}
 	// This depth pass may call Program.Clause. All subsequent comparisons
 	// and verifier calls use the captured data even if that lookup reenters.
-	if out := checkTermDepths(program, claim, proof, profile.Limits); !out.IsAccept() {
-		return out
+	if v := checkTermDepths(program, claim, proof, profile.Limits, tally); !v.IsAccept() {
+		return v
 	}
-	if len(proof.ClosedWorld) != 0 && status == nil {
-		status = verifyWorld(proof.ClosedWorld, program, &profile, ctx, certContext)
-		if memo != nil {
-			memo.rememberWorld(proof.ClosedWorld, status, profile.Limits)
+	if len(proof.ClosedWorld) != 0 {
+		if status == nil {
+			status = verifyWorld(proof.ClosedWorld, program, &profile, ctx, certContext, tally)
+			if memo != nil {
+				memo.rememberWorld(proof.ClosedWorld, status, profile.Limits)
+			}
+		} else {
+			// certs_memo_hits: every certificate of the world, served by the memo instead of
+			// verified. Counted here, after the depth pass, where rs consults its memo.
+			tally.certsMemoHits += len(proof.ClosedWorld)
 		}
 	}
-	return checkNodes(program, claim, proof, ctx, &profile, status)
+	return checkNodes(program, claim, proof, ctx, &profile, status, tally)
 }
 
 // verifyWorld is step 3a of CheckWithCertContext: every certificate of world verified, into the
-// status slice the forward pass reads. A pure function of its arguments, which is what lets a
-// WorldMemo serve it again for an equal world under the same inputs (#2569).
-func verifyWorld[C any](world []ClosedModelCert, program Program, profile *CheckProfile[C], ctx C, certContext CertContext) []certStatus {
+// status slice the forward pass reads. Its statuses are a pure function of its arguments, which is
+// what lets a WorldMemo serve them again for an equal world under the same inputs (#2569); the
+// verification's work is counted into tally.
+func verifyWorld[C any](world []ClosedModelCert, program Program, profile *CheckProfile[C], ctx C, certContext CertContext, tally *checkTally) []certStatus {
 	// 3a. verify every cited certificate ONCE, up front, memoized into a parallel
 	//     []certStatus. A Neg premise reuses the cached result. For an all-positive
 	//     derivation ClosedWorld is empty, so this is a no-op and the zero certContext
@@ -778,7 +799,7 @@ func verifyWorld[C any](world []ClosedModelCert, program Program, profile *Check
 			certStatus[i] = invalidCert(CertContextUnbound, "certifying check supplied an all-zero (unbound) cert context")
 		} else {
 			place := certPlace{own: i, worldLen: len(world)}
-			certStatus[i] = verifyCert(world[i], place, world, certStatus, verified, readProgram, profile, ctx, certContext, profile.Limits)
+			certStatus[i] = verifyCert(world[i], place, world, certStatus, verified, readProgram, profile, ctx, certContext, profile.Limits, tally)
 		}
 		verified[i] = true
 	}
@@ -787,12 +808,12 @@ func verifyWorld[C any](world []ClosedModelCert, program Program, profile *Check
 
 // checkNodes is steps 4 and 5 of CheckWithCertContext: the forward pass over the derivation's
 // nodes, reading the certificates' statuses, then the root against the claim.
-func checkNodes[C any](program Program, claim GroundLiteral, deriv Derivation, ctx C, profile *CheckProfile[C], certStatus []certStatus) Outcome {
+func checkNodes[C any](program Program, claim GroundLiteral, deriv Derivation, ctx C, profile *CheckProfile[C], certStatus []certStatus, tally *checkTally) Verdict {
 	// 4. one forward pass: validate each node (structural, then delegate).
 	depth := make([]int, len(deriv.Nodes))
 	for i, node := range deriv.Nodes {
-		if out := checkNode(i, node, program, deriv, ctx, profile, certStatus, depth); !out.IsAccept() {
-			return out
+		if v := checkNode(i, node, program, deriv, ctx, profile, certStatus, depth, tally); !v.IsAccept() {
+			return v
 		}
 	}
 
@@ -832,28 +853,28 @@ func equalGroundFilter(a, b []GroundFilterEntry) bool {
 // datum of one closed-model certificate that the cert path traverses recursively is within max.
 // A non-empty result names the first datum over the bound, in the same words the derivation path
 // reports. Shared with CheckClosedModelChain (#2313), whose certificates no derivation cites.
-// Mirrors rs cert_depths_within.
-func certDepthsWithin(cert ClosedModelCert, max int) string {
+// Mirrors rs cert_depths_within. Each depth it measures goes into tally (max_term_depth_reached).
+func certDepthsWithin(cert ClosedModelCert, max int, tally *checkTally) string {
 	for _, table := range cert.Extensions {
 		for _, fact := range table.Rows {
-			if !groundWithin(fact, max) {
+			if !groundWithin(fact, max, tally) {
 				return "certificate extension row argument"
 			}
 		}
 	}
 	for _, domain := range cert.Domains {
 		for _, v := range domain.Values {
-			if !ValueDepthLE(v, max) {
+			if !tally.valueWithin(v, max) {
 				return "certificate domain value"
 			}
 		}
 	}
 	for _, edge := range cert.Supports.Edges {
-		if !groundWithin(edge.Fact, max) {
+		if !groundWithin(edge.Fact, max, tally) {
 			return "certificate support-edge fact argument"
 		}
 		for _, term := range edge.Subst {
-			if !TermDepthLE(term, max) {
+			if !tally.termWithin(term, max) {
 				return "certificate support-edge subst image"
 			}
 		}
@@ -862,7 +883,7 @@ func certDepthsWithin(cert ClosedModelCert, max int) string {
 			if !ok {
 				continue
 			}
-			if !groundWithin(atom, max) {
+			if !groundWithin(atom, max, tally) {
 				return "certificate support-ref atom argument"
 			}
 		}
@@ -870,30 +891,32 @@ func certDepthsWithin(cert ClosedModelCert, max int) string {
 	return ""
 }
 
-func checkTermDepths(program Program, claim GroundLiteral, deriv Derivation, limits CheckLimits) Outcome {
+// checkTermDepths' every measurement (a term's depth, cut off at the first level past max) goes
+// into tally (max_term_depth_reached), so a term_too_deep refusal reports max + 1.
+func checkTermDepths(program Program, claim GroundLiteral, deriv Derivation, limits CheckLimits, tally *checkTally) Verdict {
 	max := limits.MaxTermDepth
-	tooDeep := func(what string) Outcome {
+	tooDeep := func(what string) Verdict {
 		return reject(TermTooDeep, fmt.Sprintf("%s nests deeper than max_term_depth %d", what, max))
 	}
 	// (a) the claim.
-	if !groundWithin(claim, max) {
+	if !groundWithin(claim, max, tally) {
 		return tooDeep("claim argument")
 	}
 	// (b) every node conclusion + (for Rule) subst images, and every cited clause.
 	for _, node := range deriv.Nodes {
-		if !groundWithin(node.Conclusion(), max) {
+		if !groundWithin(node.Conclusion(), max, tally) {
 			return tooDeep("node conclusion argument")
 		}
 		if rule, ok := node.(RuleNode); ok {
 			for _, term := range rule.Subst {
-				if !TermDepthLE(term, max) {
+				if !tally.termWithin(term, max) {
 					return tooDeep("subst image term")
 				}
 			}
 			// A missing clause is the structural unknown_clause error raised later in
 			// the forward pass; here we only depth-check a clause that exists.
 			if clause, ok := program.Clause(rule.Clause); ok {
-				if !goalWithin(clause.Head, max) {
+				if !goalWithin(clause.Head, max, tally) {
 					return tooDeep("cited clause head argument")
 				}
 				for _, bl := range clause.Body {
@@ -901,17 +924,17 @@ func checkTermDepths(program Program, claim GroundLiteral, deriv Derivation, lim
 						// A Count body literal has no single Goal: depth-check its filter
 						// terms + the count slot instead.
 						for _, e := range bl.CountVal.Filter {
-							if !TermDepthLE(e.Term, max) {
+							if !tally.termWithin(e.Term, max) {
 								return tooDeep("cited clause count filter term")
 							}
 						}
-						if !TermDepthLE(bl.CountVal.Count, max) {
+						if !tally.termWithin(bl.CountVal.Count, max) {
 							return tooDeep("cited clause count slot term")
 						}
 						continue
 					}
 					inner, _ := bl.AsInner() // ok: the Count arm above covers the inner-less form
-					if !goalWithin(inner, max) {
+					if !goalWithin(inner, max, tally) {
 						return tooDeep("cited clause body-literal argument")
 					}
 				}
@@ -922,7 +945,7 @@ func checkTermDepths(program Program, claim GroundLiteral, deriv Derivation, lim
 	//     all-positive derivation ClosedWorld is empty, so this is a no-op and the
 	//     positive path is byte-identical (it never reaches a term_too_deep).
 	for _, cert := range deriv.ClosedWorld {
-		if what := certDepthsWithin(cert, max); what != "" {
+		if what := certDepthsWithin(cert, max, tally); what != "" {
 			return tooDeep(what)
 		}
 	}
@@ -933,16 +956,16 @@ func checkTermDepths(program Program, claim GroundLiteral, deriv Derivation, lim
 			for _, premise := range rule.Premises {
 				switch p := premise.(type) {
 				case NegPremise:
-					if !groundWithin(p.Atom, max) {
+					if !groundWithin(p.Atom, max, tally) {
 						return tooDeep("negated premise atom argument")
 					}
 				case CountPremise:
 					for _, e := range p.Filter {
-						if !ValueDepthLE(e.Value, max) {
+						if !tally.valueWithin(e.Value, max) {
 							return tooDeep("count premise filter value")
 						}
 					}
-					if p.K != nil && !ValueDepthLE(p.K, max) {
+					if p.K != nil && !tally.valueWithin(p.K, max) {
 						return tooDeep("count premise k value")
 					}
 				case PosPremise:
@@ -958,20 +981,22 @@ func checkTermDepths(program Program, claim GroundLiteral, deriv Derivation, lim
 	return Accept()
 }
 
-// groundWithin reports that every argument of a GroundLiteral nests within max.
-func groundWithin(lit GroundLiteral, max int) bool {
+// groundWithin reports that every argument of a GroundLiteral nests within max, each measured
+// into tally.
+func groundWithin(lit GroundLiteral, max int, tally *checkTally) bool {
 	for _, v := range lit.Args {
-		if !ValueDepthLE(v, max) {
+		if !tally.valueWithin(v, max) {
 			return false
 		}
 	}
 	return true
 }
 
-// goalWithin reports that every argument term of a Goal nests within max.
-func goalWithin(goal Goal, max int) bool {
+// goalWithin reports that every argument term of a Goal nests within max, each measured into
+// tally.
+func goalWithin(goal Goal, max int, tally *checkTally) bool {
 	for _, t := range goal.Args {
-		if !TermDepthLE(t, max) {
+		if !tally.termWithin(t, max) {
 			return false
 		}
 	}
@@ -990,9 +1015,14 @@ func saturatingAddOne(n int) int {
 	return n + 1
 }
 
-func checkNode[C any](i int, node Node, program Program, deriv Derivation, ctx C, profile *CheckProfile[C], certStatus []certStatus, depth []int) Outcome {
+func checkNode[C any](i int, node Node, program Program, deriv Derivation, ctx C, profile *CheckProfile[C], certStatus []certStatus, depth []int, tally *checkTally) Verdict {
+	// nodes_walked: the walk begins this node, before any of its checks (a node that then rejects
+	// counts). Its kind is counted first thing in its arm below.
+	tally.nodesWalked++
 	switch n := node.(type) {
 	case RuleNode:
+		// rule_nodes
+		tally.ruleNodes++
 		// (a) cited clause exists.
 		clause, ok := program.Clause(n.Clause)
 		if !ok {
@@ -1022,6 +1052,8 @@ func checkNode[C any](i int, node Node, program Program, deriv Derivation, ctx C
 			}
 		}
 		depth[i] = saturatingAddOne(maxPremiseDepth)
+		// max_depth_reached: the depth compared against MaxDepth, a tripping one included.
+		tally.reachDepth(depth[i])
 		if depth[i] > profile.Limits.MaxDepth {
 			return reject(TooDeep, fmt.Sprintf("depth %d exceeds max_depth %d", depth[i], profile.Limits.MaxDepth))
 		}
@@ -1054,6 +1086,9 @@ func checkNode[C any](i int, node Node, program Program, deriv Derivation, ctx C
 		//     conclusion is its exact fact, so the exact cone #2256 kept for spelling-sensitive
 		//     clauses now holds for every clause by construction.
 		for k, bodyLit := range clause.Body {
+			// premises_pos / premises_neg: (f) begins examining premise k, counted by its own kind
+			// (a count premise is positive) before any of its checks.
+			tally.premise(n.Premises[k])
 			// A Count body literal has no single underlying Goal (AsInner() reports none), so
 			// branch on it BEFORE computing the Pos/Neg `expected` grounding.
 			if bodyLit.IsCount() {
@@ -1086,8 +1121,8 @@ func checkNode[C any](i int, node Node, program Program, deriv Derivation, ctx C
 					!gCount.Equal(premise.K) {
 					return reject(InstantiationMismatch, fmt.Sprintf("count premise %d != body literal %d under subst", k, k))
 				}
-				if out := verifyCountPremise(premise.Pred, premise.Filter, premise.Project, premise.K, premise.Cert, n.Conc.Pred, deriv, certStatus); !out.IsAccept() {
-					return out
+				if v := verifyCountPremise(premise.Pred, premise.Filter, premise.Project, premise.K, premise.Cert, n.Conc.Pred, deriv, certStatus); !v.IsAccept() {
+					return v
 				}
 				continue
 			}
@@ -1117,8 +1152,8 @@ func checkNode[C any](i int, node Node, program Program, deriv Derivation, ctx C
 				if !premise.Atom.Equal(expected) {
 					return reject(InstantiationMismatch, fmt.Sprintf("neg premise %d atom != body literal %d under subst", k, k))
 				}
-				if out := verifyNegPremise(premise.Atom, premise.Cert, premise.Nonmember, n.Conc.Pred, deriv, certStatus); !out.IsAccept() {
-					return out
+				if v := verifyNegPremise(premise.Atom, premise.Cert, premise.Nonmember, n.Conc.Pred, deriv, certStatus); !v.IsAccept() {
+					return v
 				}
 			case CountPremise:
 				// A count premise cited for a body literal that is not a count: its kind does not match.
@@ -1138,6 +1173,8 @@ func checkNode[C any](i int, node Node, program Program, deriv Derivation, ctx C
 			return reject(PredicatePartitionViolation, "rule head predicate is owned by a theory")
 		}
 		// (h) THEN delegate metadata admissibility (§4 ob.2: structural-then-delegate).
+		// admissibility_checks: one Admissible call.
+		tally.admissibilityChecks++
 		switch out := profile.Admit.Admissible(CloneClause(clause), n.Meta, ctx).(type) {
 		case RuleAdmit:
 			return Accept()
@@ -1148,7 +1185,11 @@ func checkNode[C any](i int, node Node, program Program, deriv Derivation, ctx C
 		}
 
 	case BuiltinNode:
+		// builtin_nodes
+		tally.builtinNodes++
 		depth[i] = 1
+		// max_depth_reached
+		tally.reachDepth(depth[i])
 		if depth[i] > profile.Limits.MaxDepth {
 			return reject(TooDeep, "depth 1 exceeds max_depth")
 		}
@@ -1163,22 +1204,28 @@ func checkNode[C any](i int, node Node, program Program, deriv Derivation, ctx C
 		}
 		// #3126: the ground verdict, which can say "not decided". The detail of a false is the
 		// theory's own code, read before any conversion into the algebra.
-		verdict := readGround(DecideGround(profile.Theory, n.Conc))
+		// theory_decisions: one DecideGround call.
+		tally.theoryDecisions++
+		ground := readGround(DecideGround(profile.Theory, n.Conc))
 		switch {
-		case verdict.arm == groundHolds:
+		case ground.arm == groundHolds:
 			return Accept()
-		case verdict.arm == groundFails:
-			return reject(BuiltinFailed, verdict.code)
-		case verdict.disowned():
+		case ground.arm == groundFails:
+			return reject(BuiltinFailed, ground.code)
+		case ground.disowned():
 			// owns() said yes but decide disowns: an inconsistent theory.
 			return reject(PredicatePartitionViolation, "theory owns predicate but returned NotMine")
 		default:
 			// A stop is refused by name, never read as a decision (#3126).
-			return reject(BuiltinNotDecided, verdict.cause.Kind().Tag())
+			return reject(BuiltinNotDecided, ground.cause.Kind().Tag())
 		}
 
 	case LeafNode:
+		// leaf_nodes
+		tally.leafNodes++
 		depth[i] = 1
+		// max_depth_reached
+		tally.reachDepth(depth[i])
 		if depth[i] > profile.Limits.MaxDepth {
 			return reject(TooDeep, "depth 1 exceeds max_depth")
 		}
@@ -1197,6 +1244,8 @@ func checkNode[C any](i int, node Node, program Program, deriv Derivation, ctx C
 			// concluding an intensional predicate is the sealing error.
 			return reject(SealedViolation, "leaf concludes a non-extensional (intensional) predicate")
 		}
+		// leaf_verifications: one Verify call.
+		tally.leafVerifications++
 		switch out := profile.Leaves.Verify(n.Conc.detached(), n.Evidence, ctx).(type) {
 		case LeafAdmit:
 			return Accept()
@@ -1230,11 +1279,11 @@ func checkNode[C any](i int, node Node, program Program, deriv Derivation, ctx C
 // WHAT AN EMPTY RESULT DOES NOT PROMISE: it does not mean Check will accept. It answers ONE
 // condition - theory ownership. Two others raise the same structural code and are untouched:
 // a builtin predicate that is also extensional (a genuine partition overlap), and a theory
-// whose Owns says yes while Decide returns NotMine (an inconsistent theory). Empty means no
+// whose Owns says yes while DecideGround disowns the atom (an inconsistent theory). Empty means no
 // capability refusal will occur, never that the account is valid.
 //
 // Additive and non-breaking: a helper over existing contract types, adding no RejectionCode
-// and moving no vector. It reads BuiltinNode conclusions and Theory.Owns only - no Decide
+// and moving no vector. It reads BuiltinNode conclusions and Theory.Owns only - no DecideGround
 // call, so it is total and side-effect-free. Order is derivation node order, deduplicated on
 // first appearance, so the result is deterministic for a given derivation.
 func UnownedBuiltinPredicates[C any](deriv Derivation, profile *CheckProfile[C]) []Symbol {
@@ -1273,20 +1322,21 @@ func ProfileDecidesAllBuiltins[C any](deriv Derivation, profile *CheckProfile[C]
 }
 
 // IncoherentBuiltinAtoms returns the Builtin conclusions this profile's theory owns but
-// disowns - Owns(pred) is true while Decide(conclusion) returns TheoryNotMine.
+// disowns - Owns(pred) is true while DecideGround(conclusion) answers the inconsistent_theory
+// fault (completion.TheoryGroundDisowned).
 //
 // A non-empty result is a VERIFIER-side defect: the bound Theory violates the coherence
-// obligation of §5, which requires Decide to reach a verdict on every atom whose predicate
+// obligation of §5, which requires DecideGround to reach a verdict on every atom whose predicate
 // Owns claims. Check rejects this with the structural code PredicatePartitionViolation -
 // correctly, since the account cannot be verified by this profile - but a consumer reading
 // that code alone is pointed at the PRODUCER for what is a bug in the host's own theory
 // binding. This query is the attribution the code cannot carry (issue #1378): it names the
 // atoms that expose it.
 //
-// Unlike UnownedBuiltinPredicates, this one CALLS Decide. Ownership is a property of a
+// Unlike UnownedBuiltinPredicates, this one CALLS DecideGround. Ownership is a property of a
 // predicate, but incoherence is only observable per atom, so the question cannot be answered
 // without deciding. It therefore costs what the corresponding part of Check costs and is not
-// side-effect-free against a theory whose Decide is expensive or stateful. Its value is
+// side-effect-free against a theory whose DecideGround is expensive or stateful. Its value is
 // attribution after a rejection, not avoidance before one.
 //
 // An empty result does NOT certify the theory coherent. It witnesses only that no atom this
@@ -1295,7 +1345,7 @@ func ProfileDecidesAllBuiltins[C any](deriv Derivation, profile *CheckProfile[C]
 //
 // Additive and non-breaking: no RejectionCode variant, no vector moved. Order is derivation
 // node order, deduplicated on first appearance, so the result is deterministic for a given
-// derivation. The dedup test precedes the Decide call, so a repeated offending atom is
+// derivation. The dedup test precedes the DecideGround call, so a repeated offending atom is
 // decided once.
 func IncoherentBuiltinAtoms[C any](deriv Derivation, profile *CheckProfile[C]) []GroundLiteral {
 	out := []GroundLiteral{}
@@ -1317,7 +1367,7 @@ func IncoherentBuiltinAtoms[C any](deriv Derivation, profile *CheckProfile[C]) [
 		if seen {
 			continue
 		}
-		// The disowning fault, which a TheoryNotMine from Decide becomes (#3126). A theory that
+		// The disowning fault, completion.TheoryGroundDisowned (#3126). A theory that
 		// stopped (a work cap) is not listed: it did not disown the atom.
 		if readGround(DecideGround(profile.Theory, b.Conc)).disowned() {
 			out = append(out, b.Conc)

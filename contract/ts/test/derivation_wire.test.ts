@@ -28,6 +28,7 @@ import {
   closedModelCertFromValue,
   decodeDerivationWireV1,
   encodeDerivationWireV1,
+  Subst,
 } from "../src/index.js";
 
 interface Case {
@@ -112,7 +113,7 @@ function fixture(name: string): Derivation {
       return new Derivation(
         [
           new LeafNode(lit("edge", "a", "b"), Evidence.none()),
-          new RuleNode(lit("path", "a", "b"), ClauseId.of("path#edge"), new Map(), [0], NodeMeta.none()),
+          new RuleNode(lit("path", "a", "b"), ClauseId.of("path#edge"), new Subst(), [0], NodeMeta.none()),
         ],
         1,
       );
@@ -122,7 +123,7 @@ function fixture(name: string): Derivation {
           new RuleNode(
             lit("has_count", "a"),
             ClauseId.of("count#sealed"),
-            new Map(),
+            new Subst(),
             [
               new CountPremise(
                 new PredicateRef(Symbol.of("sealed"), 1),
@@ -162,7 +163,7 @@ function fixture(name: string): Derivation {
           new RuleNode(
             lit("has_count", "a"),
             ClauseId.of("count#sealed"),
-            new Map(),
+            new Subst(),
             [
               new CountPremise(
                 new PredicateRef(Symbol.of("sealed"), 1),

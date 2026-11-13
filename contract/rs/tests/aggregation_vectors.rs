@@ -23,9 +23,9 @@ use logos_contract::{
     check_with_cert_context, check_with_cert_memo, edb_table_hash, intval::BigInt, program_digest,
     CertContext, CertId, CertSizeDecl, CheckLimits, CheckProfile, Clause, ClauseId,
     ClosedModelCert, ClosureWitness, CountLit, Derivation, Evidence, FiniteDomain, Goal,
-    GroundLiteral, Hash, LeafOutcome, LeafVerifier, MapProgram, Node, NodeMeta, Outcome,
-    PredicateRef, PredicateSet, Premise, ProjectSpec, RelationTable, StratumPrefix, Subst,
-    SupportEdge, SupportRef, SupportWitness, Symbol, Term, Theory, TheoryOutcome, WorldMemo,
+    GroundLiteral, Hash, LeafOutcome, LeafVerifier, MapProgram, Node, NodeMeta, PredicateRef,
+    PredicateSet, Premise, ProjectSpec, RelationTable, StratumPrefix, Subst, SupportEdge,
+    SupportRef, SupportWitness, Symbol, Term, Theory, TheoryGround, Verdict, WorldMemo,
 };
 use ontos_core::Value;
 use serde_json::Value as Json;
@@ -43,10 +43,8 @@ impl Theory for NoTheory {
     fn owns(&self, _pred: &Symbol) -> bool {
         false
     }
-    fn decide(&self, _atom: &GroundLiteral) -> TheoryOutcome {
-        TheoryOutcome::Fails {
-            code: "no_theory".into(),
-        }
+    fn decide_ground(&self, _atom: &GroundLiteral) -> TheoryGround {
+        TheoryGround::fails("no_theory")
     }
 }
 
@@ -560,9 +558,9 @@ fn aggregation_vectors_replay() {
         if verified > 0 {
             memoized_worlds += 1;
         }
-        let got = match &outcome {
-            Outcome::Accept => "accept".to_string(),
-            Outcome::Reject { code, .. } => format!("reject:{}", code.code()),
+        let got = match &outcome.verdict {
+            Verdict::Accept => "accept".to_string(),
+            Verdict::Reject { code, .. } => format!("reject:{}", code.code()),
         };
         let want = match case.get("outcome").unwrap() {
             Json::String(s) => s.clone(),
@@ -587,7 +585,7 @@ fn aggregation_vectors_replay() {
                     &ctx,
                 );
                 assert!(
-                    matches!(outcome, Outcome::Accept),
+                    matches!(outcome.verdict, Verdict::Accept),
                     "case {name}: raising {budget} changed the verdict: {outcome:?}"
                 );
             }

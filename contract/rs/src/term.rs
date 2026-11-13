@@ -529,18 +529,28 @@ impl Term {
     /// fires — so the work performed before refusing an over-deep term is bounded by
     /// the cutoff, not by the (unbounded) term.
     pub fn depth_le(&self, max: usize) -> bool {
+        self.depth_capped(max) <= max
+    }
+
+    /// The depth [`depth_le`](Self::depth_le) measures, by the same walk and the same cutoff:
+    /// the term's depth when it is at most `max`, else `max + 1`, the first level past `max`, where
+    /// the walk stops. `check` reports the deepest term it measured (#3111,
+    /// `max_term_depth_reached`), so the measurement is read rather than only compared.
+    pub(crate) fn depth_capped(&self, max: usize) -> usize {
+        let mut deepest = 0;
         let mut work: Vec<(&Term, usize)> = vec![(self, 1)];
         while let Some((term, level)) = work.pop() {
             if level > max {
-                return false;
+                return level;
             }
+            deepest = deepest.max(level);
             if let Term::Tuple(children) = term {
                 for child in children {
                     work.push((child, level + 1));
                 }
             }
         }
-        true
+        deepest
     }
 
     /// Apply a grounding substitution (one pass). A `Var` with no binding is left
@@ -571,18 +581,27 @@ fn substitute_leaf(leaf: &Term, subst: &Subst) -> Term {
 /// pathologically deep value, so the trusted checker measures depth without recursing
 /// and rejects an over-deep value before any of them runs.
 pub fn value_depth_le(value: &Value, max: usize) -> bool {
+    value_depth_capped(value, max) <= max
+}
+
+/// The depth [`value_depth_le`] measures, by the same walk and the same cutoff: the value's
+/// depth when it is at most `max`, else `max + 1`, where the walk stops ([`Term::depth_capped`]'s
+/// analogue, #3111).
+pub(crate) fn value_depth_capped(value: &Value, max: usize) -> usize {
+    let mut deepest = 0;
     let mut work: Vec<(&Value, usize)> = vec![(value, 1)];
     while let Some((v, level)) = work.pop() {
         if level > max {
-            return false;
+            return level;
         }
+        deepest = deepest.max(level);
         if let Value::Tuple(tuple) = v {
             for child in tuple.items() {
                 work.push((child, level + 1));
             }
         }
     }
-    true
+    deepest
 }
 
 // ===========================================================================

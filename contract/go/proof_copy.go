@@ -8,8 +8,9 @@ import (
 
 // CaptureSubst takes ownership of an untrusted substitution before its terms
 // are applied to a goal. Only immutable native terms can enter a retained map.
-// Success establishes shape and depth, without making a logical judgment.
-func CaptureSubst(subst Subst, limits CheckLimits) (Subst, Outcome) {
+// Success establishes shape and depth, without making a logical judgment. A capture is not a
+// check and performs none of a check's counted work (#3111), so it returns a bare Verdict.
+func CaptureSubst(subst Subst, limits CheckLimits) (Subst, Verdict) {
 	if err := limits.Validate(); err != nil {
 		return nil, reject(InvalidCheckLimits, err.Error())
 	}
@@ -26,22 +27,24 @@ func CaptureSubst(subst Subst, limits CheckLimits) (Subst, Outcome) {
 
 // CaptureDerivation isolates a native proposal before verification calls
 // application code. The ordinary checker and the capturing path apply the same
-// header refusals before inspecting nodes. Logical checking still follows.
-func CaptureDerivation(proof Derivation, limits CheckLimits) (Derivation, Outcome) {
+// header refusals before inspecting nodes. Logical checking still follows. The refusal is the
+// Verdict a check of the same proof gives, whose report would be all zeros (refused before the
+// walk, #3111).
+func CaptureDerivation(proof Derivation, limits CheckLimits) (Derivation, Verdict) {
 	if out := checkDerivationShape(proof, limits); !out.IsAccept() {
 		return Derivation{}, out
 	}
 	return CloneDerivation(proof), Accept()
 }
 
-func checkDerivationShape(proof Derivation, limits CheckLimits) Outcome {
+func checkDerivationShape(proof Derivation, limits CheckLimits) Verdict {
 	if out := derivationHeader(proof, limits); !out.IsAccept() {
 		return out
 	}
 	return checkWellFormed(proof, limits)
 }
 
-func derivationHeader(proof Derivation, limits CheckLimits) Outcome {
+func derivationHeader(proof Derivation, limits CheckLimits) Verdict {
 	if err := limits.Validate(); err != nil {
 		return reject(InvalidCheckLimits, err.Error())
 	}

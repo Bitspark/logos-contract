@@ -1,13 +1,13 @@
 package contract
 
 // completion.go — #3142 (research 0031 row 13; seat:caa's rulings on #3124 item 2, on #3142, and
-// on #3189 Q3/Q4): whether a decider's TheoryFails on a predicate it owns is always a decided false.
+// on #3189 Q3/Q4): whether a decider's Fails on a predicate it owns is always a decided false.
 // The go form of Rust's DecisionCompletion and its defaulted Theory::completion.
 //
-// A decider that stops before it decides can surface the stop as TheoryFails, and a closure check
+// A decider that stops before it decides can surface the stop as Fails, and a closure check
 // reads that false as knowledge, so a sealed table can miss a derivable row and still pass as
 // exhaustive. #3313 landed the typed outcome channel (DecideGround), on which a stop is
-// NotCompleted, never TheoryFails. The certifying kernel refuses at admission every seal whose
+// NotCompleted, never Fails. The certifying kernel refuses at admission every seal whose
 // clauses reach a decider that does not declare DecisionStopsAreTyped: host builtins until the host's
 // own decider declares its completion (#3506; #3374 typed only the guest's side, seat:caa's ruling on
 // #3390), and any decider on the v1 Decide alone. It retires at v2
@@ -22,12 +22,12 @@ type DecisionCompletion interface {
 }
 
 // DecisionStopsAreTyped: every non-decision on the predicate reaches readers as DecideGround's typed
-// NotCompleted, so a TheoryFails is always a decided false. A decider that never stops satisfies it
+// NotCompleted, so a Fails is always a decided false. A decider that never stops satisfies it
 // trivially; one that stops satisfies it when every stop is typed (arithmetic's work cap, #3313).
 // Named for the claim the guard needs, never "completes": a decider here may stop.
 type DecisionStopsAreTyped struct{}
 
-// DecisionMayNotComplete: a decision may stop without deciding and still answer TheoryFails (a
+// DecisionMayNotComplete: a decision may stop without deciding and still answer Fails (a
 // capacity, a bounded-work cap, a host refusal, an unreadable reply). Decider is the deciding
 // component as it attests itself; Cause says why, in its words.
 type DecisionMayNotComplete struct {
@@ -76,7 +76,7 @@ func StopsAreTyped(d DecisionCompletion) bool {
 
 // Completion: #3142, PER THEORY (seat:caa's rulings on #3142 and on #3189, Q3). Every arithmetic
 // stop is typed: its one stop, decimal alignment past maxDecimalScaleShift (#3126; #3123 removed the
-// depth capacity), is DecideGround's NotCompleted(work_cap), never TheoryFails (#3313), and check
+// depth capacity), is DecideGround's NotCompleted(work_cap), never Fails (#3313), and check
 // refuses it by name. Arithmetic still stops, so it is not "complete".
 func (ArithmeticTheory) Completion(Symbol) DecisionCompletion { return DecisionStopsAreTyped{} }
 
@@ -92,8 +92,8 @@ func (TermTheory) Completion(Symbol) DecisionCompletion { return DecisionStopsAr
 // its stops are typed trivially.
 func (ListTheory) Completion(Symbol) DecisionCompletion { return DecisionStopsAreTyped{} }
 
-// Completion: #3142, the declaration of the member that decides pred, routed as Decide routes (the
-// first owner). A predicate no member owns reads DecisionUndeclared naming the compound.
+// Completion: #3142, the declaration of the member that decides pred, routed as DecideGround routes
+// (the first owner). A predicate no member owns reads DecisionUndeclared naming the compound.
 func (c CompoundTheory) Completion(pred Symbol) DecisionCompletion {
 	for _, t := range c.theories {
 		if t.Owns(pred) {

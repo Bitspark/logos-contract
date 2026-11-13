@@ -28,14 +28,15 @@ import (
 	"testing"
 
 	contract "github.com/Bitspark/logos-contract/contract/go"
+	"github.com/Bitspark/logos-contract/contract/go/completion"
 )
 
 // test-double: consumer(an explicitly identified theory for the identity advisory)
 type ctTheory struct{ id *contract.ComponentIdentity }
 
 func (ctTheory) Owns(contract.Symbol) bool { return false }
-func (ctTheory) Decide(contract.GroundLiteral) contract.TheoryOutcome {
-	return contract.TheoryNotMine{}
+func (ctTheory) DecideGround(contract.GroundLiteral) completion.TheoryGround {
+	return completion.TheoryGroundDisowned()
 }
 func (t ctTheory) Identity() contract.ComponentIdentity { return *t.id }
 
@@ -43,8 +44,8 @@ func (t ctTheory) Identity() contract.ComponentIdentity { return *t.id }
 type ctAnonTheory struct{}
 
 func (ctAnonTheory) Owns(contract.Symbol) bool { return false }
-func (ctAnonTheory) Decide(contract.GroundLiteral) contract.TheoryOutcome {
-	return contract.TheoryNotMine{}
+func (ctAnonTheory) DecideGround(contract.GroundLiteral) completion.TheoryGround {
+	return completion.TheoryGroundDisowned()
 }
 
 // test-double: consumer(an explicitly identified leaf verifier for the identity advisory)

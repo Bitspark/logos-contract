@@ -195,14 +195,9 @@ func has(m map[string]json.RawMessage, key string) bool {
 }
 
 // expectOutcome decodes the pinned outcome ("holds" | {"fails": "<code>"} | {"not_completed":
-// "<kind>"}, #3126) and asserts the ground verdict matches it judgment-for-judgment, and that the
-// legacy Decide is the one derived from it (a not-completed verdict is TheoryNotMine there, never
-// TheoryFails).
-func expectOutcome(t *testing.T, name string, raw json.RawMessage, ground completion.TheoryGround, legacy TheoryOutcome) {
+// "<kind>"}, #3126) and asserts the ground verdict matches it judgment-for-judgment.
+func expectOutcome(t *testing.T, name string, raw json.RawMessage, ground completion.TheoryGround) {
 	t.Helper()
-	if want := LegacyOutcome(ground); want != legacy {
-		t.Errorf("%s: the legacy Decide %#v is not the one derived from DecideGround, %#v", name, legacy, want)
-	}
 	got := readGround(ground)
 	// "holds"
 	var s string
@@ -253,7 +248,7 @@ func TestArithmeticTheoryVectorDecisions(t *testing.T) {
 			args = append(args, buildArg(t, a))
 		}
 		atom := GroundLiteral{Pred: SymbolFromString(d.Pred), Args: args}
-		expectOutcome(t, d.Name, d.Outcome, theory.DecideGround(atom), theory.Decide(atom))
+		expectOutcome(t, d.Name, d.Outcome, DecideGround(theory, atom))
 	}
 }
 

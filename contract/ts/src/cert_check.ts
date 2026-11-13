@@ -22,7 +22,7 @@
 //     safety gate every clause variable occurs in a positive sealed, non-builtin literal, so a
 //     satisfied grounding binds each variable from a row that exists, and the structural matcher
 //     meets it. A satisfied grounding whose head leaves the supplied domains is refused
-//     (cert_out_of_domain), and an undecidable or inconsistent literal (a Theory's NotMine after
+//     (cert_out_of_domain), and an undecidable or inconsistent literal (a Theory disowning it after
 //     owns()) refuses by name, never reads as false, so the closure cannot under-fire.
 //
 // Support and closure give E_s = lfp(T_s^L), so `a ∉ E_s` proves `a` absent from the stratum's
@@ -57,8 +57,6 @@ import {
   type CountPremise,
   type Derivation,
   type GroundFilterEntry,
-  isCountPremise,
-  isNegPremise,
   type NegPremise,
 } from "./derivation.js";
 import { certEncodedBytes } from "./derivation_wire.js";
@@ -67,7 +65,7 @@ import { captureCertContext, captureWorld } from "./capture.js";
 import { classifySealedClause, type Outside, ScopeGraph } from "./fragment.js";
 import { type GroundLiteral, type Symbol } from "./literal.js";
 import { type BodyLit, type Clause, type ClauseId, type CompleteProgram, type CountLit, type PredicateRef, type Program, type ProjectSpec } from "./program.js";
-import { decideGround, edbTableHash, type LeafVerifier, type PredicateSet, type Theory } from "./spi.js";
+import { edbTableHash, type LeafVerifier, type PredicateSet, type Theory } from "./spi.js";
 import {
   and as completionAnd,
   completed,
@@ -80,15 +78,17 @@ import {
   type NoCallerLimit,
 } from "./completion.js";
 import { isDisowned, readGround } from "./ground_reading.js";
-import { Term, valueDepthLe, type VarId } from "./term.js";
+import { Subst, Term, type VarId } from "./term.js";
 import {
   captureCheckProfile,
   type CheckLimits,
   type CheckProfile,
   type Outcome,
-  Outcome as OutcomeOps,
   type RejectionCode,
+  Verdict,
 } from "./check.js";
+import { Tally } from "./check_report.js";
+import { certDepthsWithin, refAtom } from "./cert_depth.js";
 
 /**
  * The four pins a closed-model certificate is sealed against (ADR 0007). A
@@ -167,74 +167,6 @@ function invalid(code: RejectionCode, detail: string): CertStatus {
 /** A gate result: `undefined` on success, else a `[code, detail]` rejection. */
 type GateErr = readonly [RejectionCode, string] | undefined;
 
-// ============================ cert-deep term-depth gate ============================
-
-/**
- * Cert-deep term-depth check (issue #253, ADR 0007). For an all-positive derivation
- * `closedWorld` is empty, so this is a no-op and the positive path is byte-identical.
- * Covers every term/value reachable through a cert: extension rows, domain values,
- * support-edge facts / subst images / body-ref atoms, and `Neg`-premise atoms.
- */
-export function checkCertTermDepths(deriv: Derivation, max: number): Outcome {
-  const tooDeep = (what: string): Outcome =>
-    OutcomeOps.reject("term_too_deep", `${what} nests deeper than max_term_depth ${max}`);
-  for (const cert of deriv.closedWorld) {
-    const what = certDepthsWithin(cert, max);
-    if (what !== undefined) return tooDeep(what);
-  }
-  for (const node of deriv.nodes) {
-    if (node.kind === "rule") {
-      for (const premise of node.premises) {
-        if (isNegPremise(premise) && !groundWithin(premise.atom, max)) {
-          return tooDeep("negated premise atom argument");
-        }
-        if (isCountPremise(premise)) {
-          for (const e of premise.filter) {
-            if (!valueDepthLe(e.value, max)) return tooDeep("count premise filter value");
-          }
-          if (!valueDepthLe(premise.k, max)) return tooDeep("count premise k value");
-        }
-      }
-    }
-  }
-  return OutcomeOps.Accept;
-}
-
-function groundWithin(lit: GroundLiteral, max: number): boolean {
-  return lit.args.every((v) => valueDepthLe(v, max));
-}
-
-/**
- * The per-certificate half of `checkCertTermDepths`: every deep datum of one closed-model
- * certificate the cert path traverses recursively is within `max`. A result names the first datum
- * over the bound, in the same words the derivation path reports. Shared with
- * `checkClosedModelChain` (#2313), whose certificates no derivation cites. Mirrors Rust's
- * `cert_depths_within`.
- */
-function certDepthsWithin(cert: ClosedModelCert, max: number): string | undefined {
-  for (const table of cert.extensions) {
-    for (const fact of table.rows) {
-      if (!groundWithin(fact, max)) return "certificate extension row argument";
-    }
-  }
-  for (const domain of cert.domains) {
-    for (const v of domain.values) {
-      if (!valueDepthLe(v, max)) return "certificate domain value";
-    }
-  }
-  for (const edge of cert.supports) {
-    if (!groundWithin(edge.fact, max)) return "certificate support-edge fact argument";
-    for (const term of edge.subst.values()) {
-      if (!Term.depthLe(term, max)) return "certificate support-edge subst image";
-    }
-    for (const ref of edge.bodyRefs) {
-      const atom = refAtom(ref); // a count_lower ref carries none; its values are the subst's
-      if (atom !== undefined && !groundWithin(atom, max)) return "certificate support-ref atom argument";
-    }
-  }
-  return undefined;
-}
-
 /**
  * Verify a closed-model certificate CHAIN on its own, with no derivation citing it: the
  * completeness gate's certificate check (#2313, design 0008 §1.4.3). Each cert, at its place in
@@ -245,6 +177,10 @@ function certDepthsWithin(cert: ClosedModelCert, max: number): string | undefine
  * The first invalid cert rejects, with its own code and a detail prefixed by its index. An EMPTY
  * chain rejects as `cert_out_of_range`, because it has no cert to seal anything. A vacuous accept
  * would certify a completeness claim that nothing backs. Mirrors Rust's `check_closed_model_chain`.
+ *
+ * The outcome's report (#3111) counts each certificate verified, in verification order, up to and
+ * including the first invalid one. A refused configuration and an empty chain report zeros, and an
+ * unbound context only the term depths it measured.
  */
 export function checkClosedModelChain<C>(
   program: Program,
@@ -253,14 +189,27 @@ export function checkClosedModelChain<C>(
   profile: CheckProfile<C>,
   certContext: CertContext,
 ): Outcome {
+  const tally = new Tally();
+  return tally.outcome(verifyChain(program, chain, ctx, profile, certContext, tally));
+}
+
+/** `checkClosedModelChain`'s verdict, its work counted into `tally`. */
+function verifyChain<C>(
+  program: Program,
+  chain: readonly ClosedModelCert[],
+  ctx: C,
+  profile: CheckProfile<C>,
+  certContext: CertContext,
+  tally: Tally,
+): Verdict {
   const bound = captureCheckProfile(profile);
-  if (!bound.ok) return { kind: "reject", code: "invalid_check_limits", detail: bound.error.message };
+  if (!bound.ok) return Verdict.reject("invalid_check_limits", bound.error.message);
   profile = bound.value;
   const captured = captureWorld(chain, profile.limits);
   if (captured.kind === "reject") return captured;
   const certs = captured.value;
   if (certs.length === 0) {
-    return OutcomeOps.reject(
+    return Verdict.reject(
       "cert_out_of_range",
       "empty certificate chain: no closed-model certificate to verify",
     );
@@ -268,16 +217,16 @@ export function checkClosedModelChain<C>(
   certContext = captureCertContext(certContext);
   const max = profile.limits.maxTermDepth;
   for (let own = 0; own < certs.length; own += 1) {
-    const what = certDepthsWithin(certs[own]!, max);
+    const what = certDepthsWithin(certs[own]!, max, tally);
     if (what !== undefined) {
-      return OutcomeOps.reject(
+      return Verdict.reject(
         "term_too_deep",
         `chain cert ${own}: ${what} nests deeper than max_term_depth ${max}`,
       );
     }
   }
   if (CertContext.isUnbound(certContext)) {
-    return OutcomeOps.reject(
+    return Verdict.reject(
       "cert_context_unbound",
       "certifying check supplied an all-zero (unbound) cert context",
     );
@@ -298,26 +247,23 @@ export function checkClosedModelChain<C>(
       { own, worldLen: certs.length },
       { certs, status },
       readClauses,
+      tally,
     );
     if (verdict.kind === "invalid") {
-      return OutcomeOps.reject(verdict.code, `chain cert ${own}: ${verdict.detail}`);
+      return Verdict.reject(verdict.code, `chain cert ${own}: ${verdict.detail}`);
     }
     status[own] = verdict;
   }
-  return OutcomeOps.Accept;
-}
-
-function refAtom(ref: SupportRef): GroundLiteral | undefined {
-  if (ref.kind === "count_lower") return undefined;
-  return ref.kind === "same_stratum" ? ref.fact : ref.atom;
+  return Verdict.Accept;
 }
 
 // =============================== whole-cert verifier ===============================
 
 /**
  * Step 3a of `checkWithCertContext`: every certificate of `world` verified, into the status array
- * the forward pass reads. A pure function of its arguments, which is what lets a `WorldMemo` serve
- * it again for an equal world under the same inputs.
+ * the forward pass reads. The statuses are a pure function of its arguments, which is what lets a
+ * `WorldMemo` serve them again for an equal world under the same inputs; the calling check's `tally`
+ * counts the verification's work (#3111).
  */
 export function verifyWorld<C>(
   world: readonly ClosedModelCert[],
@@ -325,6 +271,7 @@ export function verifyWorld<C>(
   profile: CheckProfile<C>,
   ctx: C,
   certContext: CertContext,
+  tally: Tally,
 ): CertStatus[] {
   // 3a. verify every cited certificate ONCE, up front, memoized into a parallel array. A
   //     `Neg` premise reuses the cached result. For an all-positive derivation
@@ -347,7 +294,7 @@ export function verifyWorld<C>(
       : verifyCert(world[own]!, program, profile, ctx, certContext, profile.limits, {
           own,
           worldLen: world.length,
-        }, { certs: world, status }, readClauses);
+        }, { certs: world, status }, readClauses, tally);
   }
   // The order covers every index, so every status is set; a gap would be a checker defect,
   // refused rather than read as Valid.
@@ -378,7 +325,10 @@ function verifyCert<C>(
   place: CertPlace,
   world: CertWorld,
   readClauses: () => readonly Clause[] | undefined,
+  tally: Tally,
 ): CertStatus {
+  // certsVerified: this certificate's verification runs, whatever status it ends in.
+  tally.certsVerified += 1;
   const theory = profile.theory;
   // 1. BUDGET GATE — first, before any scan.
   let e: GateErr = checkCertBudget(cert, limits);
@@ -391,7 +341,7 @@ function verifyCert<C>(
   //     IDENTICALLY (the verdict is core-independent). Each defect carries the code
   //     the defeated rs/go search would otherwise have fabricated, with a detail
   //     naming the real cause.
-  e = checkCertCanonicalForm(cert);
+  e = checkCertCanonicalForm(cert, tally);
   if (e) return invalid(e[0], e[1]);
   const clauses = readClauses();
   if (clauses === undefined) return invalid("cert_scope_incomplete", "program does not supply complete clause enumeration");
@@ -421,23 +371,37 @@ function verifyCert<C>(
   const resolved = resolveLowerSeals(cert, place.own, world, clauses, theory);
   if ("err" in resolved) return invalid(resolved.err[0], resolved.err[1]);
   const view = resolved.view;
-  // 3. SCOPE DOWNWARD-CLOSURE — the sealed prefix must be self-contained.
-  e = checkScopeClauses(view, clauses, theory);
-  if (e) return invalid(e[0], e[1]);
-  // 4. DOMAIN COVERAGE — every value reachable through the cert lies in ∪domains.
-  e = checkCertDomainCoverage(cert);
-  if (e) return invalid(e[0], e[1]);
-  // 5. SUPPORT — E ⊆ least model (no junk; rank-consistent strict descent).
-  e = checkCertSupport(view, place, program, theory, profile.leaves.extensional());
-  if (e) return invalid(e[0], e[1]);
-  // 6. CLOSURE — least model ⊆ E, driven by the TRUSTED enumerated defining clauses.
-  e = checkCertClosure(view, clauses, theory, limits);
-  if (e) return invalid(e[0], e[1]);
-  // 7. EDB BINDING — every sealed extensional predicate's table == the live EDB snapshot.
-  e = checkCertEdb(cert, profile.leaves, ctx);
+  e = verifyGates(view, place, program, clauses, profile, ctx, limits, tally);
+  // theoryDecisions: the `decideGround` calls the support and closure gates made, which the view
+  // counted where they were made.
+  tally.theoryDecisions += view.theoryDecisions;
   if (e) return invalid(e[0], e[1]);
   // 8. exact.
   return VALID;
+}
+
+/** Steps 3 to 7 of `verifyCert`, over the view step 2b resolved: the first gate the certificate fails. */
+function verifyGates<C>(
+  view: CertView,
+  place: CertPlace,
+  program: Program,
+  clauses: readonly Clause[],
+  profile: CheckProfile<C>,
+  ctx: C,
+  limits: CheckLimits,
+  tally: Tally,
+): GateErr {
+  const theory = profile.theory;
+  // 3. SCOPE DOWNWARD-CLOSURE — the sealed prefix must be self-contained.
+  return checkScopeClauses(view, clauses, theory) ??
+    // 4. DOMAIN COVERAGE — every value reachable through the cert lies in ∪domains.
+    checkCertDomainCoverage(view.cert) ??
+    // 5. SUPPORT — E ⊆ least model (no junk; rank-consistent strict descent).
+    checkCertSupport(view, place, program, theory, profile.leaves.extensional()) ??
+    // 6. CLOSURE — least model ⊆ E, driven by the TRUSTED enumerated defining clauses.
+    checkCertClosure(view, clauses, theory, limits, tally) ??
+    // 7. EDB BINDING — every sealed extensional predicate's table == the live EDB snapshot.
+    checkCertEdb(view.cert, profile.leaves, ctx);
 }
 
 // ----------------------------- 1c partial sub-scope gate (ADR 0030) -----------------------------
@@ -499,8 +463,11 @@ function checkCertPartialScope(cert: ClosedModelCert, clauses: readonly Clause[]
  * 1b. CANONICAL FORM (issue #839). Every sorted-invariant collection the cert carries
  * must actually be sorted + deduped by its canonical key. Mirrors rs
  * `check_cert_canonical_form` / go `checkCertCanonicalForm` — same codes, same order.
+ *
+ * `certTablesRead` / `certRowsRead` are counted here, as each table is begun: this gate is the
+ * first to read a table's rows.
  */
-function checkCertCanonicalForm(cert: ClosedModelCert): GateErr {
+function checkCertCanonicalForm(cert: ClosedModelCert, tally: Tally): GateErr {
   if (!cert.scope.isCanonical()) {
     return [
       "cert_scope_incomplete",
@@ -516,6 +483,9 @@ function checkCertCanonicalForm(cert: ClosedModelCert): GateErr {
     }
   }
   for (const t of cert.extensions) {
+    // certTablesRead / certRowsRead: this gate begins the table and reads every row.
+    tally.certTablesRead += 1;
+    tally.certRowsRead += t.rows.length;
     if (!t.isCanonical()) {
       return [
         "cert_unsupported",
@@ -943,7 +913,9 @@ function resolveSupportRef(
     if (!bodyRef.atom.equals(grounded)) return unsupported(`support body ref ${k} builtin atom != grounded body literal`);
     if (!theory.owns(bodyRef.atom.pred)) return unsupported(`support builtin ref ${k} predicate not theory-owned`);
     // A stop is refused by name (#3126), never read as the literal's truth.
-    const verdict = readGround(decideGround(theory, bodyRef.atom));
+    // theoryDecisions: one `decideGround` call, counted on the view.
+    view.countDecision();
+    const verdict = readGround(theory.decideGround(bodyRef.atom));
     if (verdict.arm === "holds") return undefined;
     if (verdict.arm === "not_decided" && !isDisowned(verdict)) return ["builtin_not_decided", verdict.cause.kind];
     return unsupported(`support builtin ref ${k} does not hold`);
@@ -1035,19 +1007,30 @@ function checkSupportRefCert(
  * a row of that literal's table matching it — exactly a tuple the join emits. Neither
  * direction under-fires. Mirrors Rust's `check_cert_closure`.
  */
-function checkCertClosure(view: CertView, clauses: readonly Clause[], theory: Theory, limits: CheckLimits): GateErr {
+function checkCertClosure(
+  view: CertView,
+  clauses: readonly Clause[],
+  theory: Theory,
+  limits: CheckLimits,
+  tally: Tally,
+): GateErr {
   const cert = view.cert;
   const counters = { groundings: 0, joins: 0 };
+  let err: GateErr;
   for (const clause of clauses) {
     if (!cert.scope.seals(clause.head.pred)) continue;
     // ADR 0030 D2: closure is NOT verified for a table the cert marks partial — it is a
     // lower bound by declaration, and 1c has already refused any complete table that
     // reads it. Support (step 5) is verified for its rows exactly as for an exact seal.
     if (cert.isPartial(clause.head.pred)) continue;
-    const err = joinGroundings(clause, view, theory, limits, counters);
-    if (err) return err;
+    err = joinGroundings(clause, view, theory, limits, counters);
+    if (err) break;
   }
-  return undefined;
+  // joinStepsUsed / groundingsEnumerated: what this closure spent against its two budget meters,
+  // as they stand when it ends (a tripped meter at the count it tripped at).
+  tally.joinStepsUsed += counters.joins;
+  tally.groundingsEnumerated += counters.groundings;
+  return err;
 }
 
 /**
@@ -1191,19 +1174,19 @@ function planJoin(clause: Clause, view: CertView, theory: Theory): PlanResult {
  * fields' are, and a scan is never paid past min(declared, budget). Mirrors Rust's
  * `join_groundings`.
  */
-function joinGroundings(
+export function joinGroundings(
   clause: Clause,
   view: CertView,
   theory: Theory,
   limits: CheckLimits,
-  counters: { groundings: number; joins: number },
-): GateErr {
+  counters: JoinCounters,
+): readonly [RejectionCode, string] | undefined {
   const planned = planJoin(clause, view, theory);
   if ("err" in planned) return planned.err;
   const plan = planned.plan;
-  const subst: import("./term.js").Subst = new Map<string, Term>();
+  const subst = new Subst();
   // What a leading count binds stays bound for the whole clause, so nothing is undone.
-  const leadingBound: string[] = [];
+  const leadingBound: VarId[] = [];
   // #3165: the body folded so far, three-valued. A leading filter's stop is carried into every
   // tuple of the clause.
   let body = truthOf(true);
@@ -1218,16 +1201,27 @@ function joinGroundings(
   return joinStage(clause, plan, 0, body, subst, view, theory, limits, counters);
 }
 
+/**
+ * The join's two counters, and (P9 I5a, ADR 0031 D5) an optional recorder: when set, each grounding
+ * the join emits is handed to it, with whether its body is decided, and no head is verified (rs
+ * `join_groundings` with `verify = false`). Without one, the boolean path is unchanged.
+ */
+export interface JoinCounters {
+  groundings: number;
+  joins: number;
+  record?: (subst: Subst, decided: boolean) => void;
+}
+
 function joinStage(
   clause: Clause,
   plan: JoinPlan,
   stage: number,
   body: ClosureTruth,
-  subst: import("./term.js").Subst,
+  subst: Subst,
   view: CertView,
   theory: Theory,
   limits: CheckLimits,
-  counters: { groundings: number; joins: number },
+  counters: JoinCounters,
 ): GateErr {
   const cert = view.cert;
   if (stage === plan.binders.length) {
@@ -1239,6 +1233,10 @@ function joinStage(
         "cert_budget_exceeded",
         `counted rule_groundings ${counters.groundings} exceeds budget ${limits.maxRuleGroundings}`,
       ];
+    }
+    if (counters.record !== undefined) {
+      counters.record(subst, body.kind !== "not_completed");
+      return undefined;
     }
     if (counters.groundings > cert.limitsDecl.ruleGroundings) {
       return [
@@ -1277,7 +1275,7 @@ function joinStage(
   for (const row of table.rows) {
     const stepped = countJoinStep(counters, cert, limits);
     if (stepped !== undefined) return stepped;
-    const newly: string[] = [];
+    const newly: VarId[] = [];
     let result: GateErr = undefined;
     if (bindRow(goal, row, subst, newly)) {
       let pass = true;
@@ -1318,8 +1316,8 @@ function joinStage(
 function bindRow(
   goal: import("./literal.js").Goal,
   row: GroundLiteral,
-  subst: import("./term.js").Subst,
-  newly: string[],
+  subst: Subst,
+  newly: VarId[],
 ): boolean {
   if (!row.pred.equals(goal.pred) || row.args.length !== goal.args.length) return false;
   for (let i = 0; i < goal.args.length; i += 1) {
@@ -1328,10 +1326,10 @@ function bindRow(
   return true;
 }
 
-function unifyGround(term: Term, ground: Term, subst: import("./term.js").Subst, newly: string[]): boolean {
+function unifyGround(term: Term, ground: Term, subst: Subst, newly: VarId[]): boolean {
   switch (term.kind) {
     case "var": {
-      const key = term.id().asStr();
+      const key = term.id();
       const bound = subst.get(key);
       if (bound !== undefined) return bound.equals(ground);
       subst.set(key, ground);
@@ -1431,7 +1429,7 @@ function countJoinStep(
  */
 function filterOutcome(
   bodyLit: BodyLit,
-  subst: import("./term.js").Subst,
+  subst: Subst,
   view: CertView,
   theory: Theory,
   limits: CheckLimits,
@@ -1472,12 +1470,12 @@ function evalBodyLiteral(
     ],
   });
   if (!bodyLit.isNeg()) {
-    if (theory.owns(grounded.pred)) return theoryTruth(theory, grounded, false);
+    if (theory.owns(grounded.pred)) return theoryTruth(view, theory, grounded, false);
     const t = view.table(grounded.pred);
     if (t === undefined) return undecidable();
     return { truth: truthOf(t.contains(grounded)) };
   }
-  if (theory.owns(grounded.pred)) return theoryTruth(theory, grounded, true);
+  if (theory.owns(grounded.pred)) return theoryTruth(view, theory, grounded, true);
   const t = view.table(grounded.pred);
   if (t === undefined) return undecidable();
   return { truth: truthOf(!t.contains(grounded)) };
@@ -1488,13 +1486,15 @@ function evalBodyLiteral(
  * when `negated`: the theory's ground verdict (`decideGround`), through the ONE conversion into the
  * algebra (`decisionOf`). `holds` is true, `fails` false, and a stop stays NOT DECIDED, never false
  * (not(U) = U): the join folds it and refuses the instance unless a false absorbs it or the head is
- * present. The disowning fault (`not_mine` after `owns()` said yes) is an inconsistent theory, and
- * it REFUSES by name (`predicate_partition_violation`, as a Builtin node's does), never reads as
- * false: a positive filter read false would let the closure under-fire and pass a table that is not
- * closed. So does an outcome no constructor could have built. rs `theory_truth`.
+ * present. The disowning fault (`inconsistent_theory` after `owns()` said yes) is an inconsistent
+ * theory, and it REFUSES by name (`predicate_partition_violation`, as a Builtin node's does), never
+ * reads as false: a positive filter read false would let the closure under-fire and pass a table that
+ * is not closed. So does an outcome no constructor could have built. rs `theory_truth`.
  */
-function theoryTruth(theory: Theory, grounded: GroundLiteral, negated: boolean): TruthResult {
-  const ground = decideGround(theory, grounded);
+function theoryTruth(view: CertView, theory: Theory, grounded: GroundLiteral, negated: boolean): TruthResult {
+  // theoryDecisions: one `decideGround` call, counted on the view.
+  view.countDecision();
+  const ground = theory.decideGround(grounded);
   const verdict = readGround(ground);
   if (isDisowned(verdict)) {
     return {
@@ -1529,12 +1529,12 @@ function theoryTruth(theory: Theory, grounded: GroundLiteral, negated: boolean):
 /** Run one non-binder join step at its evaluation point, recording what a count binds in `newly`. */
 function runStep(
   step: JoinStep,
-  subst: import("./term.js").Subst,
+  subst: Subst,
   view: CertView,
   theory: Theory,
   limits: CheckLimits,
   counters: { joins: number },
-  newly: string[],
+  newly: VarId[],
 ): TruthResult {
   if (step.kind === "count") {
     const r = countStage(step.count, subst, view, limits, counters, newly);
@@ -1564,7 +1564,7 @@ function aggregateOver(count: CountLit, filter: readonly GroundFilterEntry[], ta
 }
 
 /** The count's filter under `subst`, each value ground, or `undefined` if one is not. */
-function groundCountFilter(count: CountLit, subst: import("./term.js").Subst): GroundFilterEntry[] | undefined {
+function groundCountFilter(count: CountLit, subst: Subst): GroundFilterEntry[] | undefined {
   const filter: GroundFilterEntry[] = [];
   for (const e of count.filter) {
     const value = Term.eraseGround(Term.substitute(e.term, subst));
@@ -1583,11 +1583,11 @@ function groundCountFilter(count: CountLit, subst: import("./term.js").Subst): G
  */
 function countStage(
   count: CountLit,
-  subst: import("./term.js").Subst,
+  subst: Subst,
   view: CertView,
   limits: CheckLimits,
   counters: { joins: number },
-  newly: string[],
+  newly: VarId[],
 ): BodyResult {
   const pred = count.pred.pred;
   const table = view.readsLower(pred) ? view.table(pred) : undefined;
@@ -1612,7 +1612,7 @@ function countStage(
   const folded = encodeInt(agg.value);
   const slot = Term.substitute(count.count, subst);
   if (slot.kind === "var") {
-    const key = slot.id().asStr();
+    const key = slot.id();
     subst.set(key, Term.fromValue(folded));
     newly.push(key);
     return { ok: true };
@@ -1631,7 +1631,7 @@ function resolveCountLower(
   k: number,
   count: CountLit,
   cited: CertId,
-  subst: import("./term.js").Subst,
+  subst: Subst,
   view: CertView,
   place: CertPlace,
 ): GateErr {
@@ -1706,28 +1706,28 @@ export function verifyNegPremise(
   headPred: Symbol,
   deriv: Derivation,
   certStatus: readonly CertStatus[],
-): Outcome {
+): Verdict {
   const atom = premise.atom;
   const idx: CertId = premise.cert;
   // 1. cert index in range.
   if (idx < 0 || idx >= deriv.closedWorld.length) {
-    return OutcomeOps.reject("cert_out_of_range", `neg premise cites cert ${idx} out of range ${deriv.closedWorld.length}`);
+    return Verdict.reject("cert_out_of_range", `neg premise cites cert ${idx} out of range ${deriv.closedWorld.length}`);
   }
   const cert = deriv.closedWorld[idx]!;
 
   // 2. the cert must be Valid (reuse the memoized status).
   const status = certStatus[idx]!;
   if (status.kind === "invalid") {
-    return OutcomeOps.reject(status.code, status.detail);
+    return Verdict.reject(status.code, status.detail);
   }
 
   // 3. predicate sealed by the cert scope.
   if (!cert.scope.seals(atom.pred)) {
-    return OutcomeOps.reject("neg_atom_not_sealed", "negated predicate is not sealed by the cited certificate");
+    return Verdict.reject("neg_atom_not_sealed", "negated predicate is not sealed by the cited certificate");
   }
   // 3b. ADR 0030 D2: sealed as a LOWER BOUND — absence from it proves nothing.
   if (cert.isPartial(atom.pred)) {
-    return OutcomeOps.reject(
+    return Verdict.reject(
       "neg_atom_partial",
       "negated predicate is sealed as a lower bound (partial_scope) by the cited certificate; absence from a partial table is not a proof of absence",
     );
@@ -1735,7 +1735,7 @@ export function verifyNegPremise(
 
   // 4. strictly lower stratum: the RULE HEAD predicate must NOT be in the cert's scope.
   if (cert.scope.seals(headPred)) {
-    return OutcomeOps.reject(
+    return Verdict.reject(
       "neg_stratum_not_lower",
       "rule head predicate is in the same (or lower) sealed stratum as the negated atom",
     );
@@ -1744,20 +1744,20 @@ export function verifyNegPremise(
   // 5. ground + well-typed within a supplied finite domain.
   for (const arg of atom.args) {
     if (cert.domainContaining(arg) === undefined) {
-      return OutcomeOps.reject("neg_atom_ill_typed", "negated atom argument is outside the certificate's finite domain");
+      return Verdict.reject("neg_atom_ill_typed", "negated atom argument is outside the certificate's finite domain");
     }
   }
 
   // 6. ABSENT from the sealed relation.
   const table = cert.table(atom.pred);
   if (table === undefined) {
-    return OutcomeOps.reject("neg_atom_not_sealed", "negated predicate sealed but has no extension table");
+    return Verdict.reject("neg_atom_not_sealed", "negated predicate sealed but has no extension table");
   }
   if (table.contains(atom)) {
-    return OutcomeOps.reject("neg_atom_present", "negated atom IS present in the sealed relation");
+    return Verdict.reject("neg_atom_present", "negated atom IS present in the sealed relation");
   }
 
-  return OutcomeOps.Accept;
+  return Verdict.Accept;
 }
 
 // ============================ per-Count-premise gate (ADR 0023) ====================
@@ -1775,12 +1775,12 @@ export function verifyCountPremise(
   headPred: Symbol,
   deriv: Derivation,
   certStatus: readonly CertStatus[],
-): Outcome {
+): Verdict {
   const pred: PredicateRef = premise.pred;
   const idx: CertId = premise.cert;
   // 1. cert index in range.
   if (idx < 0 || idx >= deriv.closedWorld.length) {
-    return OutcomeOps.reject(
+    return Verdict.reject(
       "cert_out_of_range",
       `count premise cites cert ${idx} out of range ${deriv.closedWorld.length}`,
     );
@@ -1790,16 +1790,16 @@ export function verifyCountPremise(
   // 2. the cert must be Valid (reuse the memoized status).
   const status = certStatus[idx]!;
   if (status.kind === "invalid") {
-    return OutcomeOps.reject(status.code, status.detail);
+    return Verdict.reject(status.code, status.detail);
   }
 
   // 3. predicate sealed by the cert scope (matched by name; arity is checked in 5).
   if (!cert.scope.seals(pred.pred)) {
-    return OutcomeOps.reject("neg_atom_not_sealed", "counted predicate is not sealed by the cited certificate");
+    return Verdict.reject("neg_atom_not_sealed", "counted predicate is not sealed by the cited certificate");
   }
   // 3b. ADR 0030 D2: sealed as a LOWER BOUND — a count over it is not the count.
   if (cert.isPartial(pred.pred)) {
-    return OutcomeOps.reject(
+    return Verdict.reject(
       "count_over_partial",
       "counted predicate is sealed as a lower bound (partial_scope) by the cited certificate; a count over a partial table is not the count",
     );
@@ -1807,7 +1807,7 @@ export function verifyCountPremise(
 
   // 4. strictly lower stratum: the RULE HEAD predicate must NOT be sealed by the cert's scope.
   if (cert.scope.seals(headPred)) {
-    return OutcomeOps.reject(
+    return Verdict.reject(
       "count_stratum_not_lower",
       "rule head predicate is in the same (or lower) sealed stratum as the counted relation",
     );
@@ -1816,13 +1816,13 @@ export function verifyCountPremise(
   // 5. recompute n over the sealed table.
   const table = cert.table(pred.pred);
   if (table === undefined) {
-    return OutcomeOps.reject("neg_atom_not_sealed", "counted predicate sealed but has no extension table");
+    return Verdict.reject("neg_atom_not_sealed", "counted predicate sealed but has no extension table");
   }
   const arity = table.arity;
 
   // 5·#581 ARITY AGREEMENT: matched by name AND arity, else count_attr_out_of_range.
   if (pred.arity !== arity) {
-    return OutcomeOps.reject(
+    return Verdict.reject(
       "count_attr_out_of_range",
       `count predicate arity ${pred.arity} does not match the sealed table arity ${arity}`,
     );
@@ -1831,20 +1831,20 @@ export function verifyCountPremise(
   // 5a. filter well-typed: each position within arity and value in the cert's finite domain.
   for (const e of premise.filter) {
     if (e.pos >= arity) {
-      return OutcomeOps.reject(
+      return Verdict.reject(
         "count_attr_out_of_range",
         `count filter position ${e.pos} is outside predicate arity ${arity}`,
       );
     }
     if (cert.domainContaining(e.value) === undefined) {
-      return OutcomeOps.reject("neg_atom_ill_typed", "count filter value is outside the certificate's finite domain");
+      return Verdict.reject("neg_atom_ill_typed", "count filter value is outside the certificate's finite domain");
     }
   }
 
   // 5b. projection/fold attr (count_distinct / sum / min / max) within arity.
   const projAttr = premise.project.kind === "rows" ? undefined : premise.project.attr;
   if (projAttr !== undefined && projAttr >= arity) {
-    return OutcomeOps.reject(
+    return Verdict.reject(
       "count_attr_out_of_range",
       `aggregate projection attr ${projAttr} is outside predicate arity ${arity}`,
     );
@@ -1854,7 +1854,7 @@ export function verifyCountPremise(
   //     (count rows / distinct projected values, null() excluded / an integer sum, min or max),
   //     the same one a closure count stage and a count_lower ref evaluate (#2258 L3.3b).
   const agg = evaluateAggregate(table.rows, premise.filter, premise.project);
-  if ("err" in agg) return OutcomeOps.reject(agg.err[0], agg.err[1]);
+  if ("err" in agg) return Verdict.reject(agg.err[0], agg.err[1]);
   const recomputed = agg.value;
 
   // 5d. compare the recomputed fold against the claimed k (the canonical int embedding).
@@ -1862,13 +1862,13 @@ export function verifyCountPremise(
   try {
     claimed = readInt(premise.k);
   } catch {
-    return OutcomeOps.reject("count_mismatch", "aggregate premise k is not a canonical int value");
+    return Verdict.reject("count_mismatch", "aggregate premise k is not a canonical int value");
   }
   if (claimed !== recomputed) {
-    return OutcomeOps.reject("count_mismatch", `claimed aggregate ${claimed} != recomputed aggregate ${recomputed}`);
+    return Verdict.reject("count_mismatch", `claimed aggregate ${claimed} != recomputed aggregate ${recomputed}`);
   }
 
-  return OutcomeOps.Accept;
+  return Verdict.Accept;
 }
 
 /** Positional + value agreement of two ground count filters (ADR 0023): exact value equality. */

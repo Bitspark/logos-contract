@@ -4,6 +4,8 @@ import {
   AlwaysAdmit, CertContext, Derivation, GroundLiteral, LeafNode, LeafOutcome, MapProgram,
   PredicateSet, Term, WorldMemo, captureCheckLimits, captureCheckProfile, captureDerivation, captureSubst, check, checkClosedModelChain, checkWithCertContext,
   checkWithWorldMemo, defaultLimits, newStandardTheory,
+  Subst,
+  VarId,
 } from "@bitspark/logos-contract";
 
 const claim = GroundLiteral.of("fact", []);
@@ -36,17 +38,17 @@ for (const throughMemo of [false, true]) {
   ]) {
     test(`${path} checker refuses ${field}=${String(value)} before consulting the verifier`, () => {
       const { outcome, calls } = exercise({ ...defaultLimits(), [field]: value }, throughMemo);
-      assert.deepEqual([outcome.kind, outcome.code, calls], ["reject", "invalid_check_limits", 0]);
+      assert.deepEqual([outcome.verdict.kind, outcome.verdict.code, calls], ["reject", "invalid_check_limits", 0]);
     });
   }
   test(`${path} checker distinguishes zero capacity from invalid configuration`, () => {
     const limits = defaultLimits();
     assert.equal(exercise(limits, throughMemo).calls, 1);
     const zero = exercise({ ...limits, maxNodes: 0 }, throughMemo);
-    assert.deepEqual([zero.outcome.code, zero.calls], ["too_many_nodes", 0]);
+    assert.deepEqual([zero.outcome.verdict.code, zero.calls], ["too_many_nodes", 0]);
     for (const n of [1, Number.MAX_SAFE_INTEGER]) {
       const accepted = exercise({ ...limits, maxNodes: n, maxDepth: n }, throughMemo);
-      assert.deepEqual([accepted.outcome.kind, accepted.calls], ["accept", 1]);
+      assert.deepEqual([accepted.outcome.verdict.kind, accepted.calls], ["accept", 1]);
     }
   });
 }
@@ -58,8 +60,8 @@ test("a closed-world check distinguishes malformed budgets from an empty chain",
     admit: new AlwaysAdmit(), limits: defaultLimits(),
   };
   const run = limits => checkClosedModelChain(program, [], undefined, { ...profile, limits }, context);
-  assert.equal(run(profile.limits).code, "cert_out_of_range");
-  assert.equal(run({ ...profile.limits, maxCertBytes: NaN }).code, "invalid_check_limits");
+  assert.equal(run(profile.limits).verdict.code, "cert_out_of_range");
+  assert.equal(run({ ...profile.limits, maxCertBytes: NaN }).verdict.code, "invalid_check_limits");
 });
 
 const checkerPaths = {
@@ -88,8 +90,8 @@ for (const [path, run] of Object.entries(checkerPaths)) {
       assert.fail("checker consulted an application field outside CheckProfile");
     } });
     const control = run(ordinary);
-    assert.equal(path === "chain" ? control.code : control.kind, path === "chain" ? "cert_out_of_range" : "accept");
-    assert.deepEqual(run(structural), control);
+    assert.equal(path === "chain" ? control.verdict.code : control.verdict.kind, path === "chain" ? "cert_out_of_range" : "accept");
+    assert.deepEqual(run(structural).verdict, control.verdict);
     for (const key of Object.keys(ordinary.limits)) assert.equal(counts.get(key), 1, key);
   });
 }
@@ -112,7 +114,7 @@ test("standalone proof capture uses the node cap it validated", () => {
 test("standalone substitution capture reads the native term-depth budget once", () => {
   let reads = 0;
   const limits = Object.create(defaultLimits(), { maxTermDepth: { get() { reads++; return 64; } } });
-  assert.equal(captureSubst(new Map([["X", Term.var("Y")]]), limits).kind, "captured");
+  assert.equal(captureSubst(new Subst([[VarId.of("X"), Term.var("Y")]]), limits).kind, "captured");
   assert.equal(reads, 1);
 });
 
@@ -124,13 +126,12 @@ test("native policy capture returns owned values and preserves independently sup
   const captured = captureCheckProfile(source);
   assert.equal(captured.ok, true);
   for (const key of ["theory", "leaves", "admit"]) assert.equal(captured.value[key], source[key]);
-  const updated = captureCheckLimits(source.limits, Object.create({ maxDepth: 0, termIdentity: "exact" }));
+  const updated = captureCheckLimits(source.limits, Object.create({ maxDepth: 0 }));
   assert.equal(updated.ok, true);
   const original = base.maxDepth;
   base.maxDepth = 41;
   assert.equal(captured.value.limits.maxDepth, original);
   assert.equal(updated.value.maxDepth, 0);
-  assert.equal(updated.value.termIdentity, "exact");
   assert.equal(Reflect.set(updated.value, "maxDepth", 2), false);
   assert.equal(Reflect.set(captured.value, "leaves", {}), false);
 });
@@ -146,6 +147,6 @@ test("invalid budgets precede later policy getters and report the observed numbe
   assert.equal(result.error.field, "max_depth");
   assert.equal(result.error.value, -1);
   const direct = check(program, claim, proof, undefined, input);
-  assert.equal(direct.code, "invalid_check_limits");
-  assert.match(direct.detail, /max_depth/);
+  assert.equal(direct.verdict.code, "invalid_check_limits");
+  assert.match(direct.verdict.detail, /max_depth/);
 });

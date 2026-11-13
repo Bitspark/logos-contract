@@ -3,6 +3,7 @@ import { test } from "node:test";
 import {
   AlwaysAdmit, Clause, ClauseId, Derivation, Goal, MapProgram, Outcome, PredicateSet, RuleNode,
   check, defaultLimits, newStandardTheory, programBytes, programFromValue, programToValue,
+  Subst,
 } from "@bitspark/logos-contract";
 
 const p = Goal.of("p", []);
@@ -28,7 +29,7 @@ test("opaque native handles still check locally and refuse lossy portable encodi
     const id = ClauseId.of(handle);
     const program = new MapProgram().with(id, Clause.fact(p)).with(replacement, Clause.fact(Goal.of("other", [])));
     const claim = p.asGround();
-    const proof = new Derivation([new RuleNode(claim, id, new Map(), [])], 0);
+    const proof = new Derivation([new RuleNode(claim, id, new Subst(), [])], 0);
     assert.ok(Outcome.isAccept(check(program, claim, proof, undefined, profile)));
     assert.equal(Outcome.isAccept(check(program, Goal.of("other", []).asGround(), proof, undefined, profile)), false);
     for (const encode of [programToValue, programBytes]) {

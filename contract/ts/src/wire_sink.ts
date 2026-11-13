@@ -36,8 +36,7 @@ import { hashFromBytes, nativeOctetLength } from "./octets.js";
 import { digestAtom, intAtom } from "./atoms.js";
 import type { GroundLiteral, Symbol } from "./literal.js";
 import { quote } from "./reify.js";
-import { Term, type Subst, VarIdError } from "./term.js";
-import { wellFormedUtf16 } from "./utf8.js";
+import { Term, type Subst } from "./term.js";
 import { portableClauseIdBytes } from "./clause_id_encoding.js";
 
 const enc = new TextEncoder();
@@ -334,37 +333,23 @@ export function writeGroundLiteral(s: WireSink, lit: GroundLiteral): void {
 }
 
 /**
- * A `Subst` key as a variable's name, refused by name when it is not one (#3115).
- *
- * ⚠ INTERIM, `seat:caa`'s allowed form: `Subst` is `Map<string, Term>`, so its keys never pass the
- * `VarId` constructor, and `TextEncoder` would write a lone surrogate as U+FFFD, merging two keys
- * into one. #3288 retypes the key to `VarId` and deletes this function with it; until then it calls
- * the constructor's own predicate, never a second one.
- */
-function substKeyName(name: string): string {
-  if (!wellFormedUtf16(name)) throw new VarIdError(name);
-  return name;
-}
-
-/**
  * A substitution as `Tuple[Tuple[Atom(var), quote(term)], …]`, sorted by the key's codec bytes
- * (§0.3.3): shorter names first, so Z precedes AB. A key that is not a variable's name is refused
- * with a `VarIdError` before anything is written (#3115).
+ * (§0.3.3): shorter names first, so Z precedes AB. Every key is a `VarId` (#3288), so its name has
+ * passed the constructor's §2a test and encodes as the UTF-8 text it is: no check is made here.
  */
 export function writeSubst(s: WireSink, subst: Subst): void {
   if (!s.ordered) {
-    for (const name of subst.keys()) substKeyName(name);
     wireTuple(s, subst.size, () => {
-      for (const [name, term] of subst) {
+      for (const [id, term] of subst) {
         wireTuple(s, 2, () => {
-          s.atomStr(name);
+          s.atomStr(id.asStr());
           s.quotedTerm(term);
         });
       }
     });
     return;
   }
-  const keyed = Array.from(subst, ([name, term]) => ({ key: enc.encode(substKeyName(name)), term }));
+  const keyed = Array.from(subst, ([id, term]) => ({ key: enc.encode(id.asStr()), term }));
   keyed.sort((p, q) => atomCodecCmp(p.key, q.key));
   wireTuple(s, keyed.length, () => {
     for (const { key, term } of keyed) {

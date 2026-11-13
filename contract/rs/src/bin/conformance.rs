@@ -8,12 +8,14 @@
 //! asserts each line against the hand-authored oracle.
 //!
 //!   check   : in `{program, cases:[{name, claim, derivation, limits?}]}`
-//!             out `{"name":…,"outcome":"accept"|{"reject":"<code>"}}`
+//!             out `{"name":…,"outcome":"accept"|{"reject":"<code>"},"report":{…}}`, the
+//!                 report being check()'s work counters by their snake_case names (#4206;
+//!                 the `negation` family emits the same shape)
 //!   account : in `{clauses:[{name, head, body}]}`
 //!             out `{"name":…,"id":"<hex>"}`
 //!
 //! The theory-decision families (`arithmetic`, `list`, `term`, `text`, `compound`) share
-//! one shape: each drives a standard checkable [`Theory`]'s `decide` over the shared
+//! one shape: each drives a standard checkable [`Theory`]'s `decide_ground` over the shared
 //! `vectors/<family>.json` `decisions` array.
 //!   `<theory>`: in `{identity, owns, decisions:[{name, pred, args}]}`
 //!             out one `{"name":…,"outcome":"holds"|{"fails":"<code>"}}` line per decision,
@@ -27,9 +29,9 @@ use logos_contract::{
     CertContext, CertId, CertSizeDecl, CheckLimits, CheckProfile, Clause, ClauseId,
     ClosedModelCert, ClosureWitness, CompoundTheory, CountLit, Derivation, Evidence, FiniteDomain,
     Goal, GroundLiteral, Hash, LeafOutcome, LeafVerifier, ListTheory, MapProgram, Node, NodeMeta,
-    NonMemberProof, Outcome, PredicateRef, PredicateSet, Premise, ProjectSpec, RelationTable,
-    StratumPrefix, Subst, SupportEdge, SupportRef, SupportWitness, Symbol, Term, TermTheory,
-    TextTheory, Theory, TheoryOutcome, WorldMemo,
+    NonMemberProof, PredicateRef, PredicateSet, Premise, ProjectSpec, RelationTable, StratumPrefix,
+    Subst, SupportEdge, SupportRef, SupportWitness, Symbol, Term, TermTheory, TextTheory, Theory,
+    TheoryGround, Verdict, WorldMemo,
 };
 use std::collections::BTreeMap;
 use std::io::Read;
@@ -50,17 +52,13 @@ impl Theory for LtTheory {
     fn completion(&self, _pred: &Symbol) -> logos_contract::DecisionCompletion {
         logos_contract::DecisionCompletion::StopsAreTyped
     }
-    fn decide(&self, atom: &GroundLiteral) -> TheoryOutcome {
+    fn decide_ground(&self, atom: &GroundLiteral) -> TheoryGround {
         match atom.args.as_slice() {
             [a, b] => match (a.as_atom(), b.as_atom()) {
-                (Some(a), Some(b)) if a.bytes() < b.bytes() => TheoryOutcome::Holds,
-                _ => TheoryOutcome::Fails {
-                    code: "not_less_than".into(),
-                },
+                (Some(a), Some(b)) if a.bytes() < b.bytes() => TheoryGround::holds(),
+                _ => TheoryGround::fails("not_less_than"),
             },
-            _ => TheoryOutcome::Fails {
-                code: "lt_arity".into(),
-            },
+            _ => TheoryGround::fails("lt_arity"),
         }
     }
 }
@@ -576,6 +574,39 @@ fn jstr(s: &str) -> String {
     out
 }
 
+/// `check()`'s report as one JSON object (#4206): `counters_version` and the 17 counters by their
+/// snake_case names, each a count, or `null` where this core does not count it. The harness
+/// asserts it against every `check.json` / `negation.json` row that states a `report`.
+fn report_json(r: &logos_contract::CheckReport) -> String {
+    let counters = [
+        ("nodes_walked", r.nodes_walked),
+        ("rule_nodes", r.rule_nodes),
+        ("builtin_nodes", r.builtin_nodes),
+        ("leaf_nodes", r.leaf_nodes),
+        ("premises_pos", r.premises_pos),
+        ("premises_neg", r.premises_neg),
+        ("theory_decisions", r.theory_decisions),
+        ("leaf_verifications", r.leaf_verifications),
+        ("admissibility_checks", r.admissibility_checks),
+        ("certs_verified", r.certs_verified),
+        ("certs_memo_hits", r.certs_memo_hits),
+        ("cert_tables_read", r.cert_tables_read),
+        ("cert_rows_read", r.cert_rows_read),
+        ("join_steps_used", r.join_steps_used),
+        ("groundings_enumerated", r.groundings_enumerated),
+        ("max_depth_reached", r.max_depth_reached),
+        ("max_term_depth_reached", r.max_term_depth_reached),
+    ];
+    let mut fields = vec![format!("\"counters_version\":{}", r.counters_version)];
+    for (name, count) in counters {
+        let value = count
+            .get()
+            .map_or_else(|| "null".to_string(), |n| n.to_string());
+        fields.push(format!("\"{name}\":{value}"));
+    }
+    format!("{{{}}}", fields.join(","))
+}
+
 fn run_check(doc: &Json) {
     let program = program_from_json(doc.get("program").unwrap());
     for case in doc.get("cases").unwrap().arr() {
@@ -595,18 +626,25 @@ fn run_check(doc: &Json) {
         let profile = demo_profile(limits);
         // The `check` family is all-positive: the zero cert context is never
         // consulted (no `closed_world`), so this is byte-identical to `check`.
-        let outcome = match check_with_cert_context(
+        let checked = check_with_cert_context(
             &program,
             &claim,
             &deriv,
             &(),
             &profile,
             &CertContext::zero(),
-        ) {
-            Outcome::Accept => "\"accept\"".to_string(),
-            Outcome::Reject { code, .. } => format!("{{\"reject\":{}}}", jstr(code.code())),
+        );
+        let report = report_json(&checked.report);
+        let outcome = match checked.verdict {
+            Verdict::Accept => "\"accept\"".to_string(),
+            Verdict::Reject { code, .. } => format!("{{\"reject\":{}}}", jstr(code.code())),
         };
-        println!("{{\"name\":{},\"outcome\":{}}}", jstr(name), outcome);
+        println!(
+            "{{\"name\":{},\"outcome\":{},\"report\":{}}}",
+            jstr(name),
+            outcome,
+            report
+        );
     }
 }
 
@@ -990,17 +1028,24 @@ fn run_negation(doc: &Json) {
                 "#2565: case {name}: two checks of one world must verify it at most once, verified {verified}"
             );
         }
-        let outcome = match result {
-            Outcome::Accept => "\"accept\"".to_string(),
-            Outcome::Reject { code, .. } => format!("{{\"reject\":{}}}", jstr(code.code())),
+        // #4206: the fresh check's report; the memo passes above may skip work, so theirs differ.
+        let report = report_json(&result.report);
+        let outcome = match result.verdict {
+            Verdict::Accept => "\"accept\"".to_string(),
+            Verdict::Reject { code, .. } => format!("{{\"reject\":{}}}", jstr(code.code())),
         };
-        println!("{{\"name\":{},\"outcome\":{}}}", jstr(name), outcome);
+        println!(
+            "{{\"name\":{},\"outcome\":{},\"report\":{}}}",
+            jstr(name),
+            outcome,
+            report
+        );
     }
 }
 
 // ===================== theory-decision families (ADR 0006 / #95, #154) ==============
 // arithmetic / list / term / text / compound — each drives a standard checkable Theory's
-// `decide` over the shared vectors/<family>.json `decisions` array. The arg builder mirrors
+// `decide_ground` over the shared vectors/<family>.json `decisions` array. The arg builder mirrors
 // the unit replays' build_arg (core/rs/tests/arithmetic_vectors.rs) byte-for-byte, so the
 // black-box CLI agrees with the in-process oracle.
 

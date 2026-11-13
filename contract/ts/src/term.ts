@@ -394,7 +394,7 @@ export const Term = {
           out.push(term);
           break;
         case "var":
-          out.push(subst.get(term.id().asStr()) ?? term);
+          out.push(subst.get(term.id()) ?? term);
           break;
         case "tuple": {
           const children = term.children();
@@ -543,8 +543,94 @@ export function valueDepthLe(value: Value, max: number): boolean {
   return true;
 }
 
+/** `VarId`'s own name reader. Its prototype is frozen above, so this is the method a subclass cannot replace. */
+const varIdName = VarId.prototype.asStr;
+
 /**
- * A grounding substitution (§3): a map from variable identity to a replacement
- * term. Keyed by the `VarId` string (the Rust `BTreeMap<VarId, Term>`).
+ * A grounding substitution (§3): a map from variable identity to a replacement term, the ts twin of
+ * rs's `BTreeMap<VarId, Term>` and go's `map[VarId]Term`.
+ *
+ * Keyed by `VarId` (#3288, `seat:caa`'s ruling on #3115, point 3). A key enters only as a `VarId`,
+ * so it has passed the constructor's predicate, the one ts test of §2a: a string, and with it a
+ * lone surrogate, cannot be a key. `set` refuses anything that is not a `VarId` by its brand, as
+ * `instanceof VarId` reads it, with a `TypeError`; a plain JS caller meets that instead of a key the
+ * account cannot hold. A key's name is read with `VarId`'s own frozen `asStr`, and a subclass
+ * instance is stored as the plain `VarId` of that name, so an override of `asStr` cannot change
+ * which name a key has or what `writeSubst` encodes for it.
+ *
+ * It is a class rather than a `Map<VarId, Term>` because a `VarId`'s identity is its name
+ * (`VarId.equals`), and a `Map` compares object keys by reference: two `VarId`s of one name would be
+ * two keys. Here they are one, as in rs and go. The entries are held by name, each with its `VarId`,
+ * and iterate in insertion order, as a `Map`'s do. The storage is private, so
+ * `deepEqual` over two substitutions compares nothing, as over two terms: compare with `equals`.
  */
-export type Subst = Map<string, Term>;
+export class Subst implements Iterable<[VarId, Term]> {
+  readonly #byName = new Map<string, readonly [VarId, Term]>();
+
+  static [Symbol.hasInstance](value: unknown): boolean {
+    return typeof value === "object" && value !== null && #byName in value;
+  }
+
+  constructor(entries?: Iterable<readonly [VarId, Term]>) {
+    if (entries !== undefined) {
+      for (const [id, term] of entries) this.set(id, term);
+    }
+  }
+
+  get size(): number {
+    return this.#byName.size;
+  }
+
+  get(id: VarId): Term | undefined {
+    return this.#byName.get(varIdName.call(id))?.[1];
+  }
+
+  has(id: VarId): boolean {
+    return this.#byName.has(varIdName.call(id));
+  }
+
+  /** Bind `id` to `term`, replacing an earlier binding of the same name in its place. */
+  set(id: VarId, term: Term): this {
+    if (!(id instanceof VarId)) throw new TypeError("a Subst key is a VarId (#3288)");
+    const name = varIdName.call(id);
+    this.#byName.set(name, [Object.getPrototypeOf(id) === VarId.prototype ? id : new VarId(name), term]);
+    return this;
+  }
+
+  delete(id: VarId): boolean {
+    return this.#byName.delete(varIdName.call(id));
+  }
+
+  clear(): void {
+    this.#byName.clear();
+  }
+
+  *keys(): IterableIterator<VarId> {
+    for (const [id] of this.#byName.values()) yield id;
+  }
+
+  *values(): IterableIterator<Term> {
+    for (const [, term] of this.#byName.values()) yield term;
+  }
+
+  *entries(): IterableIterator<[VarId, Term]> {
+    for (const [id, term] of this.#byName.values()) yield [id, term];
+  }
+
+  [Symbol.iterator](): IterableIterator<[VarId, Term]> {
+    return this.entries();
+  }
+
+  /** The same names, each bound to a structurally equal term (`Term.equals`); order is not read. */
+  equals(other: Subst): boolean {
+    if (this.#byName.size !== other.#byName.size) return false;
+    for (const [name, [, term]] of this.#byName) {
+      const theirs = other.#byName.get(name);
+      if (theirs === undefined || !term.equals(theirs[1])) return false;
+    }
+    return true;
+  }
+}
+
+Object.freeze(Subst.prototype);
+Object.freeze(Subst);

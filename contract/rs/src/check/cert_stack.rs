@@ -18,7 +18,7 @@ use crate::literal::{GroundLiteral, Symbol};
 use crate::program::CompleteProgram;
 use crate::spi::Theory;
 use ontos_core::Value;
-use std::cell::{OnceCell, RefCell};
+use std::cell::{Cell, OnceCell, RefCell};
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 /// The order the certificates of a `closed_world` are verified in: ascending scope level, ties
@@ -53,6 +53,10 @@ pub(super) struct CertView<'a> {
     /// #2511: every value of the certificate's finite domains, as a set built on first use (see
     /// [`Self::in_domain`]).
     domain: OnceCell<HashSet<&'a Value>>,
+    /// #3111 `theory_decisions`: the `decide_ground` calls the support and closure gates made
+    /// through this view, which `verify_cert` adds to the check's report once the gates end. The
+    /// view is the one context both gates already share down to the deciding site.
+    decisions: Cell<u64>,
 }
 
 impl<'a> CertView<'a> {
@@ -65,7 +69,18 @@ impl<'a> CertView<'a> {
             reads: ScopeReads::new(),
             members: RefCell::new(HashMap::new()),
             domain: OnceCell::new(),
+            decisions: Cell::new(0),
         }
+    }
+
+    /// #3111 `theory_decisions`: one `decide_ground` call made through this view.
+    pub(super) fn count_decision(&self) {
+        self.decisions.set(self.decisions.get() + 1);
+    }
+
+    /// The `decide_ground` calls made through this view so far.
+    pub(super) fn theory_decisions(&self) -> u64 {
+        self.decisions.get()
     }
 
     /// Does one of the certificate's finite domains hold `v` (#2511)? The answer

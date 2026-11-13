@@ -22,7 +22,7 @@ import {
   StratumPrefix,
   Symbol,
   Term,
-  TheoryOutcome,
+  TheoryGround,
   type Theory,
   zeroHash,
 } from "../src/index.js";
@@ -69,8 +69,8 @@ class FragmentOwns implements Theory {
   owns(pred: Symbol): boolean {
     return this.#owned.some((s) => s.equals(pred));
   }
-  decide(_atom: GroundLiteral): TheoryOutcome {
-    return TheoryOutcome.NotMine;
+  decideGround(_atom: GroundLiteral): TheoryGround {
+    return TheoryGround.disowned();
   }
 }
 

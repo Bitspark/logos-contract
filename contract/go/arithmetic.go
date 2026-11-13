@@ -163,25 +163,15 @@ func (ArithmeticTheory) Identity() ComponentIdentity {
 	)
 }
 
-// compile-time proof that the theory answers the #3126 ground verdict itself.
-var _ GroundDecider = ArithmeticTheory{}
-
-// Decide is the v1 answer, DERIVED from DecideGround by the one legacy adapter (#3126). An
-// evaluation past a work cap is TheoryNotMine there, never TheoryFails: every legacy reader refuses
-// an owned atom's NotMine by name, so it fails closed (seat:caa on #3126).
-func (t ArithmeticTheory) Decide(atom GroundLiteral) TheoryOutcome {
-	return LegacyOutcome(t.DecideGround(atom))
-}
-
 // DecideGround decides an owned GROUND arithmetic atom, byte-identically to the Rust
 // ArithmeticTheory::decide_ground (#3126). A ground arithmetic relation binds nothing, so it
 // Holds, Fails with a pinned host-band sub-code (a domainError is the language's false), or is not
 // decided (an evaluation past a work cap, never a false).
 func (t ArithmeticTheory) DecideGround(atom GroundLiteral) completion.TheoryGround {
 	// Not one of ours: check routes by Owns, so this is the theory contradicting its own routing,
-	// the fault the default reports for NotMine. Stay total. Mirrors Rust.
+	// the named inconsistent_theory fault. Stay total. Mirrors Rust.
 	if !t.Owns(atom.Pred) {
-		return completion.NotCompleted[completion.TheoryDecision, completion.NoCallerLimit](completion.InconsistentTheory())
+		return completion.TheoryGroundDisowned()
 	}
 	// A Go Symbol holds arbitrary bytes; an owned name is always valid UTF-8 (the
 	// names are ASCII), but mirror Rust's std::str::from_utf8 guard so the non-UTF-8
@@ -220,13 +210,13 @@ const arithDoesNotHold = "arith_does_not_hold"
 
 // arithFails is the false arm with code.
 func arithFails(code string) completion.TheoryGround {
-	return completion.Completed[completion.TheoryDecision, completion.NoCallerLimit](completion.TheoryFails(code))
+	return completion.TheoryGroundFails(code)
 }
 
 // arithHoldsIf is Holds when holds, else the relation's false.
 func arithHoldsIf(holds bool) completion.TheoryGround {
 	if holds {
-		return completion.Completed[completion.TheoryDecision, completion.NoCallerLimit](completion.TheoryHolds())
+		return completion.TheoryGroundHolds()
 	}
 	return arithFails(arithDoesNotHold)
 }

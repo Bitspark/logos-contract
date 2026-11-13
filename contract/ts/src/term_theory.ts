@@ -6,7 +6,7 @@
 // This lifts the positive-Datalog-only scope of host-side certification to the term
 // recognizers and standard order: a program that uses atom/1, atomic/1, compound/1,
 // is_list/1, number/1, ==/2, \==/2, @</2, @>/2, @=</2, @>=/2 can now be CHECKED in TS,
-// because the same decide() that the Rust core uses is reproduced here byte-for-byte. All
+// because the same decision the Rust core makes is reproduced here byte-for-byte. All
 // three cores agree on EVERY ground term atom — the §7 dual-conformance law, pinned by
 // vectors/term.json.
 //
@@ -32,7 +32,7 @@
 //
 // owns(pred): by NAME only (any arity) — the five recognizers, six comparisons, univ, and
 // (since 1.1.0, #1611) unification + the control constants.
-// decide(atom) on a ground atom:
+// decideGround(atom) on a ground atom:
 //   - non-UTF-8 predicate            -> Fails{term_unknown_predicate}   (defensive)
 //   - recognizer not at arity 1
 //     OR comparison not at arity 2
@@ -54,8 +54,9 @@ import { Atom, Tuple, type Value } from "@bitspark/ontos-core";
 import { readInt } from "@bitspark/ontos-data";
 
 import { BigDecimal } from "./decval.js";
+import { TheoryGround } from "./completion.js";
 import { Symbol, type GroundLiteral } from "./literal.js";
-import { ComponentIdentity, DecisionCompletion, type Theory, TheoryOutcome } from "./spi.js";
+import { ComponentIdentity, DecisionCompletion, type Theory } from "./spi.js";
 
 const utf8Encoder = new TextEncoder();
 
@@ -103,21 +104,21 @@ export class TermTheory implements Theory {
   }
 
   /**
-   * Decides an owned GROUND term atom, byte-identically to the Rust/Go TermTheory.decide.
+   * Decides an owned GROUND term atom, byte-identically to the Rust/Go TermTheory.decide_ground.
    * A ground term relation binds nothing, so it either Holds (the relation is true) or
    * Fails with a pinned host-band sub-code.
    */
-  decide(atom: GroundLiteral): TheoryOutcome {
+  decideGround(atom: GroundLiteral): TheoryGround {
     // Not one of ours: a routing safety net (check routes by owns, so this is
     // unreachable on a correctly-routed call — but stay total). Mirrors Rust/Go.
     if (!this.owns(atom.pred)) {
-      return TheoryOutcome.NotMine;
+      return TheoryGround.disowned();
     }
     let name: string;
     try {
       name = decodeUtf8(atom.pred.bytes());
     } catch {
-      return TheoryOutcome.Fails("term_unknown_predicate");
+      return TheoryGround.fails("term_unknown_predicate");
     }
 
     switch (name) {
@@ -164,7 +165,7 @@ export class TermTheory implements Theory {
       default:
         // Owned name routed here but not handled above — unreachable (the name set is
         // exactly the switch arms), but stay total.
-        return TheoryOutcome.Fails("term_does_not_hold");
+        return TheoryGround.fails("term_does_not_hold");
     }
   }
 
@@ -266,11 +267,11 @@ function isNumber(v: Value): boolean {
  * Decides an arity-1 recognizer: arity must be 1; then test(arg0). A non-1 arity has no
  * such relation (term_bad_arity); a false test is term_does_not_hold.
  */
-function decideRecognizer(args: readonly Value[], test: (v: Value) => boolean): TheoryOutcome {
+function decideRecognizer(args: readonly Value[], test: (v: Value) => boolean): TheoryGround {
   if (args.length !== 1) {
-    return TheoryOutcome.Fails("term_bad_arity");
+    return TheoryGround.fails("term_bad_arity");
   }
-  return test(args[0]!) ? TheoryOutcome.Holds : TheoryOutcome.Fails("term_does_not_hold");
+  return test(args[0]!) ? TheoryGround.holds() : TheoryGround.fails("term_does_not_hold");
 }
 
 /**
@@ -281,24 +282,24 @@ function decideRecognizer(args: readonly Value[], test: (v: Value) => boolean): 
 function decideComparison(
   args: readonly Value[],
   accept: (c: number) => boolean,
-): TheoryOutcome {
+): TheoryGround {
   if (args.length !== 2) {
-    return TheoryOutcome.Fails("term_bad_arity");
+    return TheoryGround.fails("term_bad_arity");
   }
   return accept(compareValues(args[0]!, args[1]!))
-    ? TheoryOutcome.Holds
-    : TheoryOutcome.Fails("term_does_not_hold");
+    ? TheoryGround.holds()
+    : TheoryGround.fails("term_does_not_hold");
 }
 
 /**
  * Decides an arity-0 control constant (#1611): arity must be 0 (term_bad_arity otherwise);
  * then `true` holds and `fail`/`false` are term_does_not_hold. Mirrors Rust's decide_control.
  */
-function decideControl(args: readonly Value[], holds: boolean): TheoryOutcome {
+function decideControl(args: readonly Value[], holds: boolean): TheoryGround {
   if (args.length !== 0) {
-    return TheoryOutcome.Fails("term_bad_arity");
+    return TheoryGround.fails("term_bad_arity");
   }
-  return holds ? TheoryOutcome.Holds : TheoryOutcome.Fails("term_does_not_hold");
+  return holds ? TheoryGround.holds() : TheoryGround.fails("term_does_not_hold");
 }
 
 /**
@@ -338,17 +339,17 @@ function univListOf(v: Value): Value | undefined {
  * univ image of T. A T that is not a labeled compound / atom -> univ_not_callable; a
  * mismatched L -> univ_mismatch. Mirrors Rust's decide_univ / Go's decideUniv.
  */
-function decideUniv(args: readonly Value[]): TheoryOutcome {
+function decideUniv(args: readonly Value[]): TheoryGround {
   if (args.length !== 2) {
-    return TheoryOutcome.Fails("term_bad_arity");
+    return TheoryGround.fails("term_bad_arity");
   }
   const expected = univListOf(args[0]!);
   if (expected === undefined) {
-    return TheoryOutcome.Fails("univ_not_callable");
+    return TheoryGround.fails("univ_not_callable");
   }
   return compareValues(args[1]!, expected) === 0
-    ? TheoryOutcome.Holds
-    : TheoryOutcome.Fails("univ_mismatch");
+    ? TheoryGround.holds()
+    : TheoryGround.fails("univ_mismatch");
 }
 
 /**

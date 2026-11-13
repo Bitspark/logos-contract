@@ -5,9 +5,10 @@ import {
   AlwaysAdmit, CertContext, Clause, ClauseId, ClosedModelCert, ComponentIdentity,
   Derivation, Evidence, FiniteDomain, Goal, GroundLiteral, LeafNode, LeafOutcome,
   MapProgram, NegPremise, PredicateSet, RelationTable, RuleNode, StratumPrefix,
-  Symbol, Term, TheoryOutcome, WorldMemo, checkClosedModelChain, checkWithCertContext,
+  Symbol, Term, TheoryGround, WorldMemo, checkClosedModelChain, checkWithCertContext,
   checkWithWorldMemo, compoundIdentityOf, defaultLimits, newCompoundTheory, programDigest,
   programDigestOf,
+  Subst,
 } from "@bitspark/logos-contract";
 
 const bytes = text => new TextEncoder().encode(text);
@@ -31,14 +32,14 @@ test("a compound captures each independent member's completed identity report", 
   // The first member implements a relation over one application-owned atom.
   const relation = {
     owns: pred => pred.equals(Symbol.of("is_allowed")),
-    decide: atom => atom.args.length === 1 && atom.args[0].equals(new Atom([97]))
-      ? TheoryOutcome.Holds : TheoryOutcome.Fails("not_allowed"),
+    decideGround: atom => atom.args.length === 1 && atom.args[0].equals(new Atom([97]))
+      ? TheoryGround.holds() : TheoryGround.fails("not_allowed"),
     identity: () => first,
   };
   // The second independently implements a zero-argument clock declaration.
   class Ready {
     owns(pred) { return pred.equals(Symbol.of("ready")); }
-    decide(atom) { return atom.args.length === 0 ? TheoryOutcome.Holds : TheoryOutcome.Fails("wrong_arity"); }
+    decideGround(atom) { return atom.args.length === 0 ? TheoryGround.holds() : TheoryGround.fails("wrong_arity"); }
     identity() {
       first.id.set(bytes("other"));
       first.version.set(bytes("2"));
@@ -49,9 +50,9 @@ test("a compound captures each independent member's completed identity report", 
   const compound = newCompoundTheory(relation, new Ready());
   const expected = compoundIdentityOf([firstReport, identity("second", "3", 3)]);
   assert.ok(compound.identity().equals(expected), "a later report rewrote the first member's contribution");
-  assert.equal(compound.decide(GroundLiteral.of("is_allowed", [new Atom([97])])).kind, "holds");
-  assert.equal(compound.decide(GroundLiteral.of("is_allowed", [new Atom([98])])).kind, "fails");
-  assert.equal(compound.decide(GroundLiteral.of("ready", [])).kind, "holds");
+  assert.deepEqual(compound.decideGround(GroundLiteral.of("is_allowed", [new Atom([97])])), TheoryGround.holds());
+  assert.deepEqual(compound.decideGround(GroundLiteral.of("is_allowed", [new Atom([98])])), TheoryGround.fails("not_allowed"));
+  assert.deepEqual(compound.decideGround(GroundLiteral.of("ready", [])), TheoryGround.holds());
   // A new operation can legitimately observe the first member's new identity.
   assert.ok(compound.identity().equals(compoundIdentityOf([
     identity("other", "2", 2), identity("second", "3", 3),
@@ -113,7 +114,7 @@ function fixture(sliced = false) {
     domains: [FiniteDomain.of(Symbol.of("domain"), [value])],
     extensions: [RelationTable.of(absent.pred, 1, [])], supports: [], edbSnapshotHashes: [], limitsDecl,
   });
-  const proof = new Derivation([new RuleNode(claim, clauseId, new Map(), [new NegPremise(absent, 0)])], 0, [cert]);
+  const proof = new Derivation([new RuleNode(claim, clauseId, new Subst(), [new NegPremise(absent, 0)])], 0, [cert]);
   let during = () => {};
   let enumerations = 0;
   const program = {
@@ -131,19 +132,19 @@ for (const [name, run] of routes) {
   for (const field of ["programHash", "profileHash", "ctxHash", "theoryConfigHash", "decompositionWitness"]) {
     test(name + " retains the original mismatching " + field + " across program enumeration", () => {
       const positive = fixture(field === "decompositionWitness");
-      assert.equal(run(positive).kind, "accept");
+      assert.equal(run(positive).verdict.kind, "accept");
       const f = fixture(field === "decompositionWitness");
       const original = f.bound[field].slice();
       f.bound[field].fill(99);
-      assert.equal(run(f).code, "cert_context_mismatch");
+      assert.equal(run(f).verdict.code, "cert_context_mismatch");
       f.mutate(() => f.bound[field].set(original));
-      assert.equal(run(f).code, "cert_context_mismatch");
+      assert.equal(run(f).verdict.code, "cert_context_mismatch");
       assert.ok(f.enumerations() > 0);
     });
     test(name + " retains the original matching " + field + " across program enumeration", () => {
       const f = fixture(field === "decompositionWitness");
       f.mutate(() => f.bound[field].fill(99));
-      assert.equal(run(f).kind, "accept");
+      assert.equal(run(f).verdict.kind, "accept");
       assert.ok(f.enumerations() > 0);
     });
   }
@@ -158,7 +159,7 @@ for (const [name, run] of routes) {
         get() { reads[field]++; return reads[field] === 1 ? source[field] : pin(99); },
       });
     }
-    assert.equal(run(f).kind, "accept");
+    assert.equal(run(f).verdict.kind, "accept");
     assert.deepEqual(reads, { programHash: 1, profileHash: 1, ctxHash: 1, theoryConfigHash: 1, decompositionWitness: 1 });
   });
 }
@@ -170,7 +171,7 @@ test("an all-positive direct check never reads irrelevant certificate pins", () 
   }
   const fact = GroundLiteral.of("allowed", [value]);
   const proof = new Derivation([new LeafNode(fact, Evidence.none())], 0);
-  assert.equal(checkWithCertContext(new MapProgram(), fact, proof, undefined, profile, bound).kind, "accept");
-  assert.equal(checkClosedModelChain(new MapProgram(), [], undefined, profile, bound).code, "cert_out_of_range");
+  assert.equal(checkWithCertContext(new MapProgram(), fact, proof, undefined, profile, bound).verdict.kind, "accept");
+  assert.equal(checkClosedModelChain(new MapProgram(), [], undefined, profile, bound).verdict.code, "cert_out_of_range");
 });
 

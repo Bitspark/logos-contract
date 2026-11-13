@@ -44,7 +44,7 @@ import {
   StratumPrefix,
   Symbol,
   Term,
-  type TheoryOutcome,
+  TheoryGround,
 } from "../src/index.js";
 
 /** The depth at which the recursive evaluator stopped until #3123. */
@@ -69,22 +69,24 @@ function deepOne(levels: number): Value {
   return e;
 }
 
-function decide(pred: string, lhs: Value, rhs: Value): TheoryOutcome {
-  return new ArithmeticTheory().decide(GroundLiteral.of(pred, [lhs, rhs]));
+function ground(pred: string, lhs: Value, rhs: Value): TheoryGround {
+  return new ArithmeticTheory().decideGround(GroundLiteral.of(pred, [lhs, rhs]));
 }
 
 test("#3123: the theory decides a deep expression by its value, in both polarities", () => {
   const wrong: string[] = [];
   for (const [name, levels] of DEPTHS) {
-    const cases: ReadonlyArray<readonly [string, TheoryOutcome, boolean]> = [
-      ["1 =:= E holds", decide("=:=", int(1), deepOne(levels)), true],
-      ["2 =\\= E holds", decide("=\\=", int(2), deepOne(levels)), true],
-      ["1 =\\= E fails", decide("=\\=", int(1), deepOne(levels)), false],
-      ["1 is E holds", decide("is", int(1), deepOne(levels)), true],
-      ["0 < E holds", decide("<", int(0), deepOne(levels)), true],
+    const cases: ReadonlyArray<readonly [string, TheoryGround, boolean]> = [
+      ["1 =:= E holds", ground("=:=", int(1), deepOne(levels)), true],
+      ["2 =\\= E holds", ground("=\\=", int(2), deepOne(levels)), true],
+      ["1 =\\= E fails", ground("=\\=", int(1), deepOne(levels)), false],
+      ["1 is E holds", ground("is", int(1), deepOne(levels)), true],
+      ["0 < E holds", ground("<", int(0), deepOne(levels)), true],
     ];
     for (const [what, got, want] of cases) {
-      if ((got.kind === "holds") !== want) {
+      // A decision either way; a stop is never a decided false, so it is wrong in both polarities.
+      const decided = got.kind === "completed" ? got.value.kind === "holds" : undefined;
+      if (decided !== want) {
         wrong.push(`${name}: ${what}, got ${JSON.stringify(got)}`);
       }
     }
@@ -95,8 +97,8 @@ test("#3123: the theory decides a deep expression by its value, in both polariti
 test("#3123: a 100,000-level expression is decided without one JS frame per level", () => {
   // The JS stack holds a few thousand frames on any V8 tier, so a recursive walk throws a
   // RangeError here; the iterative one does not.
-  const got = decide("=:=", int(1), deepOne(100_000));
-  assert.equal(got.kind, "holds", `1 =:= E must hold, got ${JSON.stringify(got)}`);
+  const got = ground("=:=", int(1), deepOne(100_000));
+  assert.deepEqual(got, TheoryGround.holds(), `1 =:= E must hold, got ${JSON.stringify(got)}`);
 });
 
 // test-double: consumer(an empty extensional set; admits nothing because nothing is a leaf)
@@ -106,11 +108,12 @@ const noLeaves: LeafVerifier<void> = {
 };
 
 function verdict(o: Outcome): string {
-  return o.kind === "accept" ? "accept" : `${o.code} (${o.detail})`;
+  const v = o.verdict;
+  return v.kind === "accept" ? "accept" : `${v.code} (${v.detail})`;
 }
 
 function code(o: Outcome): string {
-  return o.kind === "accept" ? "accept" : o.code;
+  return o.verdict.kind === "accept" ? "accept" : o.verdict.code;
 }
 
 function wide(): CheckLimits {

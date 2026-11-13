@@ -8,12 +8,12 @@
 //!
 //!   * `empty_result_does_not_promise_acceptance` — the form-33 guard. An empty result
 //!     means *no capability refusal will occur*, NOT *check will accept*.
-//!   * `never_calls_decide` — proven by a theory whose `decide` panics.
+//!   * `never_calls_decide` — proven by a theory whose `decide_ground` panics.
 
 use logos_contract::{
     check, profile_decides_all_builtins, unowned_builtin_predicates, CheckLimits, CheckProfile,
-    Derivation, Evidence, GroundLiteral, LeafOutcome, LeafVerifier, MapProgram, Node, Outcome,
-    PredicateSet, RejectionCode, Symbol, Theory, TheoryOutcome,
+    Derivation, Evidence, GroundLiteral, LeafOutcome, LeafVerifier, MapProgram, Node, PredicateSet,
+    RejectionCode, Symbol, Theory, TheoryGround, Verdict,
 };
 use ontos_core::Value;
 
@@ -30,8 +30,8 @@ impl Theory for UnboundTheory {
     fn owns(&self, _pred: &Symbol) -> bool {
         false
     }
-    fn decide(&self, _atom: &GroundLiteral) -> TheoryOutcome {
-        TheoryOutcome::NotMine
+    fn decide_ground(&self, _atom: &GroundLiteral) -> TheoryGround {
+        TheoryGround::disowned()
     }
 }
 
@@ -46,8 +46,8 @@ impl Theory for OwningTheory {
     fn owns(&self, _pred: &Symbol) -> bool {
         true
     }
-    fn decide(&self, _atom: &GroundLiteral) -> TheoryOutcome {
-        TheoryOutcome::Holds
+    fn decide_ground(&self, _atom: &GroundLiteral) -> TheoryGround {
+        TheoryGround::holds()
     }
 }
 
@@ -62,13 +62,13 @@ impl Theory for OwnsOnly {
     fn owns(&self, pred: &Symbol) -> bool {
         pred.bytes() == self.0.as_bytes()
     }
-    fn decide(&self, _atom: &GroundLiteral) -> TheoryOutcome {
-        TheoryOutcome::Holds
+    fn decide_ground(&self, _atom: &GroundLiteral) -> TheoryGround {
+        TheoryGround::holds()
     }
 }
 
-/// Owns everything, and **panics if asked to decide**. The query must never call `decide`,
-/// so this theory is safe for it and fatal for anything that reaches through.
+/// Owns everything, and **panics if asked to decide**. The query must never call
+/// `decide_ground`, so this theory is safe for it and fatal for anything that reaches through.
 struct ExplodingTheory;
 // test-double: adversarial(panics if asked to decide)
 impl Theory for ExplodingTheory {
@@ -79,8 +79,8 @@ impl Theory for ExplodingTheory {
     fn owns(&self, _pred: &Symbol) -> bool {
         true
     }
-    fn decide(&self, _atom: &GroundLiteral) -> TheoryOutcome {
-        panic!("the pre-check query must not call decide()");
+    fn decide_ground(&self, _atom: &GroundLiteral) -> TheoryGround {
+        panic!("the pre-check query must not call decide_ground()");
     }
 }
 
@@ -203,13 +203,13 @@ fn empty_result_does_not_promise_acceptance() {
     let claim = GroundLiteral::new("=:=", [atom_v("a"), atom_v("a")]);
     let outcome = check(&MapProgram::new(), &claim, &d, &(), &p);
 
-    match outcome {
-        Outcome::Reject { code, .. } => assert_eq!(
+    match outcome.verdict {
+        Verdict::Reject { code, .. } => assert_eq!(
             code,
             RejectionCode::PredicatePartitionViolation,
             "a clean capability query coexists with a structural rejection — that is the point"
         ),
-        Outcome::Accept => panic!(
+        Verdict::Accept => panic!(
             "expected a structural rejection: an empty capability report does not make an \
              overlapping account valid"
         ),
@@ -217,7 +217,7 @@ fn empty_result_does_not_promise_acceptance() {
 }
 
 /// ⭐ The query is **total and side-effect-free**: it consults `owns()` only. Proven rather
-/// than asserted — this theory panics if `decide` is ever reached, so a query that touched
+/// than asserted — this theory panics if `decide_ground` is ever reached, so a query that touched
 /// it would fail this test loudly instead of silently costing a caller real work.
 #[test]
 fn never_calls_decide() {

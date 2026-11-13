@@ -26,7 +26,7 @@ import {
   type GroundLiteral,
   Symbol as LSymbol,
   type Theory,
-  TheoryOutcome,
+  TheoryGround,
 } from "../src/index.js";
 
 function repoRoot(): string {
@@ -71,7 +71,7 @@ function identityFrom(spec: any): ComponentIdentity {
 function pinnedTheory(identity: ComponentIdentity): Theory {
   return {
     owns: (_pred: LSymbol) => false,
-    decide: (_atom: GroundLiteral) => TheoryOutcome.NotMine,
+    decideGround: (_atom: GroundLiteral) => TheoryGround.disowned(),
     identity: () => identity,
   };
 }
@@ -81,7 +81,7 @@ function pinnedTheory(identity: ComponentIdentity): Theory {
 function defaultedTheory(): Theory {
   return {
     owns: (_pred: LSymbol) => false,
-    decide: (_atom: GroundLiteral) => TheoryOutcome.NotMine,
+    decideGround: (_atom: GroundLiteral) => TheoryGround.disowned(),
   };
 }
 

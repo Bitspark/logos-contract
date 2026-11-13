@@ -45,14 +45,14 @@ func TestPublicCheckerProofBudgetDomain(t *testing.T) {
 					invalid := base
 					*invalid.Budgets()[i].Value = -1
 					out, calls := check(invalid, memo)
-					if out.IsAccept() || out.Code().Code() != "invalid_check_limits" || calls != 0 {
+					if out.IsAccept() || out.Verdict.Code().Code() != "invalid_check_limits" || calls != 0 {
 						t.Fatalf("negative %s: verdict %+v, verifier called %d times", budget.Name, out, calls)
 					}
 					above := contract.IndexMax + 1
 					if above <= uint64(math.MaxInt) {
 						*invalid.Budgets()[i].Value = int(above)
 						out, calls = check(invalid, memo)
-						if out.IsAccept() || out.Code() != contract.InvalidCheckLimits || calls != 0 {
+						if out.IsAccept() || out.Verdict.Code() != contract.InvalidCheckLimits || calls != 0 {
 							t.Fatalf("out-of-domain %s: verdict %+v, verifier called %d times", budget.Name, out, calls)
 						}
 					}
@@ -60,7 +60,7 @@ func TestPublicCheckerProofBudgetDomain(t *testing.T) {
 			}
 			base.MaxNodes = 0
 			out, calls := check(base, memo)
-			if out.IsAccept() || out.Code() != contract.TooManyNodes || calls != 0 {
+			if out.IsAccept() || out.Verdict.Code() != contract.TooManyNodes || calls != 0 {
 				t.Fatalf("zero cap: verdict %+v, calls %d", out, calls)
 			}
 			for _, n := range []int{1, int(min(uint64(math.MaxInt), contract.IndexMax))} {

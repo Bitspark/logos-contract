@@ -19,9 +19,9 @@ dependencies = [
 
 [[package]]
 name = "bit-vec"
-version = "0.10.1"
+version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5727b15fa97d4f4fee0a3b7c3d550ed0269f54329207b86388de918604e31269"
+checksum = "72503af1e72be411d74ca45cd6b309878fcb35354e252fc2a3a8bda3a97082a0"
 dependencies = [
  "borsh",
  "serde",
@@ -35,24 +35,24 @@ checksum = "3ded4057c258ba199e2d26386d3af3780957ecaee6c4ef4041c6b4b8b97c0b06"
 
 [[package]]
 name = "bitspark-ontos-codec"
-version = "0.13.0"
+version = "0.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8e83e424e0c6b6f25c156116bddf04730f5813ca1b1ce74d01d3b70c42907c53"
+checksum = "4c48383cfe0726ced0be114ff4af238bb1fb637d2401c811f68371320db0811f"
 dependencies = [
  "bitspark-ontos-core",
 ]
 
 [[package]]
 name = "bitspark-ontos-core"
-version = "0.13.0"
+version = "0.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ddd7a1ed5ca0fdcf888fc9a74471c2272542a6a277b3a9c5f7f08d71b03b697d"
+checksum = "18a01ee7f2079c2c0f242037e773760e4298bf5daa042138870f8575abdc6120"
 
 [[package]]
 name = "bitspark-ontos-data"
-version = "0.13.0"
+version = "0.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bccfcdf9b326c586f5217f000596ab4f1d34a327531f64bdafe5e1240097aafc"
+checksum = "27a61f3016e40cca4b2d898c42c6d9bbdba1a1fad931151dd1c596b0d29afa94"
 dependencies = [
  "bitspark-ontos-codec",
  "bitspark-ontos-core",
@@ -172,9 +172,9 @@ checksum = "00d174d5400e5e8fd687ad1049e2f578285fa914201b1af7e8b112a4546bd826"
 
 [[package]]
 name = "errno"
-version = "0.3.14"
+version = "0.3.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
+checksum = "e35d6e78f4cebb90e51d543db8fe41528851d6deeef6ef21ebd4bfdc1e784776"
 dependencies = [
  "libc",
  "windows-sys",
@@ -250,7 +250,7 @@ checksum = "32a66949e030da00e8c7d4434b251670a91556f4144941d37452769c25d58a53"
 
 [[package]]
 name = "logos-contract"
-version = "0.26.0"
+version = "0.27.0"
 dependencies = [
  "bitspark-ontos-codec",
  "bitspark-ontos-core",
@@ -485,9 +485,9 @@ dependencies = [
 
 [[package]]
 name = "syn"
-version = "3.0.9"
+version = "3.0.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d78c8dee4c7bf0e14673097256fed6142ce9d3b85a408189d07482442145823b"
+checksum = "4ae9ccbea3a7b0b09443036490c8f34a8b1b760fd345e5c0dae0aac718faea79"
 dependencies = [
  "proc-macro2",
  "quote",

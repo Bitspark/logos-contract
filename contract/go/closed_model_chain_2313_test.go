@@ -134,13 +134,13 @@ func TestClosedModelChainReplaysTheNegationVectors2313(t *testing.T) {
 		case c.want == "accept":
 			accepted++
 			if !got.IsAccept() {
-				t.Errorf("case %q: the oracle accepts it, so its closed_world must verify as a chain; got %s (%s)", c.name, got.Code().Code(), got.Detail())
+				t.Errorf("case %q: the oracle accepts it, so its closed_world must verify as a chain; got %s (%s)", c.name, got.Verdict.Code().Code(), got.Verdict.Detail())
 			}
 		case chainCertInternalCodes[strings.TrimPrefix(c.want, "reject:")]:
 			certRejected++
 			want := strings.TrimPrefix(c.want, "reject:")
-			if got.IsAccept() || got.Code().Code() != want {
-				t.Errorf("case %q: the oracle rejects a cited cert with %s, so the chain must too; got accept=%v %s", c.name, want, got.IsAccept(), got.Detail())
+			if got.IsAccept() || got.Verdict.Code().Code() != want {
+				t.Errorf("case %q: the oracle rejects a cited cert with %s, so the chain must too; got accept=%v %s", c.name, want, got.IsAccept(), got.Verdict.Detail())
 			}
 		}
 	}
@@ -155,8 +155,8 @@ func TestClosedModelChainEmptyIsRefusedByName2313(t *testing.T) {
 	cases := chainVectorCases(t)
 	c := cases[0]
 	got := CheckClosedModelChain[unitCtx](c.program, nil, unitCtx{}, c.profile, c.cx)
-	if got.IsAccept() || got.Code() != CertOutOfRange || !strings.Contains(got.Detail(), "empty certificate chain") {
-		t.Fatalf("an empty chain must be refused cert_out_of_range, never accepted vacuously; got accept=%v %s", got.IsAccept(), got.Detail())
+	if got.IsAccept() || got.Verdict.Code() != CertOutOfRange || !strings.Contains(got.Verdict.Detail(), "empty certificate chain") {
+		t.Fatalf("an empty chain must be refused cert_out_of_range, never accepted vacuously; got accept=%v %s", got.IsAccept(), got.Verdict.Detail())
 	}
 }
 
@@ -166,8 +166,8 @@ func TestClosedModelChainUnboundContextIsRefused2313(t *testing.T) {
 			continue
 		}
 		got := CheckClosedModelChain[unitCtx](c.program, c.certs, unitCtx{}, c.profile, ZeroCertContext())
-		if got.IsAccept() || got.Code() != CertContextUnbound {
-			t.Fatalf("case %q under the zero context must be refused cert_context_unbound; got accept=%v %s", c.name, got.IsAccept(), got.Detail())
+		if got.IsAccept() || got.Verdict.Code() != CertContextUnbound {
+			t.Fatalf("case %q under the zero context must be refused cert_context_unbound; got accept=%v %s", c.name, got.IsAccept(), got.Verdict.Detail())
 		}
 		return
 	}
@@ -183,7 +183,7 @@ func TestClosedModelChainBindsEveryCertificateBeforeTheFirstAttestation(t *testi
 	}
 	original := chain[1].ProfileHash
 	chain[1].ProfileHash[0] ^= 1
-	if out := CheckClosedModelChain(program, chain, struct{}{}, aggProfile(), ctx); out.IsAccept() || out.Code() != CertContextMismatch {
+	if out := CheckClosedModelChain(program, chain, struct{}{}, aggProfile(), ctx); out.IsAccept() || out.Verdict.Code() != CertContextMismatch {
 		t.Fatalf("mismatching control: %s", out)
 	}
 	profile := aggProfile()
@@ -193,7 +193,7 @@ func TestClosedModelChainBindsEveryCertificateBeforeTheFirstAttestation(t *testi
 		chain[1].ProfileHash = original
 	}}
 	out := CheckClosedModelChain(program, chain, struct{}{}, profile, ctx)
-	if calls == 0 || out.IsAccept() || out.Code() != CertContextMismatch {
+	if calls == 0 || out.IsAccept() || out.Verdict.Code() != CertContextMismatch {
 		t.Fatalf("an attestation changed a different certificate: %s (%d attestations)", out, calls)
 	}
 }

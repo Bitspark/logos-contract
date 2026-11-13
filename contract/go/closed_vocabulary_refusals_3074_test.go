@@ -76,8 +76,8 @@ func TestAnUntrustedPremiseOfUnknownKindIsRefusedByName3074(t *testing.T) {
 		})
 		switch {
 		case c.accept && !got.IsAccept():
-			t.Errorf("%s: want accept, got %s: %s", c.name, negOutcomeString(got), got.Detail())
-		case !c.accept && (got.IsAccept() || got.Code() != UnknownNodeKind):
+			t.Errorf("%s: want accept, got %s: %s", c.name, negOutcomeString(got), got.Verdict.Detail())
+		case !c.accept && (got.IsAccept() || got.Verdict.Code() != UnknownNodeKind):
 			t.Errorf("%s: want reject:unknown_node_kind, got %s", c.name, negOutcomeString(got))
 		}
 	}
@@ -129,9 +129,9 @@ func TestAnUntrustedSupportRefOfUnknownKindIsRefusedByName3074(t *testing.T) {
 		})
 		switch {
 		case c.accept && !got.IsAccept():
-			t.Errorf("%s: want accept, got %s: %s", c.name, negOutcomeString(got), got.Detail())
-		case !c.accept && (got.IsAccept() || got.Code() != UnknownNodeKind):
-			t.Errorf("%s: want reject:unknown_node_kind, got %s: %s", c.name, negOutcomeString(got), got.Detail())
+			t.Errorf("%s: want accept, got %s: %s", c.name, negOutcomeString(got), got.Verdict.Detail())
+		case !c.accept && (got.IsAccept() || got.Verdict.Code() != UnknownNodeKind):
+			t.Errorf("%s: want reject:unknown_node_kind, got %s: %s", c.name, negOutcomeString(got), got.Verdict.Detail())
 		}
 	}
 }

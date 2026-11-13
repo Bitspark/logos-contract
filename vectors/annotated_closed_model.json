@@ -1,0 +1,5112 @@
+{
+  "spi": "logos-contract checker v1 - ADR 0031 D5: an annotated closed-model certificate, checked relative to its semiring's identity (#1821 P9 I5a)",
+  "issue": "#1821",
+  "note": "HAND-AUTHORED from ADR 0031 D5 and rulings Q14/Q15 on #1821 (2026-11-12): every expected element is worked out by hand from the algebra; no core produced any of it. NOTATION: `profile`, `extensional`, `edb`, `program` and each case's `cert` follow vectors/negation.json (the negation_v1 profile: the lt theory; EDB leaves = `extensional`; the cert bound to the context derived from the live program). Elements follow vectors/semiring.json's value grammar. `semiring` names the semiring the checker is given and `cert_semiring` the one whose identity the annotated cert names: counting, tropical and stopping are vectors/semiring.json's (stopping is its fixture: every operation on elements stops at the capacity bound); fold_order is this file's TEST semiring, defined by each core's replay and never registered: declared identity (fixture/fold-order, 1, 32 zero bytes), no law declared, carrier every Atom, zero and one the empty atom, add(x, y) and mul(x, y) both the atom of x's bytes then y's bytes. Its add is order-sensitive on purpose (Q15 condition 3). `annotations` lists one {pred, elements} per sealed table, in the cert's table order, one element per row in row order. THE CHECK, in order: (1) the checker's semiring identity must equal the cert's (annotation_identity_mismatch); (2) the cert passes the boolean check as a one-cert world (reject_cert, its code unchanged); (3) a partial scope, a negated or count literal in a scope clause, or a grounding whose body is not decided is annotation_unsupported; (4) every sealed table is annotated in order with one element per row, each an element of the semiring (annotation_shape, naming the row for a non-element); (5) the IDB rows (every row of a table whose predicate is not extensional) are recomputed as the least solution of a(t) = the left fold, from zero, with add over t's groundings in canonical order, of the left fold, from one, with mul over the grounding's positive non-theory body literals in body order, of each literal's element (an extensional row's claimed element, which is a premise; an IDB row's previous-round value). The groundings are the closure join's body-true groundings of every scope clause with an IDB head; canonical order is ascending codec bytes of Tuple[Atom(clause id), Tuple[Tuple[Atom(var), value of its image]...]] with the variables in ascending byte order. Rounds are Jacobi from zero, bounded at (IDB rows + 1); no fixed point within the bound is annotation_not_converged; an add or mul that answers not-an-element or stopped is semiring_not_an_element or semiring_stopped, naming the IDB row being computed; then the first IDB row whose claim differs is annotation_mismatch. `outcome` is accept, reject (an annotation code) or reject_cert (the boolean check's code); `expected` carries the code, the `row` (pred, index) where one is named, and for accept the law relied on (kleene_least_fixpoint when the ground dependency graph over IDB rows has a cycle, else null), and `unattested`, the extensional tables whose elements were premises bound by the digest, never attested (Q15 condition 1), in the cert's table order.",
+  "profile": "negation_v1",
+  "extensional": [
+    "e",
+    "f",
+    "g",
+    "s",
+    "t",
+    "w"
+  ],
+  "edb": {
+    "e": [
+      {
+        "pred": "e",
+        "args": [
+          {
+            "atom_str": "a"
+          }
+        ]
+      },
+      {
+        "pred": "e",
+        "args": [
+          {
+            "atom_str": "b"
+          }
+        ]
+      }
+    ],
+    "f": [
+      {
+        "pred": "f",
+        "args": [
+          {
+            "atom_str": "a"
+          }
+        ]
+      }
+    ],
+    "g": [
+      {
+        "pred": "g",
+        "args": [
+          {
+            "atom_str": "a"
+          }
+        ]
+      }
+    ],
+    "s": [
+      {
+        "pred": "s",
+        "args": [
+          {
+            "atom_str": "a"
+          }
+        ]
+      },
+      {
+        "pred": "s",
+        "args": [
+          {
+            "atom_str": "b"
+          }
+        ]
+      },
+      {
+        "pred": "s",
+        "args": [
+          {
+            "atom_str": "c"
+          }
+        ]
+      }
+    ],
+    "t": [
+      {
+        "pred": "t",
+        "args": [
+          {
+            "atom_str": "a"
+          }
+        ]
+      }
+    ],
+    "w": [
+      {
+        "pred": "w",
+        "args": [
+          {
+            "atom_str": "a"
+          },
+          {
+            "atom_str": "b"
+          }
+        ]
+      },
+      {
+        "pred": "w",
+        "args": [
+          {
+            "atom_str": "b"
+          },
+          {
+            "atom_str": "a"
+          }
+        ]
+      }
+    ]
+  },
+  "program": {
+    "pa1": {
+      "head": {
+        "pred": "p",
+        "args": [
+          {
+            "var": "X"
+          }
+        ]
+      },
+      "body": [
+        {
+          "pred": "e",
+          "args": [
+            {
+              "var": "X"
+            }
+          ]
+        }
+      ]
+    },
+    "pa2": {
+      "head": {
+        "pred": "p",
+        "args": [
+          {
+            "var": "X"
+          }
+        ]
+      },
+      "body": [
+        {
+          "pred": "f",
+          "args": [
+            {
+              "var": "X"
+            }
+          ]
+        }
+      ]
+    },
+    "qa1": {
+      "head": {
+        "pred": "q",
+        "args": [
+          {
+            "var": "X"
+          }
+        ]
+      },
+      "body": [
+        {
+          "pred": "p",
+          "args": [
+            {
+              "var": "X"
+            }
+          ]
+        },
+        {
+          "pred": "g",
+          "args": [
+            {
+              "var": "X"
+            }
+          ]
+        }
+      ]
+    },
+    "ra1": {
+      "head": {
+        "pred": "r",
+        "args": [
+          {
+            "var": "X"
+          }
+        ]
+      },
+      "body": [
+        {
+          "pred": "e",
+          "args": [
+            {
+              "var": "X"
+            }
+          ]
+        },
+        {
+          "pred": "lt",
+          "args": [
+            {
+              "var": "X"
+            },
+            {
+              "atom_str": "b"
+            }
+          ]
+        }
+      ]
+    },
+    "rb1": {
+      "head": {
+        "pred": "reach",
+        "args": [
+          {
+            "var": "X"
+          },
+          {
+            "var": "Y"
+          }
+        ]
+      },
+      "body": [
+        {
+          "pred": "w",
+          "args": [
+            {
+              "var": "X"
+            },
+            {
+              "var": "Y"
+            }
+          ]
+        }
+      ]
+    },
+    "rb2": {
+      "head": {
+        "pred": "reach",
+        "args": [
+          {
+            "var": "X"
+          },
+          {
+            "var": "Z"
+          }
+        ]
+      },
+      "body": [
+        {
+          "pred": "reach",
+          "args": [
+            {
+              "var": "X"
+            },
+            {
+              "var": "Y"
+            }
+          ]
+        },
+        {
+          "pred": "w",
+          "args": [
+            {
+              "var": "Y"
+            },
+            {
+              "var": "Z"
+            }
+          ]
+        }
+      ]
+    },
+    "uo1": {
+      "head": {
+        "pred": "u",
+        "args": [
+          {
+            "atom_str": "z"
+          }
+        ]
+      },
+      "body": [
+        {
+          "pred": "s",
+          "args": [
+            {
+              "var": "X"
+            }
+          ]
+        }
+      ]
+    },
+    "uo2": {
+      "head": {
+        "pred": "u",
+        "args": [
+          {
+            "atom_str": "z"
+          }
+        ]
+      },
+      "body": [
+        {
+          "pred": "t",
+          "args": [
+            {
+              "var": "X"
+            }
+          ]
+        }
+      ]
+    },
+    "vo1": {
+      "head": {
+        "pred": "v",
+        "args": [
+          {
+            "var": "X"
+          }
+        ]
+      },
+      "body": [
+        {
+          "pred": "s",
+          "args": [
+            {
+              "var": "X"
+            }
+          ]
+        },
+        {
+          "pred": "t",
+          "args": [
+            {
+              "var": "X"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "cases": [
+    {
+      "name": "counting_two_derivations_are_summed",
+      "note": "p(a) has two groundings, so its count is 2 + 5; q(a) multiplies p(a) by g(a)",
+      "semiring": "counting",
+      "cert_semiring": "counting",
+      "cert": {
+        "scope": {
+          "level": 1,
+          "predicates": [
+            "e",
+            "f",
+            "g",
+            "p",
+            "q",
+            "r"
+          ]
+        },
+        "domains": [
+          {
+            "type_tag": "d",
+            "values": [
+              {
+                "atom_str": "a"
+              },
+              {
+                "atom_str": "b"
+              }
+            ]
+          }
+        ],
+        "extensions": [
+          {
+            "pred": "e",
+            "arity": 1,
+            "rows": [
+              {
+                "pred": "e",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              },
+              {
+                "pred": "e",
+                "args": [
+                  {
+                    "atom_str": "b"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "pred": "f",
+            "arity": 1,
+            "rows": [
+              {
+                "pred": "f",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "pred": "g",
+            "arity": 1,
+            "rows": [
+              {
+                "pred": "g",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "pred": "p",
+            "arity": 1,
+            "rows": [
+              {
+                "pred": "p",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              },
+              {
+                "pred": "p",
+                "args": [
+                  {
+                    "atom_str": "b"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "pred": "q",
+            "arity": 1,
+            "rows": [
+              {
+                "pred": "q",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "pred": "r",
+            "arity": 1,
+            "rows": [
+              {
+                "pred": "r",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "supports": [
+          {
+            "fact": {
+              "pred": "p",
+              "args": [
+                {
+                  "atom_str": "a"
+                }
+              ]
+            },
+            "clause": "pa1",
+            "subst": {
+              "X": {
+                "atom_str": "a"
+              }
+            },
+            "body_refs": [
+              {
+                "lower_stratum": {
+                  "cert": 0,
+                  "atom": {
+                    "pred": "e",
+                    "args": [
+                      {
+                        "atom_str": "a"
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "rank": 1
+          },
+          {
+            "fact": {
+              "pred": "p",
+              "args": [
+                {
+                  "atom_str": "b"
+                }
+              ]
+            },
+            "clause": "pa1",
+            "subst": {
+              "X": {
+                "atom_str": "b"
+              }
+            },
+            "body_refs": [
+              {
+                "lower_stratum": {
+                  "cert": 0,
+                  "atom": {
+                    "pred": "e",
+                    "args": [
+                      {
+                        "atom_str": "b"
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "rank": 1
+          },
+          {
+            "fact": {
+              "pred": "q",
+              "args": [
+                {
+                  "atom_str": "a"
+                }
+              ]
+            },
+            "clause": "qa1",
+            "subst": {
+              "X": {
+                "atom_str": "a"
+              }
+            },
+            "body_refs": [
+              {
+                "same_stratum": {
+                  "fact": {
+                    "pred": "p",
+                    "args": [
+                      {
+                        "atom_str": "a"
+                      }
+                    ]
+                  },
+                  "rank": 1
+                }
+              },
+              {
+                "lower_stratum": {
+                  "cert": 0,
+                  "atom": {
+                    "pred": "g",
+                    "args": [
+                      {
+                        "atom_str": "a"
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "rank": 2
+          },
+          {
+            "fact": {
+              "pred": "r",
+              "args": [
+                {
+                  "atom_str": "a"
+                }
+              ]
+            },
+            "clause": "ra1",
+            "subst": {
+              "X": {
+                "atom_str": "a"
+              }
+            },
+            "body_refs": [
+              {
+                "lower_stratum": {
+                  "cert": 0,
+                  "atom": {
+                    "pred": "e",
+                    "args": [
+                      {
+                        "atom_str": "a"
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "builtin": {
+                  "atom": {
+                    "pred": "lt",
+                    "args": [
+                      {
+                        "atom_str": "a"
+                      },
+                      {
+                        "atom_str": "b"
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "rank": 1
+          }
+        ],
+        "limits_decl": {
+          "cert_facts": 8,
+          "domain_values": 2,
+          "support_edges": 4,
+          "rule_groundings": 1000,
+          "join_steps": 10000,
+          "cert_bytes": 4096
+        }
+      },
+      "annotations": [
+        {
+          "pred": "e",
+          "elements": [
+            {
+              "int": 2
+            },
+            {
+              "int": 3
+            }
+          ]
+        },
+        {
+          "pred": "f",
+          "elements": [
+            {
+              "int": 5
+            }
+          ]
+        },
+        {
+          "pred": "g",
+          "elements": [
+            {
+              "int": 4
+            }
+          ]
+        },
+        {
+          "pred": "p",
+          "elements": [
+            {
+              "int": 7
+            },
+            {
+              "int": 3
+            }
+          ]
+        },
+        {
+          "pred": "q",
+          "elements": [
+            {
+              "int": 28
+            }
+          ]
+        },
+        {
+          "pred": "r",
+          "elements": [
+            {
+              "int": 2
+            }
+          ]
+        }
+      ],
+      "outcome": "accept",
+      "expected": {
+        "law": null,
+        "unattested": [
+          "e",
+          "f",
+          "g"
+        ]
+      }
+    },
+    {
+      "name": "counting_one_derivation_short_is_a_mismatch",
+      "note": "p(a) claimed as if only pa1 derived it",
+      "semiring": "counting",
+      "cert_semiring": "counting",
+      "cert": {
+        "scope": {
+          "level": 1,
+          "predicates": [
+            "e",
+            "f",
+            "g",
+            "p",
+            "q",
+            "r"
+          ]
+        },
+        "domains": [
+          {
+            "type_tag": "d",
+            "values": [
+              {
+                "atom_str": "a"
+              },
+              {
+                "atom_str": "b"
+              }
+            ]
+          }
+        ],
+        "extensions": [
+          {
+            "pred": "e",
+            "arity": 1,
+            "rows": [
+              {
+                "pred": "e",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              },
+              {
+                "pred": "e",
+                "args": [
+                  {
+                    "atom_str": "b"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "pred": "f",
+            "arity": 1,
+            "rows": [
+              {
+                "pred": "f",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "pred": "g",
+            "arity": 1,
+            "rows": [
+              {
+                "pred": "g",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "pred": "p",
+            "arity": 1,
+            "rows": [
+              {
+                "pred": "p",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              },
+              {
+                "pred": "p",
+                "args": [
+                  {
+                    "atom_str": "b"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "pred": "q",
+            "arity": 1,
+            "rows": [
+              {
+                "pred": "q",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "pred": "r",
+            "arity": 1,
+            "rows": [
+              {
+                "pred": "r",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "supports": [
+          {
+            "fact": {
+              "pred": "p",
+              "args": [
+                {
+                  "atom_str": "a"
+                }
+              ]
+            },
+            "clause": "pa1",
+            "subst": {
+              "X": {
+                "atom_str": "a"
+              }
+            },
+            "body_refs": [
+              {
+                "lower_stratum": {
+                  "cert": 0,
+                  "atom": {
+                    "pred": "e",
+                    "args": [
+                      {
+                        "atom_str": "a"
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "rank": 1
+          },
+          {
+            "fact": {
+              "pred": "p",
+              "args": [
+                {
+                  "atom_str": "b"
+                }
+              ]
+            },
+            "clause": "pa1",
+            "subst": {
+              "X": {
+                "atom_str": "b"
+              }
+            },
+            "body_refs": [
+              {
+                "lower_stratum": {
+                  "cert": 0,
+                  "atom": {
+                    "pred": "e",
+                    "args": [
+                      {
+                        "atom_str": "b"
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "rank": 1
+          },
+          {
+            "fact": {
+              "pred": "q",
+              "args": [
+                {
+                  "atom_str": "a"
+                }
+              ]
+            },
+            "clause": "qa1",
+            "subst": {
+              "X": {
+                "atom_str": "a"
+              }
+            },
+            "body_refs": [
+              {
+                "same_stratum": {
+                  "fact": {
+                    "pred": "p",
+                    "args": [
+                      {
+                        "atom_str": "a"
+                      }
+                    ]
+                  },
+                  "rank": 1
+                }
+              },
+              {
+                "lower_stratum": {
+                  "cert": 0,
+                  "atom": {
+                    "pred": "g",
+                    "args": [
+                      {
+                        "atom_str": "a"
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "rank": 2
+          },
+          {
+            "fact": {
+              "pred": "r",
+              "args": [
+                {
+                  "atom_str": "a"
+                }
+              ]
+            },
+            "clause": "ra1",
+            "subst": {
+              "X": {
+                "atom_str": "a"
+              }
+            },
+            "body_refs": [
+              {
+                "lower_stratum": {
+                  "cert": 0,
+                  "atom": {
+                    "pred": "e",
+                    "args": [
+                      {
+                        "atom_str": "a"
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "builtin": {
+                  "atom": {
+                    "pred": "lt",
+                    "args": [
+                      {
+                        "atom_str": "a"
+                      },
+                      {
+                        "atom_str": "b"
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "rank": 1
+          }
+        ],
+        "limits_decl": {
+          "cert_facts": 8,
+          "domain_values": 2,
+          "support_edges": 4,
+          "rule_groundings": 1000,
+          "join_steps": 10000,
+          "cert_bytes": 4096
+        }
+      },
+      "annotations": [
+        {
+          "pred": "e",
+          "elements": [
+            {
+              "int": 2
+            },
+            {
+              "int": 3
+            }
+          ]
+        },
+        {
+          "pred": "f",
+          "elements": [
+            {
+              "int": 5
+            }
+          ]
+        },
+        {
+          "pred": "g",
+          "elements": [
+            {
+              "int": 4
+            }
+          ]
+        },
+        {
+          "pred": "p",
+          "elements": [
+            {
+              "int": 2
+            },
+            {
+              "int": 3
+            }
+          ]
+        },
+        {
+          "pred": "q",
+          "elements": [
+            {
+              "int": 8
+            }
+          ]
+        },
+        {
+          "pred": "r",
+          "elements": [
+            {
+              "int": 2
+            }
+          ]
+        }
+      ],
+      "outcome": "reject",
+      "expected": {
+        "code": "annotation_mismatch",
+        "row": {
+          "pred": "p",
+          "index": 0
+        }
+      }
+    },
+    {
+      "name": "the_identity_is_checked_first",
+      "note": "the cert names tropical, the checker holds counting: refused before any other check",
+      "semiring": "counting",
+      "cert_semiring": "tropical",
+      "cert": {
+        "scope": {
+          "level": 1,
+          "predicates": [
+            "e",
+            "f",
+            "g",
+            "p",
+            "q",
+            "r"
+          ]
+        },
+        "domains": [
+          {
+            "type_tag": "d",
+            "values": [
+              {
+                "atom_str": "a"
+              },
+              {
+                "atom_str": "b"
+              }
+            ]
+          }
+        ],
+        "extensions": [
+          {
+            "pred": "e",
+            "arity": 1,
+            "rows": [
+              {
+                "pred": "e",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              },
+              {
+                "pred": "e",
+                "args": [
+                  {
+                    "atom_str": "b"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "pred": "f",
+            "arity": 1,
+            "rows": [
+              {
+                "pred": "f",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "pred": "g",
+            "arity": 1,
+            "rows": [
+              {
+                "pred": "g",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "pred": "p",
+            "arity": 1,
+            "rows": [
+              {
+                "pred": "p",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "pred": "q",
+            "arity": 1,
+            "rows": [
+              {
+                "pred": "q",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "pred": "r",
+            "arity": 1,
+            "rows": [
+              {
+                "pred": "r",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "supports": [
+          {
+            "fact": {
+              "pred": "p",
+              "args": [
+                {
+                  "atom_str": "a"
+                }
+              ]
+            },
+            "clause": "pa1",
+            "subst": {
+              "X": {
+                "atom_str": "a"
+              }
+            },
+            "body_refs": [
+              {
+                "lower_stratum": {
+                  "cert": 0,
+                  "atom": {
+                    "pred": "e",
+                    "args": [
+                      {
+                        "atom_str": "a"
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "rank": 1
+          },
+          {
+            "fact": {
+              "pred": "q",
+              "args": [
+                {
+                  "atom_str": "a"
+                }
+              ]
+            },
+            "clause": "qa1",
+            "subst": {
+              "X": {
+                "atom_str": "a"
+              }
+            },
+            "body_refs": [
+              {
+                "same_stratum": {
+                  "fact": {
+                    "pred": "p",
+                    "args": [
+                      {
+                        "atom_str": "a"
+                      }
+                    ]
+                  },
+                  "rank": 1
+                }
+              },
+              {
+                "lower_stratum": {
+                  "cert": 0,
+                  "atom": {
+                    "pred": "g",
+                    "args": [
+                      {
+                        "atom_str": "a"
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "rank": 2
+          },
+          {
+            "fact": {
+              "pred": "r",
+              "args": [
+                {
+                  "atom_str": "a"
+                }
+              ]
+            },
+            "clause": "ra1",
+            "subst": {
+              "X": {
+                "atom_str": "a"
+              }
+            },
+            "body_refs": [
+              {
+                "lower_stratum": {
+                  "cert": 0,
+                  "atom": {
+                    "pred": "e",
+                    "args": [
+                      {
+                        "atom_str": "a"
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "builtin": {
+                  "atom": {
+                    "pred": "lt",
+                    "args": [
+                      {
+                        "atom_str": "a"
+                      },
+                      {
+                        "atom_str": "b"
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "rank": 1
+          }
+        ],
+        "limits_decl": {
+          "cert_facts": 7,
+          "domain_values": 2,
+          "support_edges": 3,
+          "rule_groundings": 1000,
+          "join_steps": 10000,
+          "cert_bytes": 4096
+        }
+      },
+      "annotations": [
+        {
+          "pred": "e",
+          "elements": [
+            {
+              "int": 2
+            },
+            {
+              "int": 3
+            }
+          ]
+        },
+        {
+          "pred": "f",
+          "elements": [
+            {
+              "int": 5
+            }
+          ]
+        },
+        {
+          "pred": "g",
+          "elements": [
+            {
+              "int": 4
+            }
+          ]
+        },
+        {
+          "pred": "p",
+          "elements": [
+            {
+              "int": 7
+            },
+            {
+              "int": 3
+            }
+          ]
+        },
+        {
+          "pred": "q",
+          "elements": [
+            {
+              "int": 28
+            }
+          ]
+        },
+        {
+          "pred": "r",
+          "elements": [
+            {
+              "int": 2
+            }
+          ]
+        }
+      ],
+      "outcome": "reject",
+      "expected": {
+        "code": "annotation_identity_mismatch"
+      }
+    },
+    {
+      "name": "the_boolean_verdict_comes_before_the_annotations",
+      "note": "p(b) is derivable and absent, so the boolean check refuses the cert",
+      "semiring": "counting",
+      "cert_semiring": "counting",
+      "cert": {
+        "scope": {
+          "level": 1,
+          "predicates": [
+            "e",
+            "f",
+            "g",
+            "p",
+            "q",
+            "r"
+          ]
+        },
+        "domains": [
+          {
+            "type_tag": "d",
+            "values": [
+              {
+                "atom_str": "a"
+              },
+              {
+                "atom_str": "b"
+              }
+            ]
+          }
+        ],
+        "extensions": [
+          {
+            "pred": "e",
+            "arity": 1,
+            "rows": [
+              {
+                "pred": "e",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              },
+              {
+                "pred": "e",
+                "args": [
+                  {
+                    "atom_str": "b"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "pred": "f",
+            "arity": 1,
+            "rows": [
+              {
+                "pred": "f",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "pred": "g",
+            "arity": 1,
+            "rows": [
+              {
+                "pred": "g",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "pred": "p",
+            "arity": 1,
+            "rows": [
+              {
+                "pred": "p",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "pred": "q",
+            "arity": 1,
+            "rows": [
+              {
+                "pred": "q",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "pred": "r",
+            "arity": 1,
+            "rows": [
+              {
+                "pred": "r",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "supports": [
+          {
+            "fact": {
+              "pred": "p",
+              "args": [
+                {
+                  "atom_str": "a"
+                }
+              ]
+            },
+            "clause": "pa1",
+            "subst": {
+              "X": {
+                "atom_str": "a"
+              }
+            },
+            "body_refs": [
+              {
+                "lower_stratum": {
+                  "cert": 0,
+                  "atom": {
+                    "pred": "e",
+                    "args": [
+                      {
+                        "atom_str": "a"
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "rank": 1
+          },
+          {
+            "fact": {
+              "pred": "q",
+              "args": [
+                {
+                  "atom_str": "a"
+                }
+              ]
+            },
+            "clause": "qa1",
+            "subst": {
+              "X": {
+                "atom_str": "a"
+              }
+            },
+            "body_refs": [
+              {
+                "same_stratum": {
+                  "fact": {
+                    "pred": "p",
+                    "args": [
+                      {
+                        "atom_str": "a"
+                      }
+                    ]
+                  },
+                  "rank": 1
+                }
+              },
+              {
+                "lower_stratum": {
+                  "cert": 0,
+                  "atom": {
+                    "pred": "g",
+                    "args": [
+                      {
+                        "atom_str": "a"
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "rank": 2
+          },
+          {
+            "fact": {
+              "pred": "r",
+              "args": [
+                {
+                  "atom_str": "a"
+                }
+              ]
+            },
+            "clause": "ra1",
+            "subst": {
+              "X": {
+                "atom_str": "a"
+              }
+            },
+            "body_refs": [
+              {
+                "lower_stratum": {
+                  "cert": 0,
+                  "atom": {
+                    "pred": "e",
+                    "args": [
+                      {
+                        "atom_str": "a"
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "builtin": {
+                  "atom": {
+                    "pred": "lt",
+                    "args": [
+                      {
+                        "atom_str": "a"
+                      },
+                      {
+                        "atom_str": "b"
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "rank": 1
+          }
+        ],
+        "limits_decl": {
+          "cert_facts": 7,
+          "domain_values": 2,
+          "support_edges": 3,
+          "rule_groundings": 1000,
+          "join_steps": 10000,
+          "cert_bytes": 4096
+        }
+      },
+      "annotations": [
+        {
+          "pred": "e",
+          "elements": [
+            {
+              "int": 2
+            },
+            {
+              "int": 3
+            }
+          ]
+        },
+        {
+          "pred": "f",
+          "elements": [
+            {
+              "int": 5
+            }
+          ]
+        },
+        {
+          "pred": "g",
+          "elements": [
+            {
+              "int": 4
+            }
+          ]
+        },
+        {
+          "pred": "p",
+          "elements": [
+            {
+              "int": 7
+            }
+          ]
+        },
+        {
+          "pred": "q",
+          "elements": [
+            {
+              "int": 28
+            }
+          ]
+        },
+        {
+          "pred": "r",
+          "elements": [
+            {
+              "int": 2
+            }
+          ]
+        }
+      ],
+      "outcome": "reject_cert",
+      "expected": {
+        "code": "cert_not_closed"
+      }
+    },
+    {
+      "name": "a_partial_scope_is_unsupported",
+      "note": "q is sealed as a lower bound (ADR 0030), which has no least annotation",
+      "semiring": "counting",
+      "cert_semiring": "counting",
+      "cert": {
+        "scope": {
+          "level": 1,
+          "predicates": [
+            "e",
+            "f",
+            "g",
+            "p",
+            "q",
+            "r"
+          ]
+        },
+        "domains": [
+          {
+            "type_tag": "d",
+            "values": [
+              {
+                "atom_str": "a"
+              },
+              {
+                "atom_str": "b"
+              }
+            ]
+          }
+        ],
+        "extensions": [
+          {
+            "pred": "e",
+            "arity": 1,
+            "rows": [
+              {
+                "pred": "e",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              },
+              {
+                "pred": "e",
+                "args": [
+                  {
+                    "atom_str": "b"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "pred": "f",
+            "arity": 1,
+            "rows": [
+              {
+                "pred": "f",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "pred": "g",
+            "arity": 1,
+            "rows": [
+              {
+                "pred": "g",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "pred": "p",
+            "arity": 1,
+            "rows": [
+              {
+                "pred": "p",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              },
+              {
+                "pred": "p",
+                "args": [
+                  {
+                    "atom_str": "b"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "pred": "q",
+            "arity": 1,
+            "rows": [
+              {
+                "pred": "q",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "pred": "r",
+            "arity": 1,
+            "rows": [
+              {
+                "pred": "r",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "supports": [
+          {
+            "fact": {
+              "pred": "p",
+              "args": [
+                {
+                  "atom_str": "a"
+                }
+              ]
+            },
+            "clause": "pa1",
+            "subst": {
+              "X": {
+                "atom_str": "a"
+              }
+            },
+            "body_refs": [
+              {
+                "lower_stratum": {
+                  "cert": 0,
+                  "atom": {
+                    "pred": "e",
+                    "args": [
+                      {
+                        "atom_str": "a"
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "rank": 1
+          },
+          {
+            "fact": {
+              "pred": "p",
+              "args": [
+                {
+                  "atom_str": "b"
+                }
+              ]
+            },
+            "clause": "pa1",
+            "subst": {
+              "X": {
+                "atom_str": "b"
+              }
+            },
+            "body_refs": [
+              {
+                "lower_stratum": {
+                  "cert": 0,
+                  "atom": {
+                    "pred": "e",
+                    "args": [
+                      {
+                        "atom_str": "b"
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "rank": 1
+          },
+          {
+            "fact": {
+              "pred": "q",
+              "args": [
+                {
+                  "atom_str": "a"
+                }
+              ]
+            },
+            "clause": "qa1",
+            "subst": {
+              "X": {
+                "atom_str": "a"
+              }
+            },
+            "body_refs": [
+              {
+                "same_stratum": {
+                  "fact": {
+                    "pred": "p",
+                    "args": [
+                      {
+                        "atom_str": "a"
+                      }
+                    ]
+                  },
+                  "rank": 1
+                }
+              },
+              {
+                "lower_stratum": {
+                  "cert": 0,
+                  "atom": {
+                    "pred": "g",
+                    "args": [
+                      {
+                        "atom_str": "a"
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "rank": 2
+          },
+          {
+            "fact": {
+              "pred": "r",
+              "args": [
+                {
+                  "atom_str": "a"
+                }
+              ]
+            },
+            "clause": "ra1",
+            "subst": {
+              "X": {
+                "atom_str": "a"
+              }
+            },
+            "body_refs": [
+              {
+                "lower_stratum": {
+                  "cert": 0,
+                  "atom": {
+                    "pred": "e",
+                    "args": [
+                      {
+                        "atom_str": "a"
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "builtin": {
+                  "atom": {
+                    "pred": "lt",
+                    "args": [
+                      {
+                        "atom_str": "a"
+                      },
+                      {
+                        "atom_str": "b"
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "rank": 1
+          }
+        ],
+        "limits_decl": {
+          "cert_facts": 8,
+          "domain_values": 2,
+          "support_edges": 4,
+          "rule_groundings": 1000,
+          "join_steps": 10000,
+          "cert_bytes": 4096
+        },
+        "partial_scope": {
+          "level": 1,
+          "predicates": [
+            "q"
+          ]
+        }
+      },
+      "annotations": [
+        {
+          "pred": "e",
+          "elements": [
+            {
+              "int": 2
+            },
+            {
+              "int": 3
+            }
+          ]
+        },
+        {
+          "pred": "f",
+          "elements": [
+            {
+              "int": 5
+            }
+          ]
+        },
+        {
+          "pred": "g",
+          "elements": [
+            {
+              "int": 4
+            }
+          ]
+        },
+        {
+          "pred": "p",
+          "elements": [
+            {
+              "int": 7
+            },
+            {
+              "int": 3
+            }
+          ]
+        },
+        {
+          "pred": "q",
+          "elements": [
+            {
+              "int": 28
+            }
+          ]
+        },
+        {
+          "pred": "r",
+          "elements": [
+            {
+              "int": 2
+            }
+          ]
+        }
+      ],
+      "outcome": "reject",
+      "expected": {
+        "code": "annotation_unsupported"
+      }
+    },
+    {
+      "name": "a_sealed_table_without_annotations_is_refused",
+      "note": "r is sealed and not annotated",
+      "semiring": "counting",
+      "cert_semiring": "counting",
+      "cert": {
+        "scope": {
+          "level": 1,
+          "predicates": [
+            "e",
+            "f",
+            "g",
+            "p",
+            "q",
+            "r"
+          ]
+        },
+        "domains": [
+          {
+            "type_tag": "d",
+            "values": [
+              {
+                "atom_str": "a"
+              },
+              {
+                "atom_str": "b"
+              }
+            ]
+          }
+        ],
+        "extensions": [
+          {
+            "pred": "e",
+            "arity": 1,
+            "rows": [
+              {
+                "pred": "e",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              },
+              {
+                "pred": "e",
+                "args": [
+                  {
+                    "atom_str": "b"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "pred": "f",
+            "arity": 1,
+            "rows": [
+              {
+                "pred": "f",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "pred": "g",
+            "arity": 1,
+            "rows": [
+              {
+                "pred": "g",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "pred": "p",
+            "arity": 1,
+            "rows": [
+              {
+                "pred": "p",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              },
+              {
+                "pred": "p",
+                "args": [
+                  {
+                    "atom_str": "b"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "pred": "q",
+            "arity": 1,
+            "rows": [
+              {
+                "pred": "q",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "pred": "r",
+            "arity": 1,
+            "rows": [
+              {
+                "pred": "r",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "supports": [
+          {
+            "fact": {
+              "pred": "p",
+              "args": [
+                {
+                  "atom_str": "a"
+                }
+              ]
+            },
+            "clause": "pa1",
+            "subst": {
+              "X": {
+                "atom_str": "a"
+              }
+            },
+            "body_refs": [
+              {
+                "lower_stratum": {
+                  "cert": 0,
+                  "atom": {
+                    "pred": "e",
+                    "args": [
+                      {
+                        "atom_str": "a"
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "rank": 1
+          },
+          {
+            "fact": {
+              "pred": "p",
+              "args": [
+                {
+                  "atom_str": "b"
+                }
+              ]
+            },
+            "clause": "pa1",
+            "subst": {
+              "X": {
+                "atom_str": "b"
+              }
+            },
+            "body_refs": [
+              {
+                "lower_stratum": {
+                  "cert": 0,
+                  "atom": {
+                    "pred": "e",
+                    "args": [
+                      {
+                        "atom_str": "b"
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "rank": 1
+          },
+          {
+            "fact": {
+              "pred": "q",
+              "args": [
+                {
+                  "atom_str": "a"
+                }
+              ]
+            },
+            "clause": "qa1",
+            "subst": {
+              "X": {
+                "atom_str": "a"
+              }
+            },
+            "body_refs": [
+              {
+                "same_stratum": {
+                  "fact": {
+                    "pred": "p",
+                    "args": [
+                      {
+                        "atom_str": "a"
+                      }
+                    ]
+                  },
+                  "rank": 1
+                }
+              },
+              {
+                "lower_stratum": {
+                  "cert": 0,
+                  "atom": {
+                    "pred": "g",
+                    "args": [
+                      {
+                        "atom_str": "a"
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "rank": 2
+          },
+          {
+            "fact": {
+              "pred": "r",
+              "args": [
+                {
+                  "atom_str": "a"
+                }
+              ]
+            },
+            "clause": "ra1",
+            "subst": {
+              "X": {
+                "atom_str": "a"
+              }
+            },
+            "body_refs": [
+              {
+                "lower_stratum": {
+                  "cert": 0,
+                  "atom": {
+                    "pred": "e",
+                    "args": [
+                      {
+                        "atom_str": "a"
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "builtin": {
+                  "atom": {
+                    "pred": "lt",
+                    "args": [
+                      {
+                        "atom_str": "a"
+                      },
+                      {
+                        "atom_str": "b"
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "rank": 1
+          }
+        ],
+        "limits_decl": {
+          "cert_facts": 8,
+          "domain_values": 2,
+          "support_edges": 4,
+          "rule_groundings": 1000,
+          "join_steps": 10000,
+          "cert_bytes": 4096
+        }
+      },
+      "annotations": [
+        {
+          "pred": "e",
+          "elements": [
+            {
+              "int": 2
+            },
+            {
+              "int": 3
+            }
+          ]
+        },
+        {
+          "pred": "f",
+          "elements": [
+            {
+              "int": 5
+            }
+          ]
+        },
+        {
+          "pred": "g",
+          "elements": [
+            {
+              "int": 4
+            }
+          ]
+        },
+        {
+          "pred": "p",
+          "elements": [
+            {
+              "int": 7
+            },
+            {
+              "int": 3
+            }
+          ]
+        },
+        {
+          "pred": "q",
+          "elements": [
+            {
+              "int": 28
+            }
+          ]
+        }
+      ],
+      "outcome": "reject",
+      "expected": {
+        "code": "annotation_shape"
+      }
+    },
+    {
+      "name": "an_element_count_unlike_the_rows_is_refused",
+      "note": "p has two rows and one element",
+      "semiring": "counting",
+      "cert_semiring": "counting",
+      "cert": {
+        "scope": {
+          "level": 1,
+          "predicates": [
+            "e",
+            "f",
+            "g",
+            "p",
+            "q",
+            "r"
+          ]
+        },
+        "domains": [
+          {
+            "type_tag": "d",
+            "values": [
+              {
+                "atom_str": "a"
+              },
+              {
+                "atom_str": "b"
+              }
+            ]
+          }
+        ],
+        "extensions": [
+          {
+            "pred": "e",
+            "arity": 1,
+            "rows": [
+              {
+                "pred": "e",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              },
+              {
+                "pred": "e",
+                "args": [
+                  {
+                    "atom_str": "b"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "pred": "f",
+            "arity": 1,
+            "rows": [
+              {
+                "pred": "f",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "pred": "g",
+            "arity": 1,
+            "rows": [
+              {
+                "pred": "g",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "pred": "p",
+            "arity": 1,
+            "rows": [
+              {
+                "pred": "p",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              },
+              {
+                "pred": "p",
+                "args": [
+                  {
+                    "atom_str": "b"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "pred": "q",
+            "arity": 1,
+            "rows": [
+              {
+                "pred": "q",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "pred": "r",
+            "arity": 1,
+            "rows": [
+              {
+                "pred": "r",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "supports": [
+          {
+            "fact": {
+              "pred": "p",
+              "args": [
+                {
+                  "atom_str": "a"
+                }
+              ]
+            },
+            "clause": "pa1",
+            "subst": {
+              "X": {
+                "atom_str": "a"
+              }
+            },
+            "body_refs": [
+              {
+                "lower_stratum": {
+                  "cert": 0,
+                  "atom": {
+                    "pred": "e",
+                    "args": [
+                      {
+                        "atom_str": "a"
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "rank": 1
+          },
+          {
+            "fact": {
+              "pred": "p",
+              "args": [
+                {
+                  "atom_str": "b"
+                }
+              ]
+            },
+            "clause": "pa1",
+            "subst": {
+              "X": {
+                "atom_str": "b"
+              }
+            },
+            "body_refs": [
+              {
+                "lower_stratum": {
+                  "cert": 0,
+                  "atom": {
+                    "pred": "e",
+                    "args": [
+                      {
+                        "atom_str": "b"
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "rank": 1
+          },
+          {
+            "fact": {
+              "pred": "q",
+              "args": [
+                {
+                  "atom_str": "a"
+                }
+              ]
+            },
+            "clause": "qa1",
+            "subst": {
+              "X": {
+                "atom_str": "a"
+              }
+            },
+            "body_refs": [
+              {
+                "same_stratum": {
+                  "fact": {
+                    "pred": "p",
+                    "args": [
+                      {
+                        "atom_str": "a"
+                      }
+                    ]
+                  },
+                  "rank": 1
+                }
+              },
+              {
+                "lower_stratum": {
+                  "cert": 0,
+                  "atom": {
+                    "pred": "g",
+                    "args": [
+                      {
+                        "atom_str": "a"
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "rank": 2
+          },
+          {
+            "fact": {
+              "pred": "r",
+              "args": [
+                {
+                  "atom_str": "a"
+                }
+              ]
+            },
+            "clause": "ra1",
+            "subst": {
+              "X": {
+                "atom_str": "a"
+              }
+            },
+            "body_refs": [
+              {
+                "lower_stratum": {
+                  "cert": 0,
+                  "atom": {
+                    "pred": "e",
+                    "args": [
+                      {
+                        "atom_str": "a"
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "builtin": {
+                  "atom": {
+                    "pred": "lt",
+                    "args": [
+                      {
+                        "atom_str": "a"
+                      },
+                      {
+                        "atom_str": "b"
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "rank": 1
+          }
+        ],
+        "limits_decl": {
+          "cert_facts": 8,
+          "domain_values": 2,
+          "support_edges": 4,
+          "rule_groundings": 1000,
+          "join_steps": 10000,
+          "cert_bytes": 4096
+        }
+      },
+      "annotations": [
+        {
+          "pred": "e",
+          "elements": [
+            {
+              "int": 2
+            },
+            {
+              "int": 3
+            }
+          ]
+        },
+        {
+          "pred": "f",
+          "elements": [
+            {
+              "int": 5
+            }
+          ]
+        },
+        {
+          "pred": "g",
+          "elements": [
+            {
+              "int": 4
+            }
+          ]
+        },
+        {
+          "pred": "p",
+          "elements": [
+            {
+              "int": 7
+            }
+          ]
+        },
+        {
+          "pred": "q",
+          "elements": [
+            {
+              "int": 28
+            }
+          ]
+        },
+        {
+          "pred": "r",
+          "elements": [
+            {
+              "int": 2
+            }
+          ]
+        }
+      ],
+      "outcome": "reject",
+      "expected": {
+        "code": "annotation_shape"
+      }
+    },
+    {
+      "name": "a_claimed_non_element_is_refused",
+      "note": "a negative int is not a counting element",
+      "semiring": "counting",
+      "cert_semiring": "counting",
+      "cert": {
+        "scope": {
+          "level": 1,
+          "predicates": [
+            "e",
+            "f",
+            "g",
+            "p",
+            "q",
+            "r"
+          ]
+        },
+        "domains": [
+          {
+            "type_tag": "d",
+            "values": [
+              {
+                "atom_str": "a"
+              },
+              {
+                "atom_str": "b"
+              }
+            ]
+          }
+        ],
+        "extensions": [
+          {
+            "pred": "e",
+            "arity": 1,
+            "rows": [
+              {
+                "pred": "e",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              },
+              {
+                "pred": "e",
+                "args": [
+                  {
+                    "atom_str": "b"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "pred": "f",
+            "arity": 1,
+            "rows": [
+              {
+                "pred": "f",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "pred": "g",
+            "arity": 1,
+            "rows": [
+              {
+                "pred": "g",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "pred": "p",
+            "arity": 1,
+            "rows": [
+              {
+                "pred": "p",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              },
+              {
+                "pred": "p",
+                "args": [
+                  {
+                    "atom_str": "b"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "pred": "q",
+            "arity": 1,
+            "rows": [
+              {
+                "pred": "q",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "pred": "r",
+            "arity": 1,
+            "rows": [
+              {
+                "pred": "r",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "supports": [
+          {
+            "fact": {
+              "pred": "p",
+              "args": [
+                {
+                  "atom_str": "a"
+                }
+              ]
+            },
+            "clause": "pa1",
+            "subst": {
+              "X": {
+                "atom_str": "a"
+              }
+            },
+            "body_refs": [
+              {
+                "lower_stratum": {
+                  "cert": 0,
+                  "atom": {
+                    "pred": "e",
+                    "args": [
+                      {
+                        "atom_str": "a"
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "rank": 1
+          },
+          {
+            "fact": {
+              "pred": "p",
+              "args": [
+                {
+                  "atom_str": "b"
+                }
+              ]
+            },
+            "clause": "pa1",
+            "subst": {
+              "X": {
+                "atom_str": "b"
+              }
+            },
+            "body_refs": [
+              {
+                "lower_stratum": {
+                  "cert": 0,
+                  "atom": {
+                    "pred": "e",
+                    "args": [
+                      {
+                        "atom_str": "b"
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "rank": 1
+          },
+          {
+            "fact": {
+              "pred": "q",
+              "args": [
+                {
+                  "atom_str": "a"
+                }
+              ]
+            },
+            "clause": "qa1",
+            "subst": {
+              "X": {
+                "atom_str": "a"
+              }
+            },
+            "body_refs": [
+              {
+                "same_stratum": {
+                  "fact": {
+                    "pred": "p",
+                    "args": [
+                      {
+                        "atom_str": "a"
+                      }
+                    ]
+                  },
+                  "rank": 1
+                }
+              },
+              {
+                "lower_stratum": {
+                  "cert": 0,
+                  "atom": {
+                    "pred": "g",
+                    "args": [
+                      {
+                        "atom_str": "a"
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "rank": 2
+          },
+          {
+            "fact": {
+              "pred": "r",
+              "args": [
+                {
+                  "atom_str": "a"
+                }
+              ]
+            },
+            "clause": "ra1",
+            "subst": {
+              "X": {
+                "atom_str": "a"
+              }
+            },
+            "body_refs": [
+              {
+                "lower_stratum": {
+                  "cert": 0,
+                  "atom": {
+                    "pred": "e",
+                    "args": [
+                      {
+                        "atom_str": "a"
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "builtin": {
+                  "atom": {
+                    "pred": "lt",
+                    "args": [
+                      {
+                        "atom_str": "a"
+                      },
+                      {
+                        "atom_str": "b"
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "rank": 1
+          }
+        ],
+        "limits_decl": {
+          "cert_facts": 8,
+          "domain_values": 2,
+          "support_edges": 4,
+          "rule_groundings": 1000,
+          "join_steps": 10000,
+          "cert_bytes": 4096
+        }
+      },
+      "annotations": [
+        {
+          "pred": "e",
+          "elements": [
+            {
+              "int": 2
+            },
+            {
+              "int": 3
+            }
+          ]
+        },
+        {
+          "pred": "f",
+          "elements": [
+            {
+              "int": 5
+            }
+          ]
+        },
+        {
+          "pred": "g",
+          "elements": [
+            {
+              "int": 4
+            }
+          ]
+        },
+        {
+          "pred": "p",
+          "elements": [
+            {
+              "int": 7
+            },
+            {
+              "int": 3
+            }
+          ]
+        },
+        {
+          "pred": "q",
+          "elements": [
+            {
+              "int": -1
+            }
+          ]
+        },
+        {
+          "pred": "r",
+          "elements": [
+            {
+              "int": 2
+            }
+          ]
+        }
+      ],
+      "outcome": "reject",
+      "expected": {
+        "code": "annotation_shape",
+        "row": {
+          "pred": "q",
+          "index": 0
+        }
+      }
+    },
+    {
+      "name": "a_stopped_operation_is_refused_by_name",
+      "note": "every operation of the stopping fixture stops; the first is p(a)'s first product",
+      "semiring": "stopping",
+      "cert_semiring": "stopping",
+      "cert": {
+        "scope": {
+          "level": 1,
+          "predicates": [
+            "e",
+            "f",
+            "g",
+            "p",
+            "q",
+            "r"
+          ]
+        },
+        "domains": [
+          {
+            "type_tag": "d",
+            "values": [
+              {
+                "atom_str": "a"
+              },
+              {
+                "atom_str": "b"
+              }
+            ]
+          }
+        ],
+        "extensions": [
+          {
+            "pred": "e",
+            "arity": 1,
+            "rows": [
+              {
+                "pred": "e",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              },
+              {
+                "pred": "e",
+                "args": [
+                  {
+                    "atom_str": "b"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "pred": "f",
+            "arity": 1,
+            "rows": [
+              {
+                "pred": "f",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "pred": "g",
+            "arity": 1,
+            "rows": [
+              {
+                "pred": "g",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "pred": "p",
+            "arity": 1,
+            "rows": [
+              {
+                "pred": "p",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              },
+              {
+                "pred": "p",
+                "args": [
+                  {
+                    "atom_str": "b"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "pred": "q",
+            "arity": 1,
+            "rows": [
+              {
+                "pred": "q",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "pred": "r",
+            "arity": 1,
+            "rows": [
+              {
+                "pred": "r",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "supports": [
+          {
+            "fact": {
+              "pred": "p",
+              "args": [
+                {
+                  "atom_str": "a"
+                }
+              ]
+            },
+            "clause": "pa1",
+            "subst": {
+              "X": {
+                "atom_str": "a"
+              }
+            },
+            "body_refs": [
+              {
+                "lower_stratum": {
+                  "cert": 0,
+                  "atom": {
+                    "pred": "e",
+                    "args": [
+                      {
+                        "atom_str": "a"
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "rank": 1
+          },
+          {
+            "fact": {
+              "pred": "p",
+              "args": [
+                {
+                  "atom_str": "b"
+                }
+              ]
+            },
+            "clause": "pa1",
+            "subst": {
+              "X": {
+                "atom_str": "b"
+              }
+            },
+            "body_refs": [
+              {
+                "lower_stratum": {
+                  "cert": 0,
+                  "atom": {
+                    "pred": "e",
+                    "args": [
+                      {
+                        "atom_str": "b"
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "rank": 1
+          },
+          {
+            "fact": {
+              "pred": "q",
+              "args": [
+                {
+                  "atom_str": "a"
+                }
+              ]
+            },
+            "clause": "qa1",
+            "subst": {
+              "X": {
+                "atom_str": "a"
+              }
+            },
+            "body_refs": [
+              {
+                "same_stratum": {
+                  "fact": {
+                    "pred": "p",
+                    "args": [
+                      {
+                        "atom_str": "a"
+                      }
+                    ]
+                  },
+                  "rank": 1
+                }
+              },
+              {
+                "lower_stratum": {
+                  "cert": 0,
+                  "atom": {
+                    "pred": "g",
+                    "args": [
+                      {
+                        "atom_str": "a"
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "rank": 2
+          },
+          {
+            "fact": {
+              "pred": "r",
+              "args": [
+                {
+                  "atom_str": "a"
+                }
+              ]
+            },
+            "clause": "ra1",
+            "subst": {
+              "X": {
+                "atom_str": "a"
+              }
+            },
+            "body_refs": [
+              {
+                "lower_stratum": {
+                  "cert": 0,
+                  "atom": {
+                    "pred": "e",
+                    "args": [
+                      {
+                        "atom_str": "a"
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "builtin": {
+                  "atom": {
+                    "pred": "lt",
+                    "args": [
+                      {
+                        "atom_str": "a"
+                      },
+                      {
+                        "atom_str": "b"
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "rank": 1
+          }
+        ],
+        "limits_decl": {
+          "cert_facts": 8,
+          "domain_values": 2,
+          "support_edges": 4,
+          "rule_groundings": 1000,
+          "join_steps": 10000,
+          "cert_bytes": 4096
+        }
+      },
+      "annotations": [
+        {
+          "pred": "e",
+          "elements": [
+            {
+              "int": 2
+            },
+            {
+              "int": 3
+            }
+          ]
+        },
+        {
+          "pred": "f",
+          "elements": [
+            {
+              "int": 5
+            }
+          ]
+        },
+        {
+          "pred": "g",
+          "elements": [
+            {
+              "int": 4
+            }
+          ]
+        },
+        {
+          "pred": "p",
+          "elements": [
+            {
+              "int": 7
+            },
+            {
+              "int": 3
+            }
+          ]
+        },
+        {
+          "pred": "q",
+          "elements": [
+            {
+              "int": 28
+            }
+          ]
+        },
+        {
+          "pred": "r",
+          "elements": [
+            {
+              "int": 2
+            }
+          ]
+        }
+      ],
+      "outcome": "reject",
+      "expected": {
+        "code": "semiring_stopped",
+        "row": {
+          "pred": "p",
+          "index": 0
+        }
+      }
+    },
+    {
+      "name": "tropical_over_a_cycle_converges_and_names_its_law",
+      "note": "the least solution of a cyclic system, reached by Kleene iteration",
+      "semiring": "tropical",
+      "cert_semiring": "tropical",
+      "cert": {
+        "scope": {
+          "level": 1,
+          "predicates": [
+            "reach",
+            "w"
+          ]
+        },
+        "domains": [
+          {
+            "type_tag": "d",
+            "values": [
+              {
+                "atom_str": "a"
+              },
+              {
+                "atom_str": "b"
+              }
+            ]
+          }
+        ],
+        "extensions": [
+          {
+            "pred": "w",
+            "arity": 2,
+            "rows": [
+              {
+                "pred": "w",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  },
+                  {
+                    "atom_str": "b"
+                  }
+                ]
+              },
+              {
+                "pred": "w",
+                "args": [
+                  {
+                    "atom_str": "b"
+                  },
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "pred": "reach",
+            "arity": 2,
+            "rows": [
+              {
+                "pred": "reach",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  },
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              },
+              {
+                "pred": "reach",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  },
+                  {
+                    "atom_str": "b"
+                  }
+                ]
+              },
+              {
+                "pred": "reach",
+                "args": [
+                  {
+                    "atom_str": "b"
+                  },
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              },
+              {
+                "pred": "reach",
+                "args": [
+                  {
+                    "atom_str": "b"
+                  },
+                  {
+                    "atom_str": "b"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "supports": [
+          {
+            "fact": {
+              "pred": "reach",
+              "args": [
+                {
+                  "atom_str": "a"
+                },
+                {
+                  "atom_str": "b"
+                }
+              ]
+            },
+            "clause": "rb1",
+            "subst": {
+              "X": {
+                "atom_str": "a"
+              },
+              "Y": {
+                "atom_str": "b"
+              }
+            },
+            "body_refs": [
+              {
+                "lower_stratum": {
+                  "cert": 0,
+                  "atom": {
+                    "pred": "w",
+                    "args": [
+                      {
+                        "atom_str": "a"
+                      },
+                      {
+                        "atom_str": "b"
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "rank": 1
+          },
+          {
+            "fact": {
+              "pred": "reach",
+              "args": [
+                {
+                  "atom_str": "b"
+                },
+                {
+                  "atom_str": "a"
+                }
+              ]
+            },
+            "clause": "rb1",
+            "subst": {
+              "X": {
+                "atom_str": "b"
+              },
+              "Y": {
+                "atom_str": "a"
+              }
+            },
+            "body_refs": [
+              {
+                "lower_stratum": {
+                  "cert": 0,
+                  "atom": {
+                    "pred": "w",
+                    "args": [
+                      {
+                        "atom_str": "b"
+                      },
+                      {
+                        "atom_str": "a"
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "rank": 1
+          },
+          {
+            "fact": {
+              "pred": "reach",
+              "args": [
+                {
+                  "atom_str": "a"
+                },
+                {
+                  "atom_str": "a"
+                }
+              ]
+            },
+            "clause": "rb2",
+            "subst": {
+              "X": {
+                "atom_str": "a"
+              },
+              "Y": {
+                "atom_str": "b"
+              },
+              "Z": {
+                "atom_str": "a"
+              }
+            },
+            "body_refs": [
+              {
+                "same_stratum": {
+                  "fact": {
+                    "pred": "reach",
+                    "args": [
+                      {
+                        "atom_str": "a"
+                      },
+                      {
+                        "atom_str": "b"
+                      }
+                    ]
+                  },
+                  "rank": 1
+                }
+              },
+              {
+                "lower_stratum": {
+                  "cert": 0,
+                  "atom": {
+                    "pred": "w",
+                    "args": [
+                      {
+                        "atom_str": "b"
+                      },
+                      {
+                        "atom_str": "a"
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "rank": 2
+          },
+          {
+            "fact": {
+              "pred": "reach",
+              "args": [
+                {
+                  "atom_str": "b"
+                },
+                {
+                  "atom_str": "b"
+                }
+              ]
+            },
+            "clause": "rb2",
+            "subst": {
+              "X": {
+                "atom_str": "b"
+              },
+              "Y": {
+                "atom_str": "a"
+              },
+              "Z": {
+                "atom_str": "b"
+              }
+            },
+            "body_refs": [
+              {
+                "same_stratum": {
+                  "fact": {
+                    "pred": "reach",
+                    "args": [
+                      {
+                        "atom_str": "b"
+                      },
+                      {
+                        "atom_str": "a"
+                      }
+                    ]
+                  },
+                  "rank": 1
+                }
+              },
+              {
+                "lower_stratum": {
+                  "cert": 0,
+                  "atom": {
+                    "pred": "w",
+                    "args": [
+                      {
+                        "atom_str": "a"
+                      },
+                      {
+                        "atom_str": "b"
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "rank": 2
+          }
+        ],
+        "limits_decl": {
+          "cert_facts": 6,
+          "domain_values": 2,
+          "support_edges": 4,
+          "rule_groundings": 1000,
+          "join_steps": 10000,
+          "cert_bytes": 4096
+        }
+      },
+      "annotations": [
+        {
+          "pred": "w",
+          "elements": [
+            {
+              "decimal": [
+                2,
+                0
+              ]
+            },
+            {
+              "decimal": [
+                3,
+                0
+              ]
+            }
+          ]
+        },
+        {
+          "pred": "reach",
+          "elements": [
+            {
+              "decimal": [
+                5,
+                0
+              ]
+            },
+            {
+              "decimal": [
+                2,
+                0
+              ]
+            },
+            {
+              "decimal": [
+                3,
+                0
+              ]
+            },
+            {
+              "decimal": [
+                5,
+                0
+              ]
+            }
+          ]
+        }
+      ],
+      "outcome": "accept",
+      "expected": {
+        "law": "kleene_least_fixpoint",
+        "unattested": [
+          "w"
+        ]
+      }
+    },
+    {
+      "name": "tropical_a_lower_claim_on_the_cycle_is_a_mismatch",
+      "note": "aa claimed 4, below the least solution 5",
+      "semiring": "tropical",
+      "cert_semiring": "tropical",
+      "cert": {
+        "scope": {
+          "level": 1,
+          "predicates": [
+            "reach",
+            "w"
+          ]
+        },
+        "domains": [
+          {
+            "type_tag": "d",
+            "values": [
+              {
+                "atom_str": "a"
+              },
+              {
+                "atom_str": "b"
+              }
+            ]
+          }
+        ],
+        "extensions": [
+          {
+            "pred": "w",
+            "arity": 2,
+            "rows": [
+              {
+                "pred": "w",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  },
+                  {
+                    "atom_str": "b"
+                  }
+                ]
+              },
+              {
+                "pred": "w",
+                "args": [
+                  {
+                    "atom_str": "b"
+                  },
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "pred": "reach",
+            "arity": 2,
+            "rows": [
+              {
+                "pred": "reach",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  },
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              },
+              {
+                "pred": "reach",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  },
+                  {
+                    "atom_str": "b"
+                  }
+                ]
+              },
+              {
+                "pred": "reach",
+                "args": [
+                  {
+                    "atom_str": "b"
+                  },
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              },
+              {
+                "pred": "reach",
+                "args": [
+                  {
+                    "atom_str": "b"
+                  },
+                  {
+                    "atom_str": "b"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "supports": [
+          {
+            "fact": {
+              "pred": "reach",
+              "args": [
+                {
+                  "atom_str": "a"
+                },
+                {
+                  "atom_str": "b"
+                }
+              ]
+            },
+            "clause": "rb1",
+            "subst": {
+              "X": {
+                "atom_str": "a"
+              },
+              "Y": {
+                "atom_str": "b"
+              }
+            },
+            "body_refs": [
+              {
+                "lower_stratum": {
+                  "cert": 0,
+                  "atom": {
+                    "pred": "w",
+                    "args": [
+                      {
+                        "atom_str": "a"
+                      },
+                      {
+                        "atom_str": "b"
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "rank": 1
+          },
+          {
+            "fact": {
+              "pred": "reach",
+              "args": [
+                {
+                  "atom_str": "b"
+                },
+                {
+                  "atom_str": "a"
+                }
+              ]
+            },
+            "clause": "rb1",
+            "subst": {
+              "X": {
+                "atom_str": "b"
+              },
+              "Y": {
+                "atom_str": "a"
+              }
+            },
+            "body_refs": [
+              {
+                "lower_stratum": {
+                  "cert": 0,
+                  "atom": {
+                    "pred": "w",
+                    "args": [
+                      {
+                        "atom_str": "b"
+                      },
+                      {
+                        "atom_str": "a"
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "rank": 1
+          },
+          {
+            "fact": {
+              "pred": "reach",
+              "args": [
+                {
+                  "atom_str": "a"
+                },
+                {
+                  "atom_str": "a"
+                }
+              ]
+            },
+            "clause": "rb2",
+            "subst": {
+              "X": {
+                "atom_str": "a"
+              },
+              "Y": {
+                "atom_str": "b"
+              },
+              "Z": {
+                "atom_str": "a"
+              }
+            },
+            "body_refs": [
+              {
+                "same_stratum": {
+                  "fact": {
+                    "pred": "reach",
+                    "args": [
+                      {
+                        "atom_str": "a"
+                      },
+                      {
+                        "atom_str": "b"
+                      }
+                    ]
+                  },
+                  "rank": 1
+                }
+              },
+              {
+                "lower_stratum": {
+                  "cert": 0,
+                  "atom": {
+                    "pred": "w",
+                    "args": [
+                      {
+                        "atom_str": "b"
+                      },
+                      {
+                        "atom_str": "a"
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "rank": 2
+          },
+          {
+            "fact": {
+              "pred": "reach",
+              "args": [
+                {
+                  "atom_str": "b"
+                },
+                {
+                  "atom_str": "b"
+                }
+              ]
+            },
+            "clause": "rb2",
+            "subst": {
+              "X": {
+                "atom_str": "b"
+              },
+              "Y": {
+                "atom_str": "a"
+              },
+              "Z": {
+                "atom_str": "b"
+              }
+            },
+            "body_refs": [
+              {
+                "same_stratum": {
+                  "fact": {
+                    "pred": "reach",
+                    "args": [
+                      {
+                        "atom_str": "b"
+                      },
+                      {
+                        "atom_str": "a"
+                      }
+                    ]
+                  },
+                  "rank": 1
+                }
+              },
+              {
+                "lower_stratum": {
+                  "cert": 0,
+                  "atom": {
+                    "pred": "w",
+                    "args": [
+                      {
+                        "atom_str": "a"
+                      },
+                      {
+                        "atom_str": "b"
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "rank": 2
+          }
+        ],
+        "limits_decl": {
+          "cert_facts": 6,
+          "domain_values": 2,
+          "support_edges": 4,
+          "rule_groundings": 1000,
+          "join_steps": 10000,
+          "cert_bytes": 4096
+        }
+      },
+      "annotations": [
+        {
+          "pred": "w",
+          "elements": [
+            {
+              "decimal": [
+                2,
+                0
+              ]
+            },
+            {
+              "decimal": [
+                3,
+                0
+              ]
+            }
+          ]
+        },
+        {
+          "pred": "reach",
+          "elements": [
+            {
+              "decimal": [
+                4,
+                0
+              ]
+            },
+            {
+              "decimal": [
+                2,
+                0
+              ]
+            },
+            {
+              "decimal": [
+                3,
+                0
+              ]
+            },
+            {
+              "decimal": [
+                5,
+                0
+              ]
+            }
+          ]
+        }
+      ],
+      "outcome": "reject",
+      "expected": {
+        "code": "annotation_mismatch",
+        "row": {
+          "pred": "reach",
+          "index": 0
+        }
+      }
+    },
+    {
+      "name": "counting_over_a_cycle_does_not_converge",
+      "note": "the planted witness (ruling Q15 condition 2): derivations of reach(a,b) are unbounded",
+      "semiring": "counting",
+      "cert_semiring": "counting",
+      "cert": {
+        "scope": {
+          "level": 1,
+          "predicates": [
+            "reach",
+            "w"
+          ]
+        },
+        "domains": [
+          {
+            "type_tag": "d",
+            "values": [
+              {
+                "atom_str": "a"
+              },
+              {
+                "atom_str": "b"
+              }
+            ]
+          }
+        ],
+        "extensions": [
+          {
+            "pred": "w",
+            "arity": 2,
+            "rows": [
+              {
+                "pred": "w",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  },
+                  {
+                    "atom_str": "b"
+                  }
+                ]
+              },
+              {
+                "pred": "w",
+                "args": [
+                  {
+                    "atom_str": "b"
+                  },
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "pred": "reach",
+            "arity": 2,
+            "rows": [
+              {
+                "pred": "reach",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  },
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              },
+              {
+                "pred": "reach",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  },
+                  {
+                    "atom_str": "b"
+                  }
+                ]
+              },
+              {
+                "pred": "reach",
+                "args": [
+                  {
+                    "atom_str": "b"
+                  },
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              },
+              {
+                "pred": "reach",
+                "args": [
+                  {
+                    "atom_str": "b"
+                  },
+                  {
+                    "atom_str": "b"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "supports": [
+          {
+            "fact": {
+              "pred": "reach",
+              "args": [
+                {
+                  "atom_str": "a"
+                },
+                {
+                  "atom_str": "b"
+                }
+              ]
+            },
+            "clause": "rb1",
+            "subst": {
+              "X": {
+                "atom_str": "a"
+              },
+              "Y": {
+                "atom_str": "b"
+              }
+            },
+            "body_refs": [
+              {
+                "lower_stratum": {
+                  "cert": 0,
+                  "atom": {
+                    "pred": "w",
+                    "args": [
+                      {
+                        "atom_str": "a"
+                      },
+                      {
+                        "atom_str": "b"
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "rank": 1
+          },
+          {
+            "fact": {
+              "pred": "reach",
+              "args": [
+                {
+                  "atom_str": "b"
+                },
+                {
+                  "atom_str": "a"
+                }
+              ]
+            },
+            "clause": "rb1",
+            "subst": {
+              "X": {
+                "atom_str": "b"
+              },
+              "Y": {
+                "atom_str": "a"
+              }
+            },
+            "body_refs": [
+              {
+                "lower_stratum": {
+                  "cert": 0,
+                  "atom": {
+                    "pred": "w",
+                    "args": [
+                      {
+                        "atom_str": "b"
+                      },
+                      {
+                        "atom_str": "a"
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "rank": 1
+          },
+          {
+            "fact": {
+              "pred": "reach",
+              "args": [
+                {
+                  "atom_str": "a"
+                },
+                {
+                  "atom_str": "a"
+                }
+              ]
+            },
+            "clause": "rb2",
+            "subst": {
+              "X": {
+                "atom_str": "a"
+              },
+              "Y": {
+                "atom_str": "b"
+              },
+              "Z": {
+                "atom_str": "a"
+              }
+            },
+            "body_refs": [
+              {
+                "same_stratum": {
+                  "fact": {
+                    "pred": "reach",
+                    "args": [
+                      {
+                        "atom_str": "a"
+                      },
+                      {
+                        "atom_str": "b"
+                      }
+                    ]
+                  },
+                  "rank": 1
+                }
+              },
+              {
+                "lower_stratum": {
+                  "cert": 0,
+                  "atom": {
+                    "pred": "w",
+                    "args": [
+                      {
+                        "atom_str": "b"
+                      },
+                      {
+                        "atom_str": "a"
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "rank": 2
+          },
+          {
+            "fact": {
+              "pred": "reach",
+              "args": [
+                {
+                  "atom_str": "b"
+                },
+                {
+                  "atom_str": "b"
+                }
+              ]
+            },
+            "clause": "rb2",
+            "subst": {
+              "X": {
+                "atom_str": "b"
+              },
+              "Y": {
+                "atom_str": "a"
+              },
+              "Z": {
+                "atom_str": "b"
+              }
+            },
+            "body_refs": [
+              {
+                "same_stratum": {
+                  "fact": {
+                    "pred": "reach",
+                    "args": [
+                      {
+                        "atom_str": "b"
+                      },
+                      {
+                        "atom_str": "a"
+                      }
+                    ]
+                  },
+                  "rank": 1
+                }
+              },
+              {
+                "lower_stratum": {
+                  "cert": 0,
+                  "atom": {
+                    "pred": "w",
+                    "args": [
+                      {
+                        "atom_str": "a"
+                      },
+                      {
+                        "atom_str": "b"
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "rank": 2
+          }
+        ],
+        "limits_decl": {
+          "cert_facts": 6,
+          "domain_values": 2,
+          "support_edges": 4,
+          "rule_groundings": 1000,
+          "join_steps": 10000,
+          "cert_bytes": 4096
+        }
+      },
+      "annotations": [
+        {
+          "pred": "w",
+          "elements": [
+            {
+              "int": 1
+            },
+            {
+              "int": 1
+            }
+          ]
+        },
+        {
+          "pred": "reach",
+          "elements": [
+            {
+              "int": 1
+            },
+            {
+              "int": 1
+            },
+            {
+              "int": 1
+            },
+            {
+              "int": 1
+            }
+          ]
+        }
+      ],
+      "outcome": "reject",
+      "expected": {
+        "code": "annotation_not_converged"
+      }
+    },
+    {
+      "name": "the_fold_follows_the_canonical_grounding_order",
+      "note": "ruling Q15 condition 3: an order-sensitive add pins the canonical (clause id, substitution) order, and mul pins body order",
+      "semiring": "fold_order",
+      "cert_semiring": "fold_order",
+      "cert": {
+        "scope": {
+          "level": 1,
+          "predicates": [
+            "s",
+            "t",
+            "u",
+            "v"
+          ]
+        },
+        "domains": [
+          {
+            "type_tag": "d",
+            "values": [
+              {
+                "atom_str": "a"
+              },
+              {
+                "atom_str": "b"
+              },
+              {
+                "atom_str": "c"
+              },
+              {
+                "atom_str": "z"
+              }
+            ]
+          }
+        ],
+        "extensions": [
+          {
+            "pred": "s",
+            "arity": 1,
+            "rows": [
+              {
+                "pred": "s",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              },
+              {
+                "pred": "s",
+                "args": [
+                  {
+                    "atom_str": "b"
+                  }
+                ]
+              },
+              {
+                "pred": "s",
+                "args": [
+                  {
+                    "atom_str": "c"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "pred": "t",
+            "arity": 1,
+            "rows": [
+              {
+                "pred": "t",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "pred": "u",
+            "arity": 1,
+            "rows": [
+              {
+                "pred": "u",
+                "args": [
+                  {
+                    "atom_str": "z"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "pred": "v",
+            "arity": 1,
+            "rows": [
+              {
+                "pred": "v",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "supports": [
+          {
+            "fact": {
+              "pred": "u",
+              "args": [
+                {
+                  "atom_str": "z"
+                }
+              ]
+            },
+            "clause": "uo1",
+            "subst": {
+              "X": {
+                "atom_str": "a"
+              }
+            },
+            "body_refs": [
+              {
+                "lower_stratum": {
+                  "cert": 0,
+                  "atom": {
+                    "pred": "s",
+                    "args": [
+                      {
+                        "atom_str": "a"
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "rank": 1
+          },
+          {
+            "fact": {
+              "pred": "v",
+              "args": [
+                {
+                  "atom_str": "a"
+                }
+              ]
+            },
+            "clause": "vo1",
+            "subst": {
+              "X": {
+                "atom_str": "a"
+              }
+            },
+            "body_refs": [
+              {
+                "lower_stratum": {
+                  "cert": 0,
+                  "atom": {
+                    "pred": "s",
+                    "args": [
+                      {
+                        "atom_str": "a"
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "lower_stratum": {
+                  "cert": 0,
+                  "atom": {
+                    "pred": "t",
+                    "args": [
+                      {
+                        "atom_str": "a"
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "rank": 1
+          }
+        ],
+        "limits_decl": {
+          "cert_facts": 6,
+          "domain_values": 4,
+          "support_edges": 2,
+          "rule_groundings": 1000,
+          "join_steps": 10000,
+          "cert_bytes": 4096
+        }
+      },
+      "annotations": [
+        {
+          "pred": "s",
+          "elements": [
+            {
+              "atom": "1"
+            },
+            {
+              "atom": "2"
+            },
+            {
+              "atom": "3"
+            }
+          ]
+        },
+        {
+          "pred": "t",
+          "elements": [
+            {
+              "atom": "4"
+            }
+          ]
+        },
+        {
+          "pred": "u",
+          "elements": [
+            {
+              "atom": "1234"
+            }
+          ]
+        },
+        {
+          "pred": "v",
+          "elements": [
+            {
+              "atom": "14"
+            }
+          ]
+        }
+      ],
+      "outcome": "accept",
+      "expected": {
+        "law": null,
+        "unattested": [
+          "s",
+          "t"
+        ]
+      }
+    },
+    {
+      "name": "another_fold_order_is_a_mismatch",
+      "note": "u(z) claimed in the reverse order",
+      "semiring": "fold_order",
+      "cert_semiring": "fold_order",
+      "cert": {
+        "scope": {
+          "level": 1,
+          "predicates": [
+            "s",
+            "t",
+            "u",
+            "v"
+          ]
+        },
+        "domains": [
+          {
+            "type_tag": "d",
+            "values": [
+              {
+                "atom_str": "a"
+              },
+              {
+                "atom_str": "b"
+              },
+              {
+                "atom_str": "c"
+              },
+              {
+                "atom_str": "z"
+              }
+            ]
+          }
+        ],
+        "extensions": [
+          {
+            "pred": "s",
+            "arity": 1,
+            "rows": [
+              {
+                "pred": "s",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              },
+              {
+                "pred": "s",
+                "args": [
+                  {
+                    "atom_str": "b"
+                  }
+                ]
+              },
+              {
+                "pred": "s",
+                "args": [
+                  {
+                    "atom_str": "c"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "pred": "t",
+            "arity": 1,
+            "rows": [
+              {
+                "pred": "t",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "pred": "u",
+            "arity": 1,
+            "rows": [
+              {
+                "pred": "u",
+                "args": [
+                  {
+                    "atom_str": "z"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "pred": "v",
+            "arity": 1,
+            "rows": [
+              {
+                "pred": "v",
+                "args": [
+                  {
+                    "atom_str": "a"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "supports": [
+          {
+            "fact": {
+              "pred": "u",
+              "args": [
+                {
+                  "atom_str": "z"
+                }
+              ]
+            },
+            "clause": "uo1",
+            "subst": {
+              "X": {
+                "atom_str": "a"
+              }
+            },
+            "body_refs": [
+              {
+                "lower_stratum": {
+                  "cert": 0,
+                  "atom": {
+                    "pred": "s",
+                    "args": [
+                      {
+                        "atom_str": "a"
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "rank": 1
+          },
+          {
+            "fact": {
+              "pred": "v",
+              "args": [
+                {
+                  "atom_str": "a"
+                }
+              ]
+            },
+            "clause": "vo1",
+            "subst": {
+              "X": {
+                "atom_str": "a"
+              }
+            },
+            "body_refs": [
+              {
+                "lower_stratum": {
+                  "cert": 0,
+                  "atom": {
+                    "pred": "s",
+                    "args": [
+                      {
+                        "atom_str": "a"
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "lower_stratum": {
+                  "cert": 0,
+                  "atom": {
+                    "pred": "t",
+                    "args": [
+                      {
+                        "atom_str": "a"
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "rank": 1
+          }
+        ],
+        "limits_decl": {
+          "cert_facts": 6,
+          "domain_values": 4,
+          "support_edges": 2,
+          "rule_groundings": 1000,
+          "join_steps": 10000,
+          "cert_bytes": 4096
+        }
+      },
+      "annotations": [
+        {
+          "pred": "s",
+          "elements": [
+            {
+              "atom": "1"
+            },
+            {
+              "atom": "2"
+            },
+            {
+              "atom": "3"
+            }
+          ]
+        },
+        {
+          "pred": "t",
+          "elements": [
+            {
+              "atom": "4"
+            }
+          ]
+        },
+        {
+          "pred": "u",
+          "elements": [
+            {
+              "atom": "4321"
+            }
+          ]
+        },
+        {
+          "pred": "v",
+          "elements": [
+            {
+              "atom": "14"
+            }
+          ]
+        }
+      ],
+      "outcome": "reject",
+      "expected": {
+        "code": "annotation_mismatch",
+        "row": {
+          "pred": "u",
+          "index": 0
+        }
+      }
+    }
+  ]
+}

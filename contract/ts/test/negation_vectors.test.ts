@@ -57,7 +57,7 @@ import {
   ProjectSpec,
   RelationTable,
   StratumPrefix,
-  type Subst,
+  Subst,
   type SupportEdge,
   SupportEdge as SupportEdgeClass,
   type SupportRef,
@@ -65,15 +65,18 @@ import {
   Symbol,
   Term,
   type Theory,
-  TheoryOutcome,
+  TheoryGround,
   type CertSizeDecl,
   type CheckLimits,
   type CheckProfile,
+  type CheckReport,
+  ReportCount,
   defaultLimits,
   BuiltinNode,
   LeafNode,
   RuleNode,
   WorldMemo,
+  VarId,
 } from "../src/index.js";
 import { assertLengthReading2605 } from "./support/cert_len_2605.js";
 
@@ -111,15 +114,15 @@ class LtTheory implements Theory {
   owns(pred: Symbol): boolean {
     return pred.equals(Symbol.of("lt"));
   }
-  decide(atom: GroundLiteral): TheoryOutcome {
+  decideGround(atom: GroundLiteral): TheoryGround {
     const args = atom.args;
-    if (args.length !== 2) return TheoryOutcome.Fails("lt_arity");
+    if (args.length !== 2) return TheoryGround.fails("lt_arity");
     const a = args[0]!;
     const b = args[1]!;
     if (a.kind === "atom" && b.kind === "atom" && bytesLess(a.bytes(), b.bytes())) {
-      return TheoryOutcome.Holds;
+      return TheoryGround.holds();
     }
-    return TheoryOutcome.Fails("not_less_than");
+    return TheoryGround.fails("not_less_than");
   }
 }
 
@@ -223,8 +226,8 @@ function groundTermValue(j: any): Value {
 }
 
 function substFromJson(j: any): Subst {
-  const subst: Subst = new Map();
-  for (const [varName, term] of Object.entries(j)) subst.set(varName, termFromJson(term));
+  const subst: Subst = new Subst();
+  for (const [varName, term] of Object.entries(j)) subst.set(new VarId(varName), termFromJson(term));
   return subst;
 }
 
@@ -403,6 +406,54 @@ const recomputed: Hash = programDigest(program.iter().map(([, clause]) => clause
 // guard their loops the same way.
 assert(doc.cases.length > 0, "no negation cases loaded");
 
+// #4206: a row that states `report` pins check()'s work counters exactly: counters_version and the
+// 17 counters by their snake_case names, hand-computed from the rules in report.rs. The row states
+// every counter, so a counter it omits, or a name no counter has, fails too.
+const REPORT_COUNTERS: ReadonlyArray<readonly [string, Exclude<keyof CheckReport, "countersVersion">]> = [
+  ["nodes_walked", "nodesWalked"],
+  ["rule_nodes", "ruleNodes"],
+  ["builtin_nodes", "builtinNodes"],
+  ["leaf_nodes", "leafNodes"],
+  ["premises_pos", "premisesPos"],
+  ["premises_neg", "premisesNeg"],
+  ["theory_decisions", "theoryDecisions"],
+  ["leaf_verifications", "leafVerifications"],
+  ["admissibility_checks", "admissibilityChecks"],
+  ["certs_verified", "certsVerified"],
+  ["certs_memo_hits", "certsMemoHits"],
+  ["cert_tables_read", "certTablesRead"],
+  ["cert_rows_read", "certRowsRead"],
+  ["join_steps_used", "joinStepsUsed"],
+  ["groundings_enumerated", "groundingsEnumerated"],
+  ["max_depth_reached", "maxDepthReached"],
+  ["max_term_depth_reached", "maxTermDepthReached"],
+];
+
+// A counter the row states as an integer is pinned exactly; one it states as "counted" (its value
+// depends on the checker's order of work) must be counted, and its value is not pinned.
+function assertVectorReport(name: string, got: CheckReport, want: Record<string, number | "counted">): void {
+  assert.equal(got.countersVersion, want["counters_version"], `case ${name}: report.counters_version`);
+  for (const [snake, camel] of REPORT_COUNTERS) {
+    assert.ok(snake in want, `case ${name}: the row's report does not state ${snake}`);
+    const count = ReportCount.get(got[camel]);
+    if (want[snake] === "counted") {
+      assert.ok(Number.isInteger(count) && (count as number) >= 0, `case ${name}: report.${snake} must be counted`);
+    } else {
+      assert.equal(count, want[snake], `case ${name}: report.${snake}`);
+    }
+  }
+  assert.equal(
+    Object.keys(want).length,
+    REPORT_COUNTERS.length + 1,
+    `case ${name}: the row's report must state counters_version and the 17 counters, no other key`,
+  );
+}
+
+assert(
+  doc.cases.some((c: any) => c.report !== undefined),
+  "no negation case states a report (#4206): the report pin would be vacuous",
+);
+
 for (const c of doc.cases) {
   test(`negation vector: ${c.name}`, () => {
     const claim = groundFromJson(c.claim);
@@ -437,7 +488,7 @@ for (const c of doc.cases) {
       // verifies nothing: the world is verified in full once, or never (a precheck refused).
       const memo = new WorldMemo(program, profile, undefined, context);
       for (const pass of [0, 1]) {
-        assert.deepEqual(checkWithWorldMemo(memo, claim, deriv), got, `case ${c.name}: memo pass ${pass}`);
+        assert.deepEqual(checkWithWorldMemo(memo, claim, deriv).verdict, got.verdict, `case ${c.name}: memo pass ${pass}`);
       }
       assert.ok(
         memo.certificatesVerified === 0 || memo.certificatesVerified === closedWorld.length,
@@ -445,8 +496,9 @@ for (const c of doc.cases) {
       );
     }
 
-    const gotOutcome = Outcome.isAccept(got) ? "accept" : { reject: (got as { code: string }).code };
-    assert.deepEqual(gotOutcome, c.outcome, `case ${c.name}: detail=${(got as any).detail ?? ""}`);
+    const gotOutcome = got.verdict.kind === "accept" ? "accept" : { reject: got.verdict.code };
+    assert.deepEqual(gotOutcome, c.outcome, `case ${c.name}: detail=${got.verdict.kind === "reject" ? got.verdict.detail : ""}`);
+    if (c.report !== undefined) assertVectorReport(c.name, got.report, c.report);
   });
 }
 
@@ -468,11 +520,11 @@ test("the memo distinguishes native support clause handles with the same UTF-8 e
     row.derivation.closed_world.map((c: any) => certFromJson({ ...c,
       supports: c.supports.map((edge: any) => ({ ...edge, clause: handle })),
     }, pin)));
-  assert.equal(checkWithWorldMemo(memo, claim, proof(real)).kind, "accept");
+  assert.equal(checkWithWorldMemo(memo, claim, proof(real)).verdict.kind, "accept");
   const changed = proof(missing);
   const fresh = checkWithCertContext(renamed, claim, changed, undefined, profile, context);
-  assert.equal(fresh.kind === "reject" && fresh.code, "cert_unsupported");
-  assert.deepEqual(checkWithWorldMemo(memo, claim, changed), fresh);
+  assert.equal(fresh.verdict.kind === "reject" && fresh.verdict.code, "cert_unsupported");
+  assert.deepEqual(checkWithWorldMemo(memo, claim, changed).verdict, fresh.verdict);
   assert.equal(memo.certificatesVerified, row.derivation.closed_world.length * 2);
 });
 // ------------------- #2313: the same vectors through checkClosedModelChain -------------------
@@ -525,7 +577,7 @@ test("#2313 chain: the negation vectors replay through checkClosedModelChain", (
       assert.ok(Outcome.isAccept(got), `case ${c.name}: its closed_world must verify as a chain; got ${JSON.stringify(got)}`);
     } else if (CHAIN_CERT_INTERNAL_CODES.has(c.outcome.reject)) {
       certRejected += 1;
-      assert.equal((got as { code?: string }).code, c.outcome.reject, `case ${c.name}: ${JSON.stringify(got)}`);
+      assert.equal((got.verdict as { code?: string }).code, c.outcome.reject, `case ${c.name}: ${JSON.stringify(got)}`);
     }
   }
   assert.ok(accepted > 0 && certRejected > 0, `the replay is vacuous: ${accepted} accepted, ${certRejected} cert-rejected`);
@@ -533,15 +585,15 @@ test("#2313 chain: the negation vectors replay through checkClosedModelChain", (
 
 test("#2313 chain: an empty chain is refused by name, never accepted vacuously", () => {
   const got = checkClosedModelChain(program, [], undefined, negationProfile(leaves, limitsFromJson(undefined)), CertContext.of(recomputed, PROFILE_PIN, CTX_PIN, THEORY_PIN));
-  assert.equal((got as { code?: string }).code, "cert_out_of_range");
-  assert.match((got as { detail?: string }).detail ?? "", /empty certificate chain/);
+  assert.equal((got.verdict as { code?: string }).code, "cert_out_of_range");
+  assert.match((got.verdict as { detail?: string }).detail ?? "", /empty certificate chain/);
 });
 
 // #2759 (seat:caa's design gate): check admits an open compound in a sealed scope inside the
 // CONSTRUCTOR-ACYCLIC fragment and refuses one outside it, re-deriving the fragment from the bound
 // program, and the refusal NAMES the cycle: the function-free gate it replaced rejected both with the
 // same code, so the code alone cannot tell them apart. The Go twin is constructor_acyclic_2759_test.go.
-function chain2759(name: string): unknown {
+function chain2759(name: string): Outcome {
   const c = doc.cases.find((k: any) => k.name === name);
   assert.ok(c, `vectors/negation.json carries no case ${name}`);
   return checkClosedModelChain(program, chainCerts(c), undefined, negationProfile(leaves, limitsFromJson(c.limits)), chainContext(c));
@@ -549,11 +601,11 @@ function chain2759(name: string): unknown {
 
 test("#2759 chain: a constructor-acyclic sealed scope verifies", () => {
   const got = chain2759("round3_structural_subterm_closed_accept_2759");
-  assert.ok(Outcome.isAccept(got as any), `r(box(box(X))) :- e(box(X)) constructs on no cycle; got ${JSON.stringify(got)}`);
+  assert.ok(Outcome.isAccept(got), `r(box(box(X))) :- e(box(X)) constructs on no cycle; got ${JSON.stringify(got)}`);
 });
 
 test("#2759 chain: a constructor-cyclic sealed scope is refused by name", () => {
-  const got = chain2759("constructor_cycle_stratum_rejects_2759") as { code?: string; detail?: string };
+  const got = chain2759("constructor_cycle_stratum_rejects_2759").verdict as { code?: string; detail?: string };
   assert.equal(got.code, "cert_scope_incomplete");
   assert.match(got.detail ?? "", /"nat" constructs an open compound/);
   assert.match(got.detail ?? "", /dependency cycle through "nat"/);
@@ -563,7 +615,7 @@ test("#2313 chain: an unbound context refuses the chain", () => {
   const c = doc.cases.find((k: any) => k.outcome === "accept" && k.plain_check !== true && chainCerts(k).length > 0);
   assert.ok(c, "no accepted case with a closed_world to test the unbound context against");
   const got = checkClosedModelChain(program, chainCerts(c), undefined, negationProfile(leaves, limitsFromJson(c.limits)), CertContext.zero());
-  assert.equal((got as { code?: string }).code, "cert_context_unbound");
+  assert.equal((got.verdict as { code?: string }).code, "cert_context_unbound");
 });
 
 // ------------- #3424: where a certificate's scope level is inert, and where it is read -------------
@@ -585,7 +637,7 @@ function replayWithLevels(name: string, levels: number[]): string {
   const deriv = new Derivation((c.derivation.nodes as any[]).map(nodeFromJson), Number(c.derivation.root), world);
   const context = CertContext.of(recomputed, PROFILE_PIN, CTX_PIN, THEORY_PIN);
   const got = checkWithCertContext(program, groundFromJson(c.claim), deriv, undefined, negationProfile(leaves, limitsFromJson(undefined)), context);
-  return Outcome.isAccept(got) ? "accept" : `reject:${(got as { code: string }).code}`;
+  return got.verdict.kind === "accept" ? "accept" : `reject:${got.verdict.code}`;
 }
 
 test("#3424: a single certificate with a full scope does not read its level", () => {

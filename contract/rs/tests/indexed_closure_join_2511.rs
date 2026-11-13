@@ -12,7 +12,7 @@
 use logos_contract::{
     closure_join_cost, CertSizeDecl, CheckLimits, Clause, ClosedModelCert, ClosureWitness,
     FiniteDomain, Goal, GroundLiteral, MapProgram, RejectionCode, RelationTable, StratumPrefix,
-    SupportWitness, Symbol, Term, Theory, TheoryOutcome,
+    SupportWitness, Symbol, Term, Theory, TheoryGround,
 };
 use ontos_core::Value;
 
@@ -26,10 +26,8 @@ impl Theory for NoTheory {
     fn owns(&self, _: &Symbol) -> bool {
         false
     }
-    fn decide(&self, _: &GroundLiteral) -> TheoryOutcome {
-        TheoryOutcome::Fails {
-            code: "not_mine".into(),
-        }
+    fn decide_ground(&self, _: &GroundLiteral) -> TheoryGround {
+        TheoryGround::fails("not_mine")
     }
 }
 

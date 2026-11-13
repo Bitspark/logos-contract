@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	contract "github.com/Bitspark/logos-contract/contract/go"
+	"github.com/Bitspark/logos-contract/contract/go/completion"
 	core "github.com/bitspark/ontos/core/go"
 )
 
@@ -28,11 +29,11 @@ type bindingRelation struct{ report contract.ComponentIdentity }
 func (*bindingRelation) Owns(pred contract.Symbol) bool {
 	return pred == contract.SymbolFromString("is_allowed")
 }
-func (*bindingRelation) Decide(atom contract.GroundLiteral) contract.TheoryOutcome {
+func (*bindingRelation) DecideGround(atom contract.GroundLiteral) completion.TheoryGround {
 	if len(atom.Args) == 1 && core.Equal(atom.Args[0], core.NewAtom([]byte("a"))) {
-		return contract.TheoryHolds{}
+		return completion.TheoryGroundHolds()
 	}
-	return contract.TheoryFails{Code: "not_allowed"}
+	return completion.TheoryGroundFails("not_allowed")
 }
 func (r *bindingRelation) Identity() contract.ComponentIdentity { return r.report }
 
@@ -42,11 +43,11 @@ type bindingReady struct{ first *bindingRelation }
 func (*bindingReady) Owns(pred contract.Symbol) bool {
 	return pred == contract.SymbolFromString("ready")
 }
-func (*bindingReady) Decide(atom contract.GroundLiteral) contract.TheoryOutcome {
+func (*bindingReady) DecideGround(atom contract.GroundLiteral) completion.TheoryGround {
 	if len(atom.Args) == 0 {
-		return contract.TheoryHolds{}
+		return completion.TheoryGroundHolds()
 	}
-	return contract.TheoryFails{Code: "wrong_arity"}
+	return completion.TheoryGroundFails("wrong_arity")
 }
 func (r *bindingReady) Identity() contract.ComponentIdentity {
 	copy(r.first.report.Id, "other")
@@ -65,13 +66,15 @@ func TestCompoundCapturesEachCompletedMemberReport(t *testing.T) {
 	if !compound.Identity().Equal(want) {
 		t.Error("the second independent report rewrote the first contribution")
 	}
-	if _, ok := compound.Decide(contract.NewGroundLiteral("is_allowed", core.NewAtom([]byte("a")))).(contract.TheoryHolds); !ok {
+	allowed := contract.NewGroundLiteral("is_allowed", core.NewAtom([]byte("a")))
+	if contract.DecideGround(compound, allowed) != completion.TheoryGroundHolds() {
 		t.Error("the first member's relation was not preserved")
 	}
-	if _, ok := compound.Decide(contract.NewGroundLiteral("is_allowed", core.NewAtom([]byte("b")))).(contract.TheoryFails); !ok {
+	refused := contract.NewGroundLiteral("is_allowed", core.NewAtom([]byte("b")))
+	if contract.DecideGround(compound, refused) != completion.TheoryGroundFails("not_allowed") {
 		t.Error("the first member's refusal was not preserved")
 	}
-	if _, ok := compound.Decide(contract.NewGroundLiteral("ready")).(contract.TheoryHolds); !ok {
+	if contract.DecideGround(compound, contract.NewGroundLiteral("ready")) != completion.TheoryGroundHolds() {
 		t.Error("the second member's independent relation was not preserved")
 	}
 	later := contract.CompoundIdentityOf([]contract.ComponentIdentity{
@@ -159,7 +162,7 @@ func TestCertificateContextOwnsItsOptionalWitnessBeforeCallbacks(t *testing.T) {
 				t.Fatalf("matching slice control: %s", got)
 			}
 			*f.context.DecompositionWitness = contract.Hash{99}
-			if got := run(f); got.IsAccept() || got.Code() != contract.CertContextMismatch {
+			if got := run(f); got.IsAccept() || got.Verdict.Code() != contract.CertContextMismatch {
 				t.Fatalf("mismatched slice control: %s", got)
 			}
 		})
@@ -168,7 +171,7 @@ func TestCertificateContextOwnsItsOptionalWitnessBeforeCallbacks(t *testing.T) {
 			*f.context.DecompositionWitness = contract.Hash{99}
 			f.leaves.during = func() { *f.context.DecompositionWitness = contract.Hash{4} }
 			got := run(f)
-			if f.leaves.calls == 0 || got.IsAccept() || got.Code() != contract.CertContextMismatch {
+			if f.leaves.calls == 0 || got.IsAccept() || got.Verdict.Code() != contract.CertContextMismatch {
 				t.Fatalf("witness changed during declaration: %s (%d calls)", got, f.leaves.calls)
 			}
 		})

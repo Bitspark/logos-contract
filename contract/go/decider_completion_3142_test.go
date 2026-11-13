@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"sort"
 	"testing"
+
+	"github.com/Bitspark/logos-contract/contract/go/completion"
 )
 
 type completionRow struct {
@@ -25,17 +27,21 @@ type completionRow struct {
 // test-double: consumer(a domain theory that declares nothing about completing)
 type declaresNothing struct{}
 
-func (declaresNothing) Owns(pred Symbol) bool              { return pred.String() == "p" }
-func (declaresNothing) Decide(GroundLiteral) TheoryOutcome { return TheoryHolds{} }
+func (declaresNothing) Owns(pred Symbol) bool { return pred.String() == "p" }
+func (declaresNothing) DecideGround(GroundLiteral) completion.TheoryGround {
+	return completion.TheoryGroundHolds()
+}
 
-// stopsUntyped owns q and declares that a decision may stop and still answer TheoryFails: the
+// stopsUntyped owns q and declares that a decision may stop and still answer Fails: the
 // population the guard still refuses (host builtins until #3506, v1-only deciders). No standard
 // theory declares it after #3313, so the replay carries its own to exercise the kind.
 // test-double: consumer(a domain theory whose stops still surface as Fails)
 type stopsUntyped struct{}
 
-func (stopsUntyped) Owns(pred Symbol) bool              { return pred.String() == "q" }
-func (stopsUntyped) Decide(GroundLiteral) TheoryOutcome { return TheoryHolds{} }
+func (stopsUntyped) Owns(pred Symbol) bool { return pred.String() == "q" }
+func (stopsUntyped) DecideGround(GroundLiteral) completion.TheoryGround {
+	return completion.TheoryGroundHolds()
+}
 func (stopsUntyped) Completion(Symbol) DecisionCompletion {
 	return DecisionMayNotComplete{
 		Decider: NewComponentIdentity([]byte("demo/stops-untyped-theory"), []byte("1"), [32]byte{}),

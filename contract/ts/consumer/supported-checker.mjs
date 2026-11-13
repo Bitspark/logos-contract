@@ -25,7 +25,7 @@ test("the identity advisory reports the slots and allowances selected for this c
   const profile = {
     theory: {
       owns: () => false,
-      decide: () => contract.TheoryOutcome.NotMine,
+      decideGround: () => contract.TheoryGround.disowned(),
       identity() {
         profile.leaves = { ...leaves, identity: () => id };
         allow[0] = "leaves";
@@ -40,24 +40,3 @@ test("the identity advisory reports the slots and allowances selected for this c
   assert.deepEqual(contract.unidentifiedProfileSlotsAllowing(profile, allow), ["admit"]);
 });
 
-test("a ground decision selects its optional implementation once and invokes it on the theory", () => {
-  const atom = contract.GroundLiteral.of("ready", []);
-  let reads = 0;
-  let calls = 0;
-  const theory = {
-    owns: () => true,
-    decide: () => { assert.fail("the optional decision was supplied"); },
-    get decideGround() {
-      reads++;
-      return function (given) {
-        assert.equal(this, theory);
-        assert.equal(given, atom);
-        calls++;
-        return contract.completion.completed(contract.completion.theoryHolds);
-      };
-    },
-  };
-  assert.deepEqual(contract.decideGround(theory, atom), contract.completion.completed(contract.completion.theoryHolds));
-  assert.equal(reads, 1);
-  assert.equal(calls, 1);
-});

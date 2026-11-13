@@ -40,7 +40,7 @@ import {
   RuleOutcome,
   type Symbol as LogosSymbol,
   type Theory,
-  TheoryOutcome,
+  TheoryGround,
   defaultLimits,
   profileIsFullyIdentified,
   unidentifiedProfileSlots,
@@ -91,7 +91,7 @@ function theoryFor(name: string): Theory {
   // test-double: consumer(a theory identified per vector case)
   const base: Theory = {
     owns: (_p: LogosSymbol) => false,
-    decide: (_a: GroundLiteral) => TheoryOutcome.NotMine,
+    decideGround: (_a: GroundLiteral) => TheoryGround.disowned(),
   };
   const id = identityFor(name);
   return id === undefined ? base : { ...base, identity: () => id };

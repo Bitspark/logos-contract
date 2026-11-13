@@ -29,7 +29,7 @@
 //
 // Owns(pred): by NAME only (any arity) — contains, starts_with, ends_with. There is no
 // nested expression grammar (unlike arithmetic operators), so nothing else to exclude.
-// Decide(atom) on a ground atom:
+// DecideGround(atom) on a ground atom:
 //   - non-UTF-8 predicate            -> Fails{text_unknown_predicate}   (defensive)
 //   - owned name, arity != 2         -> Fails{text_bad_arity}
 //   - both args bare Atoms, test true -> Holds
@@ -46,6 +46,7 @@ import (
 	"bytes"
 	"unicode/utf8"
 
+	"github.com/Bitspark/logos-contract/contract/go/completion"
 	core "github.com/bitspark/ontos/core/go"
 )
 
@@ -94,21 +95,21 @@ func (TextTheory) Identity() ComponentIdentity {
 	)
 }
 
-// Decide decides an owned GROUND text atom, byte-identically to the Rust
-// TextTheory::decide. A ground text relation binds nothing, so it either Holds (the
+// DecideGround decides an owned GROUND text atom, byte-identically to the Rust
+// TextTheory::decide_ground. A ground text relation binds nothing, so it either Holds (the
 // byte test is true) or Fails with a pinned host-band sub-code.
-func (t TextTheory) Decide(atom GroundLiteral) TheoryOutcome {
+func (t TextTheory) DecideGround(atom GroundLiteral) completion.TheoryGround {
 	// Not one of ours: a routing safety net (check routes by Owns, so this is
 	// unreachable on a correctly-routed call — but stay total). Mirrors Rust.
 	if !t.Owns(atom.Pred) {
-		return TheoryNotMine{}
+		return completion.TheoryGroundDisowned()
 	}
 	// An owned name is always valid UTF-8 (the names are ASCII), but mirror Rust's
 	// std::str::from_utf8 guard so the non-UTF-8 defensive arm carries the identical
 	// code on every path.
 	predBytes := atom.Pred.Bytes()
 	if !utf8.Valid(predBytes) {
-		return TheoryFails{Code: "text_unknown_predicate"}
+		return completion.TheoryGroundFails("text_unknown_predicate")
 	}
 
 	switch string(predBytes) {
@@ -121,7 +122,7 @@ func (t TextTheory) Decide(atom GroundLiteral) TheoryOutcome {
 	default:
 		// Owned name routed here but not handled above — unreachable (the name set is
 		// exactly the switch arms), but stay total.
-		return TheoryFails{Code: "text_does_not_hold"}
+		return completion.TheoryGroundFails("text_does_not_hold")
 	}
 }
 
@@ -142,14 +143,14 @@ func textAtomBytes(v core.Value) ([]byte, bool) {
 // a non-2 arity has no such relation (text_bad_arity). The test functions are Go's
 // bytes.Contains/HasPrefix/HasSuffix, which agree with Rust byte-for-byte (an empty
 // needle/prefix/suffix holds).
-func decideTextRelation(args []core.Value, test func(text, sub []byte) bool) TheoryOutcome {
+func decideTextRelation(args []core.Value, test func(text, sub []byte) bool) completion.TheoryGround {
 	if len(args) != 2 {
-		return TheoryFails{Code: "text_bad_arity"}
+		return completion.TheoryGroundFails("text_bad_arity")
 	}
 	lhs, lok := textAtomBytes(args[0])
 	rhs, rok := textAtomBytes(args[1])
 	if lok && rok && test(lhs, rhs) {
-		return TheoryHolds{}
+		return completion.TheoryGroundHolds()
 	}
-	return TheoryFails{Code: "text_does_not_hold"}
+	return completion.TheoryGroundFails("text_does_not_hold")
 }

@@ -29,13 +29,14 @@ import {
   NodeMeta,
   PredicateSet,
   RuleNode,
-  type Subst,
+  Subst,
   type Symbol,
   Term,
   type Theory,
-  TheoryOutcome,
+  TheoryGround,
   type CheckProfile,
   defaultLimits,
+  VarId,
 } from "../src/index.js";
 
 // ----------------------------- profile + helpers -----------------------------
@@ -46,8 +47,8 @@ class NoTheory implements Theory {
   owns(_pred: Symbol): boolean {
     return false;
   }
-  decide(_atom: GroundLiteral): TheoryOutcome {
-    return TheoryOutcome.NotMine;
+  decideGround(_atom: GroundLiteral): TheoryGround {
+    return TheoryGround.disowned();
   }
 }
 
@@ -120,7 +121,7 @@ function wrapProgram(): MapProgram {
 }
 /** `subst {X = <cons-form list term>}`. */
 function substXConsList(elems: readonly Value[]): Subst {
-  return new Map([["X", Term.fromValue(consList(elems))]]);
+  return new Subst([[VarId.of("X"), Term.fromValue(consList(elems))]]);
 }
 
 // ======================= 1. THE REIFIED SPELLING IS REFUSED (#3022) ========================
@@ -137,7 +138,7 @@ test("a reified list derivation is REFUSED: its conclusion is not the instantiat
     ],
     1,
   );
-  const got = check(program, wrapList, deriv, undefined, srcProfile(leaves));
+  const got = check(program, wrapList, deriv, undefined, srcProfile(leaves)).verdict;
   assert.equal(got.kind === "reject" ? got.code : got.kind, "instantiation_mismatch", JSON.stringify(got));
 });
 
@@ -159,7 +160,7 @@ test("a reified node is refused at its own head before a cons-form claim is read
     1,
   );
   const consClaim = gl("wrap", consList(elems));
-  const got = check(program, consClaim, deriv, undefined, srcProfile(leaves));
+  const got = check(program, consClaim, deriv, undefined, srcProfile(leaves)).verdict;
   assert.equal(got.kind === "reject" ? got.code : got.kind, "instantiation_mismatch", JSON.stringify(got));
 });
 
@@ -181,7 +182,7 @@ test("the frozen cons-form derivation still accepts (additive)", () => {
     1,
   );
   const consClaim = gl("wrap", consList(elems));
-  const got = check(program, consClaim, deriv, undefined, srcProfile(leaves));
+  const got = check(program, consClaim, deriv, undefined, srcProfile(leaves)).verdict;
   assert.equal(got.kind, "accept", JSON.stringify(got));
 });
 
@@ -204,7 +205,7 @@ test("a wrong-order reified list is REJECTED (no conflation)", () => {
     ],
     1,
   );
-  const got = check(program, wrong, deriv, undefined, srcProfile(leaves));
+  const got = check(program, wrong, deriv, undefined, srcProfile(leaves)).verdict;
   assert.equal(got.kind, "reject");
   if (got.kind === "reject") assert.equal(got.code, "instantiation_mismatch");
 });
@@ -212,7 +213,7 @@ test("a wrong-order reified list is REJECTED (no conflation)", () => {
 test("an improper cons claimed as a proper list is REJECTED (no conflation)", () => {
   const program = wrapProgram();
   const improper = consv(av("a"), av("b"));
-  const subst: Subst = new Map([["X", Term.fromValue(improper)]]);
+  const subst: Subst = new Subst([[VarId.of("X"), Term.fromValue(improper)]]);
   const leaves = new SrcLeaves([gl("src", improper)]);
   const dishonest = gl("wrap", listEmbed([av("a"), av("b")]));
   const deriv = new Derivation(
@@ -222,7 +223,7 @@ test("an improper cons claimed as a proper list is REJECTED (no conflation)", ()
     ],
     1,
   );
-  const got = check(program, dishonest, deriv, undefined, srcProfile(leaves));
+  const got = check(program, dishonest, deriv, undefined, srcProfile(leaves)).verdict;
   assert.equal(got.kind, "reject");
   if (got.kind === "reject") assert.equal(got.code, "instantiation_mismatch");
 });
@@ -244,7 +245,7 @@ test("a distinct cons root still rejects a cons claim (additive)", () => {
     1,
   );
   const otherClaim = gl("wrap", consList([av("z")]));
-  const got = check(program, otherClaim, deriv, undefined, srcProfile(leaves));
+  const got = check(program, otherClaim, deriv, undefined, srcProfile(leaves)).verdict;
   assert.equal(got.kind, "reject");
   if (got.kind === "reject") assert.equal(got.code, "root_conclusion_mismatch");
 });
@@ -306,13 +307,13 @@ test("a reified leaf matches the cons-form EDB-of-record", () => {
   const leaves = new SrcLeaves([gl("src", consList([av("a"), av("b")]))]);
   const leafList = gl("src", listEmbed([av("a"), av("b")]));
   const deriv = new Derivation([new LeafNode(leafList, Evidence.none())], 0);
-  const got = check(program, leafList, deriv, undefined, srcProfile(leaves));
+  const got = check(program, leafList, deriv, undefined, srcProfile(leaves)).verdict;
   assert.equal(got.kind, "accept", JSON.stringify(got));
 
   const leaves2 = new SrcLeaves([gl("src", consList([av("a"), av("b")]))]);
   const absent = gl("src", listEmbed([av("z")]));
   const deriv2 = new Derivation([new LeafNode(absent, Evidence.none())], 0);
-  const got2 = check(program, absent, deriv2, undefined, srcProfile(leaves2));
+  const got2 = check(program, absent, deriv2, undefined, srcProfile(leaves2)).verdict;
   assert.equal(got2.kind, "reject");
   if (got2.kind === "reject") assert.equal(got2.code, "leaf_rejected");
 });

@@ -7,6 +7,7 @@ package contract
 import (
 	"testing"
 
+	"github.com/Bitspark/logos-contract/contract/go/completion"
 	core "github.com/bitspark/ontos/core/go"
 )
 
@@ -135,10 +136,10 @@ func TestCheckRejectsOverDeepTermTermTooDeepNotACrash(t *testing.T) {
 	deriv := NewDerivation([]Node{LeafNode{Conc: concl, Evidence: NoEvidence()}}, 0)
 	profile := demoTermDepthProfile(DefaultLimits())
 	got := Check[struct{}](NewMapProgram(), concl, deriv, struct{}{}, profile)
-	if got.IsAccept() || got.Code().Code() != "term_too_deep" {
+	if got.IsAccept() || got.Verdict.Code().Code() != "term_too_deep" {
 		t.Fatalf("expected term_too_deep, got %s", got)
 	}
-	if !got.Code().IsStructural() {
+	if !got.Verdict.Code().IsStructural() {
 		t.Error("term_too_deep must be a structural-band code")
 	}
 }
@@ -171,8 +172,8 @@ func demoTermDepthProfile(limits CheckLimits) *CheckProfile[struct{}] {
 type termDepthLtTheory struct{}
 
 func (termDepthLtTheory) Owns(pred Symbol) bool { return pred.Equal(SymbolFromString("lt")) }
-func (termDepthLtTheory) Decide(GroundLiteral) TheoryOutcome {
-	return TheoryFails{Code: "not_less_than"}
+func (termDepthLtTheory) DecideGround(GroundLiteral) completion.TheoryGround {
+	return completion.TheoryGroundFails("not_less_than")
 }
 
 // test-double: consumer(admits any edge leaf)

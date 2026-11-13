@@ -19,8 +19,9 @@
 //     safety gate every clause variable occurs in a positive sealed, non-builtin literal, so a
 //     satisfied grounding binds each variable from a row that exists, and the structural matcher
 //     meets it. A satisfied grounding whose head leaves the supplied domains is refused
-//     (cert_out_of_domain), and an undecidable or inconsistent literal (a Theory's NotMine after
-//     owns()) refuses by name, never reads as false, so the closure cannot under-fire.
+//     (cert_out_of_domain), and an undecidable or inconsistent literal (a Theory's disowning
+//     fault after owns()) refuses by name, never reads as false, so the closure cannot
+//     under-fire.
 //
 // Support and closure give E_s = lfp(T_s^L), so `a ∉ E_s` proves `a` absent from the stratum's
 // least model: absence is sound, not an upper bound. Neither obligation needs the program to be
@@ -116,7 +117,9 @@ func worldProgram(program Program) func() CompleteProgram {
 // world is the derivation's ClosedWorld and status/verified the statuses computed so far, in
 // verificationOrder: every certificate at a lower level is final, so a predicate this cert reads
 // from one is read only once that cert is known Valid (#2258 (a)).
-func verifyCert[C any](cert ClosedModelCert, place certPlace, world []ClosedModelCert, status []certStatus, verified []bool, readProgram func() CompleteProgram, profile *CheckProfile[C], ctx C, certContext CertContext, limits CheckLimits) certStatus {
+func verifyCert[C any](cert ClosedModelCert, place certPlace, world []ClosedModelCert, status []certStatus, verified []bool, readProgram func() CompleteProgram, profile *CheckProfile[C], ctx C, certContext CertContext, limits CheckLimits, tally *checkTally) certStatus {
+	// certs_verified: this certificate's verification runs, whatever status it ends in.
+	tally.certsVerified++
 	theory := profile.Theory
 	// 1. BUDGET GATE — first, before any scan.
 	if e := checkCertBudget(cert, limits); e != nil {
@@ -130,7 +133,7 @@ func verifyCert[C any](cert ClosedModelCert, place certPlace, world []ClosedMode
 	//     loudly — it fabricates arbitrary per-lookup verdicts. Reject
 	//     deterministically here, bounded by the budget just validated, before any
 	//     gate consults a lookup.
-	if e := checkCertCanonicalForm(cert); e != nil {
+	if e := checkCertCanonicalForm(cert, tally); e != nil {
 		return invalidCert(e.code, e.detail)
 	}
 	program := readProgram()
@@ -168,6 +171,9 @@ func verifyCert[C any](cert ClosedModelCert, place certPlace, world []ClosedMode
 	if e != nil {
 		return invalidCert(e.code, e.detail)
 	}
+	// theory_decisions (#3111): the support and closure gates count their DecideGround calls
+	// through the view, the one context both share down to the deciding site (rs CertView).
+	view.tally = tally
 	// 3. SCOPE DOWNWARD-CLOSURE (§3.2) — the sealed prefix must be self-contained.
 	if e := checkScopeDownwardClosed(view, program, theory); e != nil {
 		return invalidCert(e.code, e.detail)
@@ -184,7 +190,7 @@ func verifyCert[C any](cert ClosedModelCert, place certPlace, world []ClosedMode
 	}
 	// 6. CLOSURE (§3.3) — least model ⊆ E, driven by the TRUSTED enumerated defining
 	//    clauses of the sealed scope.
-	if e := checkCertClosure(view, program, theory, limits); e != nil {
+	if e := checkCertClosure(view, program, theory, limits, tally); e != nil {
 		return invalidCert(e.code, e.detail)
 	}
 	// 7. EDB BINDING (§3.6) — every sealed extensional predicate's table must equal the
@@ -256,7 +262,10 @@ func checkCertPartialScope(cert ClosedModelCert, program CompleteProgram, extens
 	return err
 }
 
-func checkCertCanonicalForm(cert ClosedModelCert) *certErr {
+// checkCertCanonicalForm is gate 1b (its doc is above checkCertPartialScope). cert_tables_read /
+// cert_rows_read are counted here, as each table is begun: this gate is the first to read a
+// table's rows (#3111).
+func checkCertCanonicalForm(cert ClosedModelCert, tally *checkTally) *certErr {
 	if !cert.Scope.IsCanonical() {
 		return &certErr{CertScopeIncomplete,
 			"sealed scope predicates are not sorted+deduped by symbol byte order - build the prefix via NewStratumPrefix, not a struct literal (issue #839)"}
@@ -269,6 +278,9 @@ func checkCertCanonicalForm(cert ClosedModelCert) *certErr {
 		}
 	}
 	for _, t := range cert.Extensions {
+		// cert_tables_read / cert_rows_read: this gate begins the table and reads every row.
+		tally.certTablesRead++
+		tally.certRowsRead += len(t.Rows)
 		if !t.IsCanonical() {
 			return &certErr{CertUnsupported, fmt.Sprintf(
 				"sealed table %q rows are not sorted+deduped by canonical codec bytes, so binary-search membership is defeated - build the table via NewRelationTable, not a struct literal (issue #839)",
@@ -744,6 +756,8 @@ func resolveSupportRef(k int, bodyLit BodyLit, bodyRef SupportRef, grounded Grou
 			return unsupported(fmt.Sprintf("support builtin ref %d predicate not theory-owned", k))
 		}
 		// A stop is refused by name (#3126), never read as the literal's truth.
+		// theory_decisions: one DecideGround call, counted through the view.
+		view.countDecision()
 		verdict := readGround(DecideGround(theory, ref.Atom))
 		if verdict.arm == groundHolds {
 			return nil
@@ -856,7 +870,7 @@ func checkSupportRefCert(k int, cited CertId, pred Symbol, view certView, place 
 // own space. A grounding the enumeration would have found satisfied has, for each positive
 // sealed literal, a row of that literal's table matching it — exactly a tuple the join
 // emits. Neither direction under-fires. Mirrors Rust's check_cert_closure.
-func checkCertClosure(view certView, program CompleteProgram, theory Theory, limits CheckLimits) *certErr {
+func checkCertClosure(view certView, program CompleteProgram, theory Theory, limits CheckLimits, tally *checkTally) *certErr {
 	cert := view.cert
 	groundings := 0
 	joins := 0
@@ -879,6 +893,10 @@ func checkCertClosure(view certView, program CompleteProgram, theory Theory, lim
 			err = e
 		}
 	})
+	// join_steps_used / groundings_enumerated: what this closure spent against its two budget
+	// meters, as they stand when it ends (a tripped meter at the count it tripped at).
+	tally.joinStepsUsed += joins
+	tally.groundingsEnumerated += groundings
 	return err
 }
 
@@ -1190,6 +1208,13 @@ func joinStage(clause Clause, plan joinPlan, stage int, body closureTruth, subst
 		if *groundings > limits.MaxRuleGroundings {
 			return &certErr{CertBudgetExceeded, fmt.Sprintf("counted rule_groundings %d exceeds budget %d", *groundings, limits.MaxRuleGroundings)}
 		}
+		// ADR 0031 D5: the annotated check's recording hook, at rs's non-verify return. It runs only
+		// after the boolean check has verified this join in full; verifyCert never sets it.
+		if view.record != nil {
+			_, undecided := undecidedCause(body)
+			view.record(subst, !undecided)
+			return nil
+		}
 		if uint64(*groundings) > cert.LimitsDecl.RuleGroundings {
 			return &certErr{CertDeclMismatch, fmt.Sprintf("actual rule_groundings %d exceeds declared %d", *groundings, cert.LimitsDecl.RuleGroundings)}
 		}
@@ -1355,7 +1380,7 @@ func evalBodyLiteral(bodyLit BodyLit, grounded GroundLiteral, view certView, the
 	}
 	if !bodyLit.IsNeg() {
 		if theory.Owns(grounded.Pred) {
-			return theoryTruth(theory, grounded)
+			return theoryTruth(view, theory, grounded)
 		}
 		if t, ok := view.table(grounded.Pred); ok {
 			return truthOf(t.Contains(grounded)), nil
@@ -1365,7 +1390,7 @@ func evalBodyLiteral(bodyLit BodyLit, grounded GroundLiteral, view certView, the
 	// Negated body literal: \+ b is true iff b does NOT Hold / is ABSENT, and a b that is not
 	// decided leaves \+ b not decided (not(U) = U, #3165).
 	if theory.Owns(grounded.Pred) {
-		truth, err := theoryTruth(theory, grounded)
+		truth, err := theoryTruth(view, theory, grounded)
 		if err != nil {
 			return closureTruth{}, err
 		}
@@ -1381,12 +1406,14 @@ func evalBodyLiteral(bodyLit BodyLit, grounded GroundLiteral, view certView, the
 // A8; #3165): the theory's ground verdict (DecideGround), through the ONE conversion into the
 // algebra (completion.DecisionOf). Holds is true, Fails false, and a stop stays NOT DECIDED, never
 // false: the join folds it and refuses the instance unless a false absorbs it or the head is
-// present. The disowning fault (NotMine after Owns said yes) is an inconsistent theory, and it
-// REFUSES by name (predicate_partition_violation, as a Builtin node's does), never reads as false:
-// a positive filter read false would let the closure under-fire and pass a table that is not
-// closed. So does an outcome no constructor could have built (a nil or unknown TheoryOutcome). rs
+// present. The disowning fault (TheoryGroundDisowned after Owns said yes) is an inconsistent
+// theory, and it REFUSES by name (predicate_partition_violation, as a Builtin node's does), never
+// reads as false: a positive filter read false would let the closure under-fire and pass a table
+// that is not closed. So does an outcome no constructor could have built (a zero TheoryGround). rs
 // theory_truth.
-func theoryTruth(theory Theory, grounded GroundLiteral) (closureTruth, *certErr) {
+func theoryTruth(view certView, theory Theory, grounded GroundLiteral) (closureTruth, *certErr) {
+	// theory_decisions: one DecideGround call, counted through the view.
+	view.countDecision()
 	ground := DecideGround(theory, grounded)
 	verdict := readGround(ground)
 	if verdict.disowned() {
@@ -1410,7 +1437,7 @@ func theoryTruth(theory Theory, grounded GroundLiteral) (closureTruth, *certErr)
 //     lower-stratum scope (stratified negation looks only downward);
 //  5. the atom is ground + within a supplied finite domain (neg_atom_ill_typed);
 //  6. the atom is ABSENT from the sealed table (neg_atom_present if present).
-func verifyNegPremise(atom GroundLiteral, certID CertId, _ NonMemberProof, headPred Symbol, deriv Derivation, certStatus []certStatus) Outcome {
+func verifyNegPremise(atom GroundLiteral, certID CertId, _ NonMemberProof, headPred Symbol, deriv Derivation, certStatus []certStatus) Verdict {
 	idx, ok := certID.Offset(len(deriv.ClosedWorld))
 	if !ok {
 		return reject(CertOutOfRange, fmt.Sprintf("neg premise cites cert %d out of range %d", certID.Index(), len(deriv.ClosedWorld)))
@@ -1487,7 +1514,7 @@ func isNullValue(v core.Value) bool {
 // identical: cert in range + Valid, predicate sealed, strictly-lower stratum); step 5
 // swaps the membership test for a counted projection — recompute n over the proven-exact
 // RelationTable and require n == K, else count_mismatch. Mirrors Rust's verify_count_premise.
-func verifyCountPremise(pred PredicateRef, filter []GroundFilterEntry, project ProjectSpec, k core.Value, certID CertId, headPred Symbol, deriv Derivation, certStatus []certStatus) Outcome {
+func verifyCountPremise(pred PredicateRef, filter []GroundFilterEntry, project ProjectSpec, k core.Value, certID CertId, headPred Symbol, deriv Derivation, certStatus []certStatus) Verdict {
 	// 1. cert index in range.
 	idx, ok := certID.Offset(len(deriv.ClosedWorld))
 	if !ok {

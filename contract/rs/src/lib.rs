@@ -132,6 +132,7 @@
 
 pub mod account;
 pub mod aggregate;
+pub mod annotated_cert;
 pub mod answer_set;
 pub mod arithmetic;
 pub mod cert;
@@ -152,6 +153,10 @@ pub mod prelude;
 pub mod program;
 pub mod program_serde;
 pub mod reify;
+pub mod semiring;
+pub mod semiring_decimal;
+pub mod semiring_product;
+pub mod semiring_provenance;
 pub mod spi;
 pub mod term;
 pub mod term_theory;
@@ -207,14 +212,14 @@ pub use check::{
     check_with_cert_memo, closure_join_cost, closure_join_cost_in_world, incoherent_builtin_atoms,
     profile_decides_all_builtins, profile_is_fully_identified, program_digest,
     unidentified_profile_slots, unidentified_profile_slots_allowing, unowned_builtin_predicates,
-    CertContext, CheckLimitError, CheckLimits, CheckProfile, Outcome, ProfileSlot,
-    ProofBudgetCount, RejectionCode, TermIdentity, WorldMemo,
+    CertContext, CheckLimitError, CheckLimits, CheckProfile, CheckReport, Outcome, ProfileSlot,
+    ProofBudgetCount, RejectionCode, ReportCount, Verdict, WorldMemo,
+    CHECK_REPORT_COUNTERS_VERSION,
 };
 pub use spi::{
-    compound_identity_of, edb_table_hash, ground_from_legacy, legacy_outcome, standard_theory,
-    AlwaysAdmit, ComponentIdentity, CompoundTheory, CopyIncapacity, DecisionCompletion,
-    LeafOutcome, LeafVerifier, PredicateSet, RuleAdmissibility, RuleOutcome, Theory, TheoryOutcome,
-    EDB_PREFIX,
+    compound_identity_of, edb_table_hash, standard_theory, AlwaysAdmit, ComponentIdentity,
+    CompoundTheory, CopyIncapacity, DecisionCompletion, LeafOutcome, LeafVerifier, PredicateSet,
+    RuleAdmissibility, RuleOutcome, Theory, TheoryGround, EDB_PREFIX,
 };
 // ---- standard checkable Theory impls (STABLE v1; ADR 0014, ADR 0016 "Shelf A") ----
 // The standard theories live in the contract tier (tri-core with contract/{go,ts}); the
@@ -228,6 +233,17 @@ pub use decval::BigDecimal;
 pub use list_theory::ListTheory;
 pub use term_theory::{compare_values, TermTheory};
 pub use text::TextTheory;
+// ---- the Semiring SPI (PROPOSED; ADR 0031 D1, G3), its core semirings (D2), their product ----
+// A semiring is bound by an identity the contract computes from its declared identity and laws;
+// `audit_semiring` refutes a false law on samples and never proves one (v2 §14.3).
+pub use semiring::{
+    audit_semiring, semiring_identity, semiring_identity_of, CountingSemiring, LawDeclaration,
+    LawTally, Semiring, SemiringAnswer, SemiringAudit, SemiringLaw, SEMIRING_AUDIT_SAMPLE_LIMIT,
+    SEMIRING_IDENTITY_PREFIX,
+};
+pub use semiring_decimal::{ProbabilitySemiring, TropicalSemiring, TROPICAL_INFINITY};
+pub use semiring_product::{ProductSemiring, PRODUCT_SEMIRING_PREFIX};
+pub use semiring_provenance::ProvenanceSemiring;
 // ---- the Shelf-B hash-pinned Horn-clause prelude (STABLE v1; ADR 0016 "Shelf B") ----
 // A loaded bundle's clauses are ordinary account `Rule` nodes the EXISTING `check` verifies —
 // zero new trusted code. `load_prelude` recomputes the `program_digest` over the deserialized
@@ -235,6 +251,18 @@ pub use text::TextTheory;
 // `CheckProfile` field). See `prelude/<name>@<version>.json` + `vectors/prelude.json`.
 pub use prelude::{
     bundle_digest, canonical_clause_bytes, load_prelude, PreludeBundle, PreludeError,
+};
+
+// ---- the annotated closed-model certificate and its check (PROPOSED; ADR 0031 D5) ----
+// A closed-model certificate with one semiring element per sealed row, checked relative to the
+// semiring's identity. The verdict names the extensional tables' elements as unattested premises
+// and never attests them (#1821 Q15).
+pub use annotated_cert::{
+    annotated_closed_model_cert_as_value, annotated_closed_model_cert_from_value,
+    AnnotatedClosedModelCert, AnnotatedTable,
+};
+pub use check::{
+    check_annotated_closed_model, AnnotatedOutcome, AnnotatedRow, AnnotationCode, AnnotationLaw,
 };
 
 // ---- the engine-facing seam (PROPOSED — ADR 0002) ----

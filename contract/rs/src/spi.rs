@@ -111,45 +111,33 @@ impl ComponentIdentity {
     }
 }
 
-/// The verdict of a [`Theory`] on a ground atom (§5).
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum TheoryOutcome {
-    Holds,
-    /// The atom is owned by this theory but does not hold; `code` is a host-band
-    /// sub-code surfaced under `builtin_failed`.
-    Fails {
-        code: String,
-    },
-    /// Not this theory's predicate (a routing safety net; `check` routes by
-    /// [`Theory::owns`], so a correctly-routed call never returns this).
-    NotMine,
-}
-
-/// The mapping [`Theory::decide_ground`]'s default applies to a v1 answer (#3126): `Holds` and
-/// `Fails` are the decision, and `NotMine` is the named `inconsistent_theory` fault. A wrapper
-/// whose own answers come from `decide` (a host builtin) uses it for them, and forwards the rest.
-pub fn ground_from_legacy(outcome: TheoryOutcome) -> Completion<TheoryDecision, NoCallerLimit> {
-    match outcome {
-        TheoryOutcome::Holds => Completion::Completed(TheoryDecision::Holds),
-        TheoryOutcome::Fails { code } => Completion::Completed(TheoryDecision::Fails { code }),
-        TheoryOutcome::NotMine => Completion::NotCompleted(NonCompletion::inconsistent_theory()),
-    }
-}
-
-/// **The one legacy adapter (#3126):** the v1 [`TheoryOutcome`] of a
-/// [`decide_ground`](Theory::decide_ground) answer, for a theory that overrides `decide_ground`
-/// and derives its `decide` from it.
+/// What a [`Theory`] answers for a ground atom (§5; checker SPI v2, ADR 0036 D8 change 3): its
+/// decision, or NOT DECIDED. `Completed(Holds)` and `Completed(Fails { code })` are the decision;
+/// `NotCompleted(cause)` is a stop before the fact was established (a work cap, a capacity), never
+/// a false; and an atom the theory does not own is the named `inconsistent_theory` fault,
+/// [`TheoryGround::disowned`]. A theory never reaches a caller's limit (`NoCallerLimit`).
 ///
-/// A not-completed answer becomes `NotMine`, never `Fails`: v1 has no "not decided" arm, and
-/// every reader refuses an owned atom's `NotMine` by name, so a legacy reader fails CLOSED. It is
-/// the wrong category (a stop reported as a routing fault) but never a wrong answer, and ADR 0036
-/// D8's v2 deletes it with `decide` (seat:caa on #3126).
-pub fn legacy_outcome(ground: Completion<TheoryDecision, NoCallerLimit>) -> TheoryOutcome {
-    match ground {
-        Completion::Completed(TheoryDecision::Holds) => TheoryOutcome::Holds,
-        Completion::Completed(TheoryDecision::Fails { code }) => TheoryOutcome::Fails { code },
-        Completion::LimitExceeded(never) => match never {},
-        Completion::NotCompleted(_) => TheoryOutcome::NotMine,
+/// Until v2 this answer sat beside a v1 `decide` with a three-arm outcome (holds, fails, not mine) and a
+/// pair of legacy adapters. v2 deleted all three: the v1 outcome had no "not decided" arm, so a stop
+/// could only be reported as a routing fault, and every reader had to remember to call the right one.
+pub type TheoryGround = Completion<TheoryDecision, NoCallerLimit>;
+
+impl Completion<TheoryDecision, NoCallerLimit> {
+    /// The atom holds.
+    pub fn holds() -> Self {
+        Completion::Completed(TheoryDecision::Holds)
+    }
+
+    /// The theory decided the atom does not hold; `code` is the theory's own name for why
+    /// (surfaced under `builtin_failed`).
+    pub fn fails(code: impl Into<String>) -> Self {
+        Completion::Completed(TheoryDecision::Fails { code: code.into() })
+    }
+
+    /// Not this theory's predicate: the named `inconsistent_theory` fault. `check` routes by
+    /// [`Theory::owns`], so a correctly-routed call never returns it.
+    pub fn disowned() -> Self {
+        Completion::NotCompleted(NonCompletion::inconsistent_theory())
     }
 }
 
@@ -198,17 +186,18 @@ impl std::error::Error for CopyIncapacity {}
 /// Whether a decider's `Fails` on a predicate it owns is always a decided false (#3142; research
 /// 0031 row 13, `seat:caa`'s rulings on #3124 item 2, on #3142, and on #3189 Q3/Q4).
 ///
-/// A decider that stops before it decides can surface the stop as [`TheoryOutcome::Fails`], a
+/// A decider that stops before it decides can surface the stop as a `Fails`, a
 /// decided false, and a closure check reads that false as knowledge: a sealed table can miss a
 /// derivable row and still pass as exhaustive. #3313 landed the typed outcome channel,
 /// [`Theory::decide_ground`], on which a stop is `NotCompleted` and never `Fails`. So the guard's
 /// scope is the deciders whose stops still surface as `Fails`: the certifying kernel refuses, at
 /// admission, every seal whose clauses reach a decider that does not declare [`StopsAreTyped`].
-/// Host builtins stay in scope until a host declares its own decider's completion (#3506), and so
-/// does any decider on the v1 `decide` alone.
+/// Host builtins stay in scope until a host declares its own decider's completion (#3506).
 ///
-/// **It retires at v2:** ADR 0036 D8 makes `decide_ground` required and deletes `decide`, and this
-/// declaration goes with them.
+/// **It stays in v2** (decided on #3111, 2026-11-12). Checker SPI v2 made `decide_ground` required
+/// and deleted `decide`, so every theory now HAS the typed channel; that does not show a theory
+/// USES it for every stop, and only the theory can say so. Retiring the declaration is not among
+/// ADR 0036 D8's changes.
 ///
 /// The declaration is TYPED and made by the decider about itself, never a predicate list kept
 /// elsewhere. Silence is not the safe answer (research 0025): a decider that declares nothing
@@ -313,7 +302,7 @@ impl std::fmt::Display for DecisionCompletion {
 /// `decide(atom, cfg)`. To keep [`check`](crate::check::check)'s signature stable
 /// via a `Box<dyn Theory>` (object-safe — see §4's `CheckProfile`), the config is
 /// held *inside* the implementing value (closed over at construction) rather than
-/// threaded as an associated type. `decide` therefore takes only the atom; the
+/// threaded as an associated type. `decide_ground` therefore takes only the atom; the
 /// theory is still config-pinned and pure by construction. This realizes the
 /// spec's *intent* (a stable check signature over a config-pinned pure relation);
 /// it adjusts the trait's literal Rust syntax, not its semantics.
@@ -325,31 +314,18 @@ pub trait Theory {
     /// `Builtin` nodes by this; exactly one theory must own each builtin predicate.)
     fn owns(&self, pred: &Symbol) -> bool;
 
-    /// Decide an owned ground atom. Pure / total / deterministic / config-pinned.
+    /// **REQUIRED: decide an owned ground atom, or say it was NOT DECIDED** (#3126; seat:caa's
+    /// rulings of 2026-09-27; required since checker SPI v2, ADR 0036 D8 change 3). Pure / total /
+    /// deterministic / config-pinned. A decider that stops before it establishes a fact (a work
+    /// cap, a capacity) returns `NotCompleted(cause)`, never a false: under negation or in the
+    /// closure check a stop read as `Fails` becomes a false positive (research 0031). An atom this
+    /// theory does not own answers [`TheoryGround::disowned`]. A composite theory FORWARDS to the
+    /// member that owns the predicate.
     ///
-    /// The v1 form, kept for external readers: logos's own readers call
-    /// [`decide_ground`](Self::decide_ground), which can also say "not decided".
-    fn decide(&self, atom: &GroundLiteral) -> TheoryOutcome;
-
-    /// **Decide an owned ground atom, or say it was NOT DECIDED (#3126; seat:caa's rulings of
-    /// 2026-09-27).** A decider that stops before it establishes a fact (a work cap, a capacity)
-    /// returns `NotCompleted(cause)`, never a false: under negation or in the closure check a
-    /// stop read as `Fails` becomes a false positive (research 0031).
-    ///
-    /// **Additive (ADR 0003), defaulted from [`decide`](Self::decide):** `Holds` and `Fails` map
-    /// to the decision, and `NotMine` to the named `inconsistent_theory` fault, so a theory that
-    /// never stops needs no change. A theory that can stop overrides it, and its `decide` then
-    /// answers the stopped case with `NotMine`, never `Fails`, so a legacy reader fails CLOSED.
-    /// A composite theory FORWARDS it to its members rather than taking the default, which would
-    /// read a member's `NotMine` as a fault.
-    ///
-    /// Every logos reader calls this, never `decide`: `check`'s builtin verification, the
-    /// closure's literal truth, and the search registry's ground decision. `check` refuses a
-    /// certificate whose builtin was not decided, in every position. ADR 0036 D8's checker SPI v2
-    /// makes this method required and deletes `decide`.
-    fn decide_ground(&self, atom: &GroundLiteral) -> Completion<TheoryDecision, NoCallerLimit> {
-        ground_from_legacy(self.decide(atom))
-    }
+    /// Every reader calls this: `check`'s builtin verification, the closure's literal truth, and
+    /// the search registry's ground decision. `check` refuses a certificate whose builtin was not
+    /// decided, in every position.
+    fn decide_ground(&self, atom: &GroundLiteral) -> TheoryGround;
 
     /// **REQUIRED: hand back an independent copy of this theory, or DECLARE why not (#1023;
     /// required since #2722 item 1).**
@@ -410,7 +386,7 @@ const COMPOUND_THEORY_PREFIX: &[u8] = b"logos-core/compound-theory/v1\n";
 ///
 /// **Partition discipline (§4.4).** `check` requires exactly one theory to own each
 /// builtin predicate. The members a compound holds MUST own DISJOINT predicate sets; if
-/// two members claim the same predicate, `decide` routes it to the FIRST owner
+/// two members claim the same predicate, `decide_ground` routes it to the FIRST owner
 /// (deterministic, but a mis-binding) — keep the member predicate sets disjoint, as the
 /// standard theories (arithmetic vs text) are by construction.
 ///
@@ -460,28 +436,17 @@ impl Theory for CompoundTheory {
         self.theories.iter().any(|t| t.owns(pred))
     }
 
-    fn decide(&self, atom: &GroundLiteral) -> TheoryOutcome {
-        // Route to the FIRST member that owns the predicate (members own disjoint sets,
-        // so "first" is "the" owner). No member owns it → NotMine — a routing safety net;
-        // `check` routes by `owns`, so a correctly-routed call always finds an owner.
-        for theory in &self.theories {
-            if theory.owns(&atom.pred) {
-                return theory.decide(atom);
-            }
-        }
-        TheoryOutcome::NotMine
-    }
-
-    /// Forwarded to the owning member (#3126), never the default: the default would read a
-    /// member's `NotMine` (the answer a stopping member gives its legacy `decide`) as a fault
-    /// instead of the member's own non-completion.
-    fn decide_ground(&self, atom: &GroundLiteral) -> Completion<TheoryDecision, NoCallerLimit> {
+    /// Route to the FIRST member that owns the predicate (members own disjoint sets, so "first"
+    /// is "the" owner), and forward its answer, a non-completion included. No member owns it:
+    /// [`TheoryGround::disowned`], a routing safety net; `check` routes by `owns`, so a
+    /// correctly-routed call always finds an owner.
+    fn decide_ground(&self, atom: &GroundLiteral) -> TheoryGround {
         for theory in &self.theories {
             if theory.owns(&atom.pred) {
                 return theory.decide_ground(atom);
             }
         }
-        Completion::NotCompleted(NonCompletion::inconsistent_theory())
+        TheoryGround::disowned()
     }
 
     fn identity(&self) -> ComponentIdentity {
@@ -491,7 +456,7 @@ impl Theory for CompoundTheory {
     }
 
     /// #3142: the declaration of the member that DECIDES `pred`, routed exactly as
-    /// [`decide`](Theory::decide) routes (the first owner). A predicate no member owns has no
+    /// [`decide_ground`](Theory::decide_ground) routes (the first owner). A predicate no member owns has no
     /// decider here, so it reads `Undeclared` (fail closed), never a borrowed `StopsAreTyped`.
     fn completion(&self, pred: &Symbol) -> DecisionCompletion {
         match self.theories.iter().find(|theory| theory.owns(pred)) {
@@ -540,11 +505,7 @@ pub fn compound_identity_of(member_identities: &[ComponentIdentity]) -> Componen
     let mut hasher = Sha256::new();
     hasher.update(COMPOUND_THEORY_PREFIX);
     for id in member_identities {
-        hasher.update((id.id.len() as u64).to_be_bytes());
-        hasher.update(&id.id);
-        hasher.update((id.version.len() as u64).to_be_bytes());
-        hasher.update(&id.version);
-        hasher.update(id.config_digest);
+        fold_component_identity(&mut hasher, id);
     }
     let config_digest: [u8; 32] = hasher.finalize().into();
     ComponentIdentity::new(
@@ -552,6 +513,17 @@ pub fn compound_identity_of(member_identities: &[ComponentIdentity]) -> Componen
         b"1.0.0".to_vec(),
         config_digest,
     )
+}
+
+/// Fold one identity into `hasher` as `u64be(len id) ‖ id ‖ u64be(len version) ‖ version ‖
+/// config_digest`: the per-identity layout of [`compound_identity_of`], of a semiring's computed
+/// identity and of a product semiring's declared one, defined once.
+pub(crate) fn fold_component_identity(hasher: &mut Sha256, identity: &ComponentIdentity) {
+    hasher.update((identity.id.len() as u64).to_be_bytes());
+    hasher.update(&identity.id);
+    hasher.update((identity.version.len() as u64).to_be_bytes());
+    hasher.update(&identity.version);
+    hasher.update(identity.config_digest);
 }
 
 /// The consumer-facing **standard gate `Theory`** — a [`CompoundTheory`] over the four
@@ -748,8 +720,8 @@ mod tests {
             fn owns(&self, _pred: &Symbol) -> bool {
                 false
             }
-            fn decide(&self, _atom: &GroundLiteral) -> TheoryOutcome {
-                TheoryOutcome::NotMine
+            fn decide_ground(&self, _atom: &GroundLiteral) -> TheoryGround {
+                TheoryGround::disowned()
             }
         }
         assert_eq!(BareTheory.identity(), ComponentIdentity::unidentified());
@@ -768,8 +740,8 @@ mod tests {
             fn owns(&self, _pred: &Symbol) -> bool {
                 true
             }
-            fn decide(&self, _atom: &GroundLiteral) -> TheoryOutcome {
-                TheoryOutcome::Holds
+            fn decide_ground(&self, _atom: &GroundLiteral) -> TheoryGround {
+                TheoryGround::holds()
             }
             fn identity(&self) -> ComponentIdentity {
                 ComponentIdentity::new(b"demo/lt".to_vec(), b"1.2.0".to_vec(), [7u8; 32])
@@ -807,27 +779,23 @@ mod tests {
                 Value::atom(b"world".to_vec()),
             ],
         );
-        assert_eq!(compound.decide(&hit), TheoryOutcome::Holds);
+        assert_eq!(compound.decide_ground(&hit), TheoryGround::holds());
         let miss = GroundLiteral::new(
             Symbol::new(b"contains".to_vec()),
             [Value::atom(b"abc".to_vec()), Value::atom(b"z".to_vec())],
         );
         assert_eq!(
-            compound.decide(&miss),
-            TheoryOutcome::Fails {
-                code: "text_does_not_hold".into()
-            }
+            compound.decide_ground(&miss),
+            TheoryGround::fails("text_does_not_hold")
         );
         // and an arithmetic goal still routes to the arithmetic member: two non-int
         // atoms make `=:=` not hold, with the arithmetic sub-code (not a text one).
         assert_eq!(
-            compound.decide(&GroundLiteral::new(
+            compound.decide_ground(&GroundLiteral::new(
                 Symbol::new(b"=:=".to_vec()),
                 [Value::atom(b"x".to_vec()), Value::atom(b"y".to_vec())],
             )),
-            TheoryOutcome::Fails {
-                code: "arith_does_not_hold".into()
-            }
+            TheoryGround::fails("arith_does_not_hold")
         );
 
         // identity: the compound id + a digest that commits to membership AND order.

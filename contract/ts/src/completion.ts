@@ -49,7 +49,12 @@ export type ScopedStopKind = "capacity" | "work_cap" | "instantiation";
 /** A stop that is always request-wide: the host refusal channel is sticky for the run. */
 export type RequestStopKind = "host_refusal" | "reply_unreadable";
 
-/** A fault: the evidence is invalid, not merely incomplete. */
+/**
+ * A fault: the evidence is invalid, not merely incomplete. `malformed_outcome` is a value no
+ * constructor could have built, or a host's reply to a declared builtin that is not a value of the
+ * reply type: the host broke its channel's contract (#2734 3e-iii). A well-formed reply nested past
+ * the reader's depth is not this fault: it is the `reply_unreadable` stop, a capacity of the reader.
+ */
 export type FaultKind = "inconsistent_theory" | "malformed_outcome";
 
 /** Why a producer did not decide. */
@@ -364,8 +369,36 @@ export function theoryFails(code: string): TheoryDecision {
 /** The limit vocabulary of a producer no caller's limit reaches (Rust's uninhabited `NoCallerLimit`). */
 export type NoCallerLimit = never;
 
-/** What a theory's `decideGround` returns: its decision, or not completed. */
+/**
+ * What a theory's `decideGround` returns (checker SPI v2, ADR 0036 D8 change 3): its decision, or
+ * NOT DECIDED. `completed(holds)` and `completed(fails(code))` are the decision; `not_completed(cause)`
+ * is a stop before the fact was established (a work cap, a capacity), never a false; and an atom the
+ * theory does not own is the named `inconsistent_theory` fault, {@link TheoryGround.disowned}. A
+ * theory never reaches a caller's limit (`NoCallerLimit`). Rust's `TheoryGround`.
+ */
 export type TheoryGround = Completion<TheoryDecision, NoCallerLimit>;
+
+/** The three answers a theory builds most often, Rust's `TheoryGround::{holds, fails, disowned}`. */
+export const TheoryGround = Object.freeze({
+  /** The atom holds. */
+  holds(): TheoryGround {
+    return completed(theoryHolds);
+  },
+  /**
+   * The theory decided the atom does not hold; `code` is the theory's own name for why (surfaced
+   * under `builtin_failed`).
+   */
+  fails(code: string): TheoryGround {
+    return completed(theoryFails(code));
+  },
+  /**
+   * Not this theory's predicate: the named `inconsistent_theory` fault. `check` routes by
+   * `Theory.owns`, so a correctly-routed call never returns it.
+   */
+  disowned(): TheoryGround {
+    return notCompleted(fault("inconsistent_theory"));
+  },
+});
 
 /**
  * The ONE conversion from a theory's answer to the algebra's `GroundOutcome` (#3126, seat:caa's

@@ -24,7 +24,7 @@ import {
   newTextTheory,
   Symbol,
   type Theory,
-  TheoryOutcome,
+  TheoryGround,
 } from "../src/index.js";
 
 interface CompletionRow {
@@ -52,8 +52,8 @@ class DeclaresNothing implements Theory {
   owns(pred: Symbol): boolean {
     return pred.equals(Symbol.of("p"));
   }
-  decide(_atom: GroundLiteral): TheoryOutcome {
-    return TheoryOutcome.Holds;
+  decideGround(_atom: GroundLiteral): TheoryGround {
+    return TheoryGround.holds();
   }
 }
 
@@ -67,8 +67,8 @@ class StopsUntyped implements Theory {
   owns(pred: Symbol): boolean {
     return pred.equals(Symbol.of("q"));
   }
-  decide(_atom: GroundLiteral): TheoryOutcome {
-    return TheoryOutcome.Holds;
+  decideGround(_atom: GroundLiteral): TheoryGround {
+    return TheoryGround.holds();
   }
   completion(_pred: Symbol): DecisionCompletion {
     const utf8 = new TextEncoder();

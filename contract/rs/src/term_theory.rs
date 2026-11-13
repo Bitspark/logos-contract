@@ -10,7 +10,7 @@
 //! is therefore a shared, certifiable artifact rather than a search-only Rust builtin.
 //!
 //! The search-side builtins (`logos_core::builtins::{builtin_atom, …, builtin_order_lt,
-//! …}`) stay in `core` as the fast path over `Term`/`Subst`; this `decide` reproduces
+//! …}`) stay in `core` as the fast path over `Term`/`Subst`; this `decide_ground` reproduces
 //! them byte-for-byte over the SAME structure — the §7 dual-conformance law, pinned by
 //! `vectors/term.json` and mirrored tri-core (`contract/{go,ts}`). To guarantee that, the
 //! standard order itself ([`compare_values`]) lives HERE and is the single source `core`'s
@@ -22,7 +22,7 @@
 //! Ground terms are an `ontos::Value = Atom(Bytes) | Tuple(Value*)` — there is **no
 //! `Var`** in a ground atom (a `Var` is logos's sole non-ground addition). The full
 //! standard order over *all* terms is `Var < Atom < Tuple`; restricted to the ground
-//! terms a `decide` ever sees it is just
+//! terms a `decide_ground` ever sees it is just
 //!
 //! ```text
 //! Atom  <  Tuple
@@ -47,7 +47,7 @@
 //!
 //! `owns(pred)`: by NAME only (any arity) — the five recognizers, the six comparisons,
 //! univ, and (since `1.1.0`, #1611) unification and the control constants.
-//! `decide(atom)` on a ground atom: a non-UTF-8 predicate → `Fails{term_unknown_predicate}`
+//! `decide_ground(atom)` on a ground atom: a non-UTF-8 predicate → `Fails{term_unknown_predicate}`
 //! (defensive); an owned name at the wrong arity (a recognizer not at arity 1, a
 //! comparison not at arity 2, a control constant not at arity 0) → `Fails{term_bad_arity}`;
 //! the relation true → `Holds`; the relation false → `Fails{term_does_not_hold}`.
@@ -63,7 +63,7 @@
 //! HERE with ground semantics: on ground terms syntactic unification coincides with structural
 //! equality, so `t = u` holds iff `compare_values(t, u) == Equal` and `t \= u` holds iff they
 //! differ; `true` holds; `fail` and `false` never hold. A non-ground atom cannot reach
-//! `decide` (it takes a `GroundLiteral`), so there is no NotMine arm for an unbound `=`.
+//! `decide_ground` (it takes a `GroundLiteral`), so there is no NotMine arm for an unbound `=`.
 
 use std::cmp::Ordering;
 
@@ -71,7 +71,7 @@ use ontos_core::Value;
 
 use crate::decval::BigDecimal;
 use crate::intval::BigInt;
-use crate::{ComponentIdentity, GroundLiteral, Symbol, Term, Theory, TheoryOutcome};
+use crate::{ComponentIdentity, GroundLiteral, Symbol, Term, Theory, TheoryGround};
 
 /// The list-cons functor `.`/2 (`[H|T]` = `Tuple[Atom("."), H, T]`) and nil `[]`.
 const CONS_FUNCTOR: &[u8] = b".";
@@ -264,20 +264,16 @@ impl Theory for TermTheory {
         crate::spi::DecisionCompletion::StopsAreTyped
     }
 
-    fn decide(&self, atom: &GroundLiteral) -> TheoryOutcome {
+    fn decide_ground(&self, atom: &GroundLiteral) -> TheoryGround {
         // Not one of ours: a routing safety net (`check` routes by `owns`, so this is
         // unreachable on a correctly-routed call — but stay total).
         if !owns_name(&atom.pred) {
-            return TheoryOutcome::NotMine;
+            return TheoryGround::disowned();
         }
         let name = match std::str::from_utf8(atom.pred.bytes()) {
             Ok(name) => name,
             // A non-UTF-8 predicate cannot be a registered term relation.
-            Err(_) => {
-                return TheoryOutcome::Fails {
-                    code: "term_unknown_predicate".into(),
-                }
-            }
+            Err(_) => return TheoryGround::fails("term_unknown_predicate"),
         };
         match name {
             // A0 recognizers (arity 1).
@@ -307,9 +303,7 @@ impl Theory for TermTheory {
             "fail" | "false" => decide_control(&atom.args, false),
             // Owned name routed here but not handled above — unreachable (the name set is
             // exactly the match arms above), but stay total.
-            _ => TheoryOutcome::Fails {
-                code: "term_does_not_hold".into(),
-            },
+            _ => TheoryGround::fails("term_does_not_hold"),
         }
     }
 }
@@ -326,53 +320,41 @@ fn is_number(value: &Value) -> bool {
 
 /// Decide an arity-1 recognizer: arity must be 1; then `test(arg0)`. A non-1 arity has no
 /// such relation (`term_bad_arity`); a false test is `term_does_not_hold`.
-fn decide_recognizer(args: &[Value], test: impl Fn(&Value) -> bool) -> TheoryOutcome {
+fn decide_recognizer(args: &[Value], test: impl Fn(&Value) -> bool) -> TheoryGround {
     if args.len() != 1 {
-        return TheoryOutcome::Fails {
-            code: "term_bad_arity".into(),
-        };
+        return TheoryGround::fails("term_bad_arity");
     }
     if test(&args[0]) {
-        TheoryOutcome::Holds
+        TheoryGround::holds()
     } else {
-        TheoryOutcome::Fails {
-            code: "term_does_not_hold".into(),
-        }
+        TheoryGround::fails("term_does_not_hold")
     }
 }
 
 /// Decide an arity-2 standard-order comparison: arity must be 2; then accept iff
 /// `accept(compare_values(arg0, arg1))`. A non-2 arity has no such relation
 /// (`term_bad_arity`); a false comparison is `term_does_not_hold`.
-fn decide_comparison(args: &[Value], accept: impl Fn(Ordering) -> bool) -> TheoryOutcome {
+fn decide_comparison(args: &[Value], accept: impl Fn(Ordering) -> bool) -> TheoryGround {
     if args.len() != 2 {
-        return TheoryOutcome::Fails {
-            code: "term_bad_arity".into(),
-        };
+        return TheoryGround::fails("term_bad_arity");
     }
     if accept(compare_values(&args[0], &args[1])) {
-        TheoryOutcome::Holds
+        TheoryGround::holds()
     } else {
-        TheoryOutcome::Fails {
-            code: "term_does_not_hold".into(),
-        }
+        TheoryGround::fails("term_does_not_hold")
     }
 }
 
 /// Decide an arity-0 control constant (#1611): arity must be 0 (`term_bad_arity`
 /// otherwise); then `true` holds and `fail`/`false` are `term_does_not_hold`.
-fn decide_control(args: &[Value], holds: bool) -> TheoryOutcome {
+fn decide_control(args: &[Value], holds: bool) -> TheoryGround {
     if !args.is_empty() {
-        return TheoryOutcome::Fails {
-            code: "term_bad_arity".into(),
-        };
+        return TheoryGround::fails("term_bad_arity");
     }
     if holds {
-        TheoryOutcome::Holds
+        TheoryGround::holds()
     } else {
-        TheoryOutcome::Fails {
-            code: "term_does_not_hold".into(),
-        }
+        TheoryGround::fails("term_does_not_hold")
     }
 }
 
@@ -411,28 +393,23 @@ fn univ_list_of(value: &Value) -> Option<Value> {
 /// the univ image of `T` (`compare_values == Equal ⟺ structural equality`). A `T` that is
 /// not a labeled compound / atom ⇒ `univ_not_callable`; a mismatched `L` ⇒ `univ_mismatch`.
 /// Pure / total / deterministic over the ground args, like every term-theory decision.
-fn decide_univ(args: &[Value]) -> TheoryOutcome {
+fn decide_univ(args: &[Value]) -> TheoryGround {
     if args.len() != 2 {
-        return TheoryOutcome::Fails {
-            code: "term_bad_arity".into(),
-        };
+        return TheoryGround::fails("term_bad_arity");
     }
     match univ_list_of(&args[0]) {
         Some(expected) if compare_values(&args[1], &expected) == Ordering::Equal => {
-            TheoryOutcome::Holds
+            TheoryGround::holds()
         }
-        Some(_) => TheoryOutcome::Fails {
-            code: "univ_mismatch".into(),
-        },
-        None => TheoryOutcome::Fails {
-            code: "univ_not_callable".into(),
-        },
+        Some(_) => TheoryGround::fails("univ_mismatch"),
+        None => TheoryGround::fails("univ_not_callable"),
     }
 }
 
 #[cfg(test)]
 mod univ_tests {
     use super::*;
+    use crate::completion::{Completion, TheoryDecision};
     use crate::GroundLiteral;
     use ontos_core::Value;
 
@@ -445,15 +422,15 @@ mod univ_tests {
         let theory = TermTheory::new();
         let t = Value::tuple([a(b"f"), a(b"a"), a(b"b")]);
         let list = value_cons_list(&[a(b"f"), a(b"a"), a(b"b")]);
-        assert!(matches!(
-            theory.decide(&GroundLiteral::new("=..", [t.clone(), list])),
-            TheoryOutcome::Holds
-        ));
+        assert_eq!(
+            theory.decide_ground(&GroundLiteral::new("=..", [t.clone(), list])),
+            TheoryGround::holds()
+        );
         // A wrong functor in the list rejects.
         let wrong = value_cons_list(&[a(b"g"), a(b"a"), a(b"b")]);
         assert!(matches!(
-            theory.decide(&GroundLiteral::new("=..", [t, wrong])),
-            TheoryOutcome::Fails { .. }
+            theory.decide_ground(&GroundLiteral::new("=..", [t, wrong])),
+            Completion::Completed(TheoryDecision::Fails { .. })
         ));
     }
 
@@ -461,18 +438,18 @@ mod univ_tests {
     fn univ_atom_is_arity_zero_singleton() {
         let theory = TermTheory::new();
         let list = value_cons_list(&[a(b"x")]);
-        assert!(matches!(
-            theory.decide(&GroundLiteral::new("=..", [a(b"x"), list])),
-            TheoryOutcome::Holds
-        ));
+        assert_eq!(
+            theory.decide_ground(&GroundLiteral::new("=..", [a(b"x"), list])),
+            TheoryGround::holds()
+        );
     }
 
     #[test]
     fn univ_wrong_arity_fails() {
         let theory = TermTheory::new();
         assert!(matches!(
-            theory.decide(&GroundLiteral::new("=..", [a(b"x")])),
-            TheoryOutcome::Fails { .. }
+            theory.decide_ground(&GroundLiteral::new("=..", [a(b"x")])),
+            Completion::Completed(TheoryDecision::Fails { .. })
         ));
     }
 }

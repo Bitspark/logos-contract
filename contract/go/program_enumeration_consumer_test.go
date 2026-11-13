@@ -39,7 +39,7 @@ func TestLookupOnlyProgramChecksACitedPositiveRule(t *testing.T) {
 	proof := contract.NewDerivation([]contract.Node{contract.RuleNode{Conc: claim, Clause: id}}, 0)
 	got := contract.Check(lookupOnlyProgram(p.Clause), claim, proof, struct{}{}, bindingContext().profile)
 	if !got.IsAccept() {
-		t.Fatalf("positive rule lookup: %s %s", got.Code().Code(), got.Detail())
+		t.Fatalf("positive rule lookup: %s %s", got.Verdict.Code().Code(), got.Verdict.Detail())
 	}
 }
 
@@ -77,8 +77,8 @@ func TestClosureRequiresTheCompleteTrustedClauseSet(t *testing.T) {
 			cert.ProgramHash = tc.hash
 			cx := contract.NewCertContext(tc.hash, f.context.ProfileHash, f.context.CtxHash, f.context.TheoryConfigHash)
 			out := contract.CheckClosedModelChain(tc.program, []contract.ClosedModelCert{cert}, struct{}{}, f.profile, cx)
-			if out.IsAccept() != tc.accept || (!tc.accept && out.Code() != tc.code) {
-				t.Fatalf("accept=%v, code=%s, detail=%s", out.IsAccept(), out.Code().Code(), out.Detail())
+			if out.IsAccept() != tc.accept || (!tc.accept && out.Verdict.Code() != tc.code) {
+				t.Fatalf("accept=%v, code=%s, detail=%s", out.IsAccept(), out.Verdict.Code().Code(), out.Verdict.Detail())
 			}
 		})
 	}

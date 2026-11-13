@@ -11,7 +11,7 @@
 // # Partition discipline (§4.4)
 //
 // check requires exactly one theory to own each builtin predicate. The members a compound
-// holds MUST own DISJOINT predicate sets; if two members claim the same predicate, Decide
+// holds MUST own DISJOINT predicate sets; if two members claim the same predicate, DecideGround
 // routes it to the FIRST owner (deterministic, but a mis-binding) — keep the member
 // predicate sets disjoint, as the standard theories (arithmetic vs text) are by
 // construction.
@@ -28,6 +28,7 @@ package contract
 import (
 	"crypto/sha256"
 	"encoding/binary"
+	"hash"
 
 	"github.com/Bitspark/logos-contract/contract/go/completion"
 )
@@ -90,26 +91,10 @@ func (c CompoundTheory) Owns(pred Symbol) bool {
 	return false
 }
 
-// Decide routes the atom to the FIRST member that owns its predicate (members own
-// disjoint sets, so "first" is "the" owner). No member owns it → TheoryNotMine — a
-// routing safety net; check routes by Owns, so a correctly-routed call always finds an
-// owner. Mirrors Rust's CompoundTheory::decide.
-func (c CompoundTheory) Decide(atom GroundLiteral) TheoryOutcome {
-	for _, t := range c.theories {
-		if t.Owns(atom.Pred) {
-			return t.Decide(atom)
-		}
-	}
-	return TheoryNotMine{}
-}
-
-// compile-time proof that the compound forwards the #3126 ground verdict.
-var _ GroundDecider = CompoundTheory{}
-
-// DecideGround forwards to the FIRST member that owns the atom's predicate (#3126), through that
-// member's own ground verdict, never the default: the default would read a member's TheoryNotMine
-// (the answer a stopping member gives its legacy Decide) as a fault instead of the member's own
-// non-completion. No member owns it: the inconsistent_theory fault. Mirrors Rust's
+// DecideGround routes the atom to the FIRST member that owns its predicate (members own disjoint
+// sets, so "first" is "the" owner), and forwards that member's ground verdict, a non-completion
+// included (#3126). No member owns it: completion.TheoryGroundDisowned, a routing safety net; check
+// routes by Owns, so a correctly-routed call always finds an owner. Mirrors Rust's
 // CompoundTheory::decide_ground.
 func (c CompoundTheory) DecideGround(atom GroundLiteral) completion.TheoryGround {
 	for _, t := range c.theories {
@@ -117,7 +102,7 @@ func (c CompoundTheory) DecideGround(atom GroundLiteral) completion.TheoryGround
 			return DecideGround(t, atom)
 		}
 	}
-	return completion.NotCompleted[completion.TheoryDecision, completion.NoCallerLimit](completion.InconsistentTheory())
+	return completion.TheoryGroundDisowned()
 }
 
 // Identity reports logos-core/compound-theory@1.0.0 with a config digest that commits to
@@ -165,19 +150,27 @@ func (c CompoundTheory) Identity() ComponentIdentity {
 func CompoundIdentityOf(memberIdentities []ComponentIdentity) ComponentIdentity {
 	h := sha256.New()
 	h.Write(compoundTheoryPrefix)
-	lenBuf := make([]byte, 8)
 	for _, id := range memberIdentities {
-		binary.BigEndian.PutUint64(lenBuf, uint64(len(id.Id)))
-		h.Write(lenBuf)
-		h.Write(id.Id)
-		binary.BigEndian.PutUint64(lenBuf, uint64(len(id.Version)))
-		h.Write(lenBuf)
-		h.Write(id.Version)
-		h.Write(id.ConfigDigest[:])
+		writeIdentityMember(h, id)
 	}
 	var digest [32]byte
 	copy(digest[:], h.Sum(nil))
 	return NewComponentIdentity([]byte("logos-core/compound-theory"), []byte("1.0.0"), digest)
+}
+
+// writeIdentityMember writes one member's identity to h in the layout a composite's digest folds:
+// u64be(len id) ‖ id ‖ u64be(len version) ‖ version ‖ config digest. CompoundIdentityOf folds each
+// member this way, and the product semiring each member's computed identity (#1821), so the two
+// share one encoding.
+func writeIdentityMember(h hash.Hash, id ComponentIdentity) {
+	lenBuf := make([]byte, 8)
+	binary.BigEndian.PutUint64(lenBuf, uint64(len(id.Id)))
+	h.Write(lenBuf)
+	h.Write(id.Id)
+	binary.BigEndian.PutUint64(lenBuf, uint64(len(id.Version)))
+	h.Write(lenBuf)
+	h.Write(id.Version)
+	h.Write(id.ConfigDigest[:])
 }
 
 // identityOf reports a member's identity, mirroring Rust's defaulted Theory::identity():
